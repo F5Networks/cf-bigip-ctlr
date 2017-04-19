@@ -10,9 +10,9 @@ import (
 	"github.com/cloudfoundry/dropsonde/logs"
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/logger"
 
 	"os"
 )

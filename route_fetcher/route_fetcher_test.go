@@ -7,12 +7,12 @@ import (
 
 	"code.cloudfoundry.org/clock/fakeclock"
 
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
-	testRegistry "code.cloudfoundry.org/gorouter/registry/fakes"
-	"code.cloudfoundry.org/gorouter/route"
-	. "code.cloudfoundry.org/gorouter/route_fetcher"
-	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/logger"
+	testRegistry "github.com/cf-bigip-ctlr/registry/fakes"
+	"github.com/cf-bigip-ctlr/route"
+	. "github.com/cf-bigip-ctlr/route_fetcher"
+	"github.com/cf-bigip-ctlr/test_util"
 	"code.cloudfoundry.org/routing-api"
 	fake_routing_api "code.cloudfoundry.org/routing-api/fake_routing_api"
 	"code.cloudfoundry.org/routing-api/models"

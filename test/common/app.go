@@ -1,8 +1,8 @@
 package common
 
 import (
-	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/common/uuid"
+	"github.com/cf-bigip-ctlr/route"
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/gomega"

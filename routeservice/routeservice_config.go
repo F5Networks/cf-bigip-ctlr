@@ -9,9 +9,9 @@ import (
 
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/routeservice/header"
+	"github.com/cf-bigip-ctlr/common/secure"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/routeservice/header"
 )
 
 const (

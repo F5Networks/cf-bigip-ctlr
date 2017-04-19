@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"code.cloudfoundry.org/gorouter/proxy/round_tripper"
+	"github.com/cf-bigip-ctlr/proxy/round_tripper"
 )
 
 type FakeProxyRoundTripper struct {

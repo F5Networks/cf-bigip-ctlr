@@ -5,12 +5,12 @@ import (
 	"os"
 	"sync/atomic"
 
-	"code.cloudfoundry.org/gorouter/common"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/mbus"
-	"code.cloudfoundry.org/gorouter/registry/fakes"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/cf-bigip-ctlr/common"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/mbus"
+	"github.com/cf-bigip-ctlr/registry/fakes"
+	"github.com/cf-bigip-ctlr/route"
+	"github.com/cf-bigip-ctlr/test_util"
 
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"

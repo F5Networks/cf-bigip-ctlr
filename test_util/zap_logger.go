@@ -3,7 +3,7 @@ package test_util
 import (
 	"strings"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/cf-bigip-ctlr/logger"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/uber-go/zap"

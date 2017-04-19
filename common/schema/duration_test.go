@@ -1,7 +1,7 @@
 package schema_test
 
 import (
-	"code.cloudfoundry.org/gorouter/common/schema"
+	"github.com/cf-bigip-ctlr/common/schema"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 

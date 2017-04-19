@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/common/uuid"
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/cf-bigip-ctlr/common/uuid"
+	"github.com/cf-bigip-ctlr/logger"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )

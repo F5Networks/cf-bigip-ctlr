@@ -5,9 +5,9 @@ import (
 	"io"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/proxy"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test/common"
+	"github.com/cf-bigip-ctlr/proxy"
+	"github.com/cf-bigip-ctlr/route"
+	"github.com/cf-bigip-ctlr/test/common"
 	"github.com/nats-io/nats"
 )
 

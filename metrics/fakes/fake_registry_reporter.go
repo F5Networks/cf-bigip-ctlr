@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics"
+	"github.com/cf-bigip-ctlr/metrics"
 )
 
 type FakeRouteRegistryReporter struct {

@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"code.cloudfoundry.org/gorouter/common"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/common"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/route"
 	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/routing-api/models"
 

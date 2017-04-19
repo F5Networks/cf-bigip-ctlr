@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"os/user"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
+	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/codegangsta/cli"
 )
 

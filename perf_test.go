@@ -4,21 +4,21 @@ import (
 	"crypto/tls"
 	"strconv"
 
-	"code.cloudfoundry.org/gorouter/access_log"
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy"
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/routeservice"
-	"code.cloudfoundry.org/gorouter/test_util"
-	"code.cloudfoundry.org/gorouter/varz"
+	"github.com/cf-bigip-ctlr/access_log"
+	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/proxy"
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/route"
+	"github.com/cf-bigip-ctlr/routeservice"
+	"github.com/cf-bigip-ctlr/test_util"
+	"github.com/cf-bigip-ctlr/varz"
 	"code.cloudfoundry.org/routing-api/models"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"github.com/cf-bigip-ctlr/metrics/fakes"
 )
 
 var _ = Describe("AccessLogRecord", func() {

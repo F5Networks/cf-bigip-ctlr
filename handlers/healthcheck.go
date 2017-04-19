@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/cf-bigip-ctlr/logger"
 )
 
 type healthcheck struct {

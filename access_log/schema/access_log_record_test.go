@@ -3,11 +3,11 @@ package schema_test
 import (
 	"bytes"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/handlers"
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	"github.com/cf-bigip-ctlr/handlers"
 	"code.cloudfoundry.org/routing-api/models"
 
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 

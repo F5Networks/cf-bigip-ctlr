@@ -1,0 +1,82 @@
+variables:
+  baseimg: "docker-regisry.pdbld.f5net.com/${CI_PROJECT_NAMESPACE}/cf-bigip-ctlr"
+
+before_script:
+  - 'if [ "$CI_BUILD_STAGE" != "deploy" ] && [ "$(id -u)" == "0" ]; then'
+  # Only run if in a container
+  # Use apt-cache server to speed things up
+  - echo -e "Acquire::HTTP::Proxy \"http://apt-cache.pdbld.f5net.com:3142\";\nAcquire::HTTPS::Proxy \"false\";" > /etc/apt/apt.conf.d/01proxy
+  - fi
+  # Install ssh-agent if not already installed, it is required by Docker.
+  # (change apt-get to yum if you use a CentOS-based image)
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+
+  # Run ssh-agent (inside the build environment)
+  - eval $(ssh-agent -s)
+  # Add the SSH key stored in TESTLAB_CI_SSH_PRIVATE_KEY variable to the agent store
+  - ssh-add <(echo "$TESTLAB_CI_SSH_PRIVATE_KEY")
+  - echo 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $*' > /tmp/ssh
+  - chmod a+x /tmp/ssh
+  - export GIT_SSH=/tmp/ssh
+
+stages:
+  - sanity
+  - build
+
+sanity verification:
+  image: "golang:1.7.5"
+  stage: sanity
+  tags:
+    - docker
+  script:
+    - make verify
+
+attributions generator:
+  image: docker-registry.pdbld.f5net.com/velcro/attributions-generator:master
+  stage: sanity
+  script:
+    - /usr/local/bin/run-backends.sh $PWD
+    - node /frontEnd/frontEnd.js $PWD
+  tags:
+    - docker
+  artifacts:
+    paths:
+      - Licence_generated.json
+      - flatfile_attributions.json
+      - golang_attributions.json
+      - pip_attributions.json
+      - ATTRIBUTIONS.md
+
+release build and unit test:
+  image: "golang:1.7.5"
+  stage: build
+  tags:
+    - docker
+  script:
+    - go-wrapper download
+    - cd $GOPATH/src/github.com/cf-bigip-ctlr
+    - go get -v github.com/wadey/gocovmerge
+    - go get -v github.com/nats-io/gnatsd
+    - make release
+  artifacts:
+    paths:
+      - coverage.out
+      - coverage.html
+
+# The official alpine image doesn't support race.
+# Use a different build env for debug
+debug build and unit test:
+  image: "golang:1.7.5"
+  stage: build
+  tags:
+    - docker
+  script:
+    - go-wrapper download
+    - cd $GOPATH/src/github.com/cf-bigip-ctlr
+    - go get -v github.com/wadey/gocovmerge
+    - go get -v github.com/nats-io/gnatsd
+    - make debug
+  artifacts:
+    paths:
+      - coverage.out
+      - coverage.html

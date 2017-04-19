@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/route"
 )
 
 // Deprecated: this interface is marked for removal. It should be removed upon

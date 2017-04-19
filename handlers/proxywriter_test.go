@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"code.cloudfoundry.org/gorouter/handlers"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/cf-bigip-ctlr/handlers"
+	"github.com/cf-bigip-ctlr/proxy/utils"
+	"github.com/cf-bigip-ctlr/test_util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

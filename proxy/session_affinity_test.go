@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/proxy"
-	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/cf-bigip-ctlr/proxy"
+	"github.com/cf-bigip-ctlr/test_util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

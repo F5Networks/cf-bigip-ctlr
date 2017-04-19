@@ -1,13 +1,13 @@
 package varz_test
 
 import (
-	"code.cloudfoundry.org/gorouter/config"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test_util"
-	. "code.cloudfoundry.org/gorouter/varz"
+	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/metrics/fakes"
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/route"
+	"github.com/cf-bigip-ctlr/test_util"
+	. "github.com/cf-bigip-ctlr/varz"
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
