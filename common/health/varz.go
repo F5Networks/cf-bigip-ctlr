@@ -1,7 +1,7 @@
 package health
 
 import (
-	"code.cloudfoundry.org/gorouter/common/schema"
+	"github.com/cf-bigip-ctlr/common/schema"
 	"encoding/json"
 	"sync"
 )

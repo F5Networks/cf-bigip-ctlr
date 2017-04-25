@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/metrics/fakes"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/metrics/fakes"
 	"code.cloudfoundry.org/routing-api/models"
 
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/route"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

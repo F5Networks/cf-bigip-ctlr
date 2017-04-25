@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/proxy/utils"
 
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"

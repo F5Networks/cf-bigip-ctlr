@@ -7,11 +7,11 @@ import (
 
 	"fmt"
 
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
+	router_http "github.com/cf-bigip-ctlr/common/http"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/route"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )

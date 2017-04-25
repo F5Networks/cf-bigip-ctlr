@@ -5,12 +5,12 @@ import (
 	"errors"
 	"net/http"
 
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/routeservice"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/routeservice"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/route"
 )
 
 type routeService struct {

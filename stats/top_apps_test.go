@@ -1,7 +1,7 @@
 package stats_test
 
 import (
-	. "code.cloudfoundry.org/gorouter/stats"
+	. "github.com/cf-bigip-ctlr/stats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 

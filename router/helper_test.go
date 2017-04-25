@@ -1,8 +1,8 @@
 package router_test
 
 import (
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/test/common"
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/test/common"
 
 	"net"
 	"time"

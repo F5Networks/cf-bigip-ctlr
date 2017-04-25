@@ -7,9 +7,9 @@ import (
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/cf-bigip-ctlr/logger"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
+	"github.com/cf-bigip-ctlr/common/secure"
 )
 
 const (

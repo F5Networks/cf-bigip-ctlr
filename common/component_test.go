@@ -1,10 +1,10 @@
 package common_test
 
 import (
-	. "code.cloudfoundry.org/gorouter/common"
-	"code.cloudfoundry.org/gorouter/common/health"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/test_util"
+	. "github.com/cf-bigip-ctlr/common"
+	"github.com/cf-bigip-ctlr/common/health"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/test_util"
 	"github.com/nats-io/nats"
 
 	"code.cloudfoundry.org/localip"

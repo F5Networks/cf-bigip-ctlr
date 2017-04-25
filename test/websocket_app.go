@@ -9,9 +9,9 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/test/common"
-	"code.cloudfoundry.org/gorouter/test_util"
+	"github.com/cf-bigip-ctlr/route"
+	"github.com/cf-bigip-ctlr/test/common"
+	"github.com/cf-bigip-ctlr/test_util"
 )
 
 func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *common.TestApp {

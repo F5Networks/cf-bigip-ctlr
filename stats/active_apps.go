@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/stats/container"
+	"github.com/cf-bigip-ctlr/stats/container"
 )
 
 const (

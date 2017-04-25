@@ -1,7 +1,7 @@
 package http_test
 
 import (
-	. "code.cloudfoundry.org/gorouter/common/http"
+	. "github.com/cf-bigip-ctlr/common/http"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 

@@ -13,12 +13,12 @@ import (
 
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	router_http "code.cloudfoundry.org/gorouter/common/http"
-	"code.cloudfoundry.org/gorouter/logger"
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	router_http "github.com/cf-bigip-ctlr/common/http"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/proxy/utils"
+	"github.com/cf-bigip-ctlr/route"
 )
 
 const (

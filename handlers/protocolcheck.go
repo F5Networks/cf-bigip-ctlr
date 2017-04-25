@@ -8,8 +8,8 @@ import (
 
 	"fmt"
 
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/logger"
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	"github.com/cf-bigip-ctlr/logger"
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )

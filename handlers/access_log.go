@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/access_log"
-	"code.cloudfoundry.org/gorouter/access_log/schema"
-	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"github.com/cf-bigip-ctlr/access_log"
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	"github.com/cf-bigip-ctlr/proxy/utils"
 
 	"github.com/urfave/negroni"
 )

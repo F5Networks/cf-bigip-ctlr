@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"code.cloudfoundry.org/gorouter/common/schema"
+	"github.com/cf-bigip-ctlr/common/schema"
 	"code.cloudfoundry.org/lager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

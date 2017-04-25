@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"code.cloudfoundry.org/gorouter/common/secure"
+	"github.com/cf-bigip-ctlr/common/secure"
 )
 
 type FakeCrypto struct {

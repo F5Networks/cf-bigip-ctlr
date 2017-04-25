@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/negroni"
 
-	"code.cloudfoundry.org/gorouter/proxy/utils"
+	"github.com/cf-bigip-ctlr/proxy/utils"
 )
 
 type proxyWriterHandler struct{}

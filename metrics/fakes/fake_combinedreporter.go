@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/metrics"
-	"code.cloudfoundry.org/gorouter/route"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/route"
 )
 
 type FakeCombinedReporter struct {

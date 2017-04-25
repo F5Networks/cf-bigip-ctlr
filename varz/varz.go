@@ -6,9 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"code.cloudfoundry.org/gorouter/registry"
-	"code.cloudfoundry.org/gorouter/route"
-	"code.cloudfoundry.org/gorouter/stats"
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/route"
+	"github.com/cf-bigip-ctlr/stats"
 	metrics "github.com/rcrowley/go-metrics"
 )
 

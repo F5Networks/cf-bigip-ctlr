@@ -3,7 +3,7 @@
 # GoRouter
 This repository contains the source code for the Cloud Foundry L7 HTTP router. GoRouter is deployed by default with Cloud Foundry ([cf-release](https://github.com/cloudfoundry/cf-release)) which includes [routing-release](https://github.com/cloudfoundry-incubator/routing-release) as submodule.
 
-**Note**: This repository should be imported as `code.cloudfoundry.org/gorouter`.
+**Note**: This repository should be imported as `github.com/cf-bigip-ctlr`.
 
 ## Development
 
@@ -24,7 +24,7 @@ GoRouter is part of [routing-release](https://github.com/cloudfoundry-incubator/
 git clone https://github.com/cloudfoundry-incubator/routing-release
 cd routing-release
 ./scripts/update
-cd src/code.cloudfoundry.org/gorouter
+cd src/github.com/cf-bigip-ctlr
 ```
  *Note: direnv will automatically set your GOPATH when you cd into the routing-release directory. You will need to run `direnv allow` the first time.*
 

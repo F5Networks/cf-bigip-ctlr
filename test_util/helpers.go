@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"code.cloudfoundry.org/gorouter/config"
+	"github.com/cf-bigip-ctlr/config"
 
 	"time"
 

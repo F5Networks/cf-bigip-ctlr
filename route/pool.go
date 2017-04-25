@@ -9,7 +9,7 @@ import (
 
 	"github.com/uber-go/zap"
 
-	"code.cloudfoundry.org/gorouter/config"
+	"github.com/cf-bigip-ctlr/config"
 	"code.cloudfoundry.org/routing-api/models"
 )
 
