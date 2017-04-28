@@ -1,0 +1,51 @@
+applications:
+  - name: cf-bigip-ctlr
+    env:
+      BIGIP_CTLR_CFG: |
+                      bigip:
+                        url: https://10.190.24.32
+                        user: admin
+                        pass: admin
+                        partition: test
+                        balance: round-robin
+
+                      status:
+                        port: 8087
+                        user: admin
+                        pass: admin
+                      nats:
+                        - host: local.pcfdev.io
+                          port: 4222
+                          user: nats
+                          pass: "nats"
+
+                      logging:
+                        file: /tmp/cf-bigip.ctlr.log
+                        syslog: vcap.cf-bigip-ctlr
+                        level: debug
+                        loggregator_enabled: false
+                        metron_address:
+
+                      go_max_procs: -1
+                      prune_stale_droplets_interval: 30s
+                      droplet_stale_threshold: 120s
+                      suspend_pruning_if_nats_unavailable: false
+
+                      oauth:
+                        token_endpoint: uaa.local.pcfdev.io
+                        client_name: "gorouter"
+                        client_secret: gorouter-secret
+                        port: 443
+                        skip_ssl_validation: true
+                        ca_certs:
+
+                      routing_api:
+                        uri: http://api.local.pcfdev.io
+                        port: 80
+                        auth_disabled: false
+
+                      start_response_delay_interval: 20s
+
+                      token_fetcher_max_retries: 3
+                      token_fetcher_retry_interval: 5s
+                      token_fetcher_expiration_buffer_time: 30

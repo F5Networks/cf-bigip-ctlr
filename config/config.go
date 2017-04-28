@@ -26,6 +26,14 @@ type StatusConfig struct {
 	Pass string `yaml:"pass"`
 }
 
+type BigIPConfig struct {
+	Url       string `yaml:"url"`
+	User      string `yaml:"user"`
+	Pass      string `yaml:"pass"`
+	Partition string `yaml:"partition"`
+	Balance   string `yaml:"balance"`
+}
+
 var defaultStatusConfig = StatusConfig{
 	Host: "0.0.0.0",
 	Port: 8082,
@@ -87,6 +95,7 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type Config struct {
+	BigIP                    BigIPConfig   `yaml:"bigip"`
 	Status                   StatusConfig  `yaml:"status"`
 	Nats                     []NatsConfig  `yaml:"nats"`
 	Logging                  LoggingConfig `yaml:"logging"`
