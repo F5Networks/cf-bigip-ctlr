@@ -49,17 +49,27 @@ var configFile string
 var healthCheck int32
 
 func main() {
-	flag.StringVar(&configFile, "c", "", "Configuration File")
-	flag.Parse()
+	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
+	if !ok {
+		flag.StringVar(&configFile, "c", "", "Configuration File")
+		flag.Parse()
+	}
 
 	c := config.DefaultConfig()
 	logCounter := schema.NewLogCounter()
 
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
+	} else {
+		e := c.Initialize([]byte(val))
+		if e != nil {
+			panic(e.Error())
+		}
+
+		c.Process()
 	}
 
-	prefix := "gorouter.stdout"
+	prefix := "cf-bigip-ctlr.stdout"
 	if c.Logging.Syslog != "" {
 		prefix = c.Logging.Syslog
 	}
@@ -69,7 +79,7 @@ func main() {
 
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
-		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
+		logger.Error("dropsonde-initialize-error", zap.Error(err))
 	}
 
 	// setup number of procs
