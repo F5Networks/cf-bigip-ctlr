@@ -4,12 +4,11 @@ import (
 	"encoding/hex"
 	"net/http"
 
-	"github.com/uber-go/zap"
-	"github.com/urfave/negroni"
-
+	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/cf-bigip-ctlr/logger"
 
-	"github.com/cf-bigip-ctlr/common/secure"
+	"github.com/uber-go/zap"
+	"github.com/urfave/negroni"
 )
 
 const (

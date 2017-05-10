@@ -5,20 +5,19 @@ import (
 	"crypto/x509"
 	"net"
 	"net/http"
+	"testing"
+	"time"
 
 	"github.com/cf-bigip-ctlr/access_log"
 	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/metrics/fakes"
 	"github.com/cf-bigip-ctlr/proxy"
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/routeservice"
 	"github.com/cf-bigip-ctlr/test_util"
 
-	"testing"
-	"time"
-
-	"github.com/cf-bigip-ctlr/metrics/fakes"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo"

@@ -1,8 +1,6 @@
 package test_util
 
 import (
-	. "github.com/onsi/gomega"
-
 	"errors"
 	"fmt"
 	"net"
@@ -11,6 +9,7 @@ import (
 	"time"
 
 	"code.cloudfoundry.org/localip"
+	. "github.com/onsi/gomega"
 )
 
 type Nats struct {

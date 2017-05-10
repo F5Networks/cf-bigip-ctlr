@@ -1,14 +1,13 @@
 package main_test
 
 import (
+	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
 	"github.com/onsi/gomega/ghttp"
-
-	"testing"
 )
 
 var (

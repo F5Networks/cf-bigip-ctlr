@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/cf-bigip-ctlr/access_log/schema"
+	router_http "github.com/cf-bigip-ctlr/common/http"
+	"github.com/cf-bigip-ctlr/common/uuid"
 	"github.com/cf-bigip-ctlr/handlers"
 	"github.com/cf-bigip-ctlr/metrics/fakes"
 	"github.com/cf-bigip-ctlr/proxy/handler"
@@ -21,11 +23,8 @@ import (
 	"github.com/cf-bigip-ctlr/proxy/utils"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
+
 	"code.cloudfoundry.org/routing-api/models"
-
-	router_http "github.com/cf-bigip-ctlr/common/http"
-	"github.com/cf-bigip-ctlr/common/uuid"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"

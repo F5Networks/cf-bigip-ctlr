@@ -8,6 +8,7 @@ import (
 
 	"github.com/cf-bigip-ctlr/access_log/schema"
 	"github.com/cf-bigip-ctlr/logger"
+
 	"github.com/uber-go/zap"
 )
 

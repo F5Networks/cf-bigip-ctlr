@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cf-bigip-ctlr/route"
+
 	"github.com/cloudfoundry/dropsonde/metrics"
 )
 

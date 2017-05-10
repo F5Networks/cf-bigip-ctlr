@@ -1,21 +1,20 @@
 package router
 
 import (
-	"io/ioutil"
-	"os"
-	"strconv"
-	"sync"
-	"sync/atomic"
-	"syscall"
-
 	"bytes"
 	"compress/zlib"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/cf-bigip-ctlr/common"
@@ -28,6 +27,7 @@ import (
 	"github.com/cf-bigip-ctlr/proxy"
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/varz"
+
 	"github.com/armon/go-proxyproto"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/nats-io/nats"
@@ -69,8 +69,17 @@ type Router struct {
 	NatsHost         *atomic.Value
 }
 
-func NewRouter(logger logger.Logger, cfg *config.Config, p proxy.Proxy, mbusClient *nats.Conn, r *registry.RouteRegistry,
-	v varz.Varz, heartbeatOK *int32, logCounter *schema.LogCounter, errChan chan error) (*Router, error) {
+func NewRouter(
+	logger logger.Logger,
+	cfg *config.Config,
+	p proxy.Proxy,
+	mbusClient *nats.Conn,
+	r *registry.RouteRegistry,
+	v varz.Varz,
+	heartbeatOK *int32,
+	logCounter *schema.LogCounter,
+	errChan chan error,
+) (*Router, error) {
 
 	var host string
 	if cfg.Status.Port != 0 {

@@ -15,8 +15,8 @@ import (
 	"github.com/cf-bigip-ctlr/proxy/utils"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
-	"code.cloudfoundry.org/routing-api/models"
 
+	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni"

@@ -3,18 +3,16 @@ package access_log
 import (
 	"io"
 	"log/syslog"
+	"os"
 	"regexp"
-
 	"strconv"
-
-	"github.com/cloudfoundry/dropsonde/logs"
-	"github.com/uber-go/zap"
 
 	"github.com/cf-bigip-ctlr/access_log/schema"
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 
-	"os"
+	"github.com/cloudfoundry/dropsonde/logs"
+	"github.com/uber-go/zap"
 )
 
 //go:generate counterfeiter -o fakes/fake_access_logger.go . AccessLogger

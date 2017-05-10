@@ -2,14 +2,13 @@ package router_test
 
 import (
 	"log"
+	"testing"
 	"time"
 
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/emitter/fake"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"testing"
 )
 
 func TestRouter(t *testing.T) {

@@ -1,18 +1,19 @@
 package common
 
 import (
-	"github.com/cf-bigip-ctlr/common/uuid"
-	"github.com/cf-bigip-ctlr/route"
-	"code.cloudfoundry.org/localip"
-	"github.com/nats-io/nats"
-	. "github.com/onsi/gomega"
-
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/cf-bigip-ctlr/common/uuid"
+	"github.com/cf-bigip-ctlr/route"
+
+	"code.cloudfoundry.org/localip"
+	"github.com/nats-io/nats"
+	. "github.com/onsi/gomega"
 )
 
 type TestApp struct {
@@ -28,7 +29,13 @@ type TestApp struct {
 	routeService string
 }
 
-func NewTestApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string, routeService string) *TestApp {
+func NewTestApp(
+	urls []route.Uri,
+	rPort uint16,
+	mbusClient *nats.Conn,
+	tags map[string]string,
+	routeService string,
+) *TestApp {
 	app := new(TestApp)
 
 	port, _ := localip.LocalPort()

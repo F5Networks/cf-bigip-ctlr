@@ -16,6 +16,7 @@ import (
 	"github.com/cf-bigip-ctlr/common/schema"
 	"github.com/cf-bigip-ctlr/common/uuid"
 	"github.com/cf-bigip-ctlr/logger"
+
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	"github.com/uber-go/zap"

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/cf-bigip-ctlr/metrics/monitor"
+
 	"github.com/cloudfoundry/sonde-go/events"
 	"github.com/gogo/protobuf/proto"
 	. "github.com/onsi/ginkgo"

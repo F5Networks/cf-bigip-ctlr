@@ -1,12 +1,12 @@
 package http_test
 
 import (
+	"net"
+	"net/http"
+
 	. "github.com/cf-bigip-ctlr/common/http"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"net"
-	"net/http"
 )
 
 var _ = Describe("http", func() {

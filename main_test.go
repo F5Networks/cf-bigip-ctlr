@@ -2,12 +2,23 @@ package main_test
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/handlers"
@@ -15,6 +26,7 @@ import (
 	"github.com/cf-bigip-ctlr/test"
 	"github.com/cf-bigip-ctlr/test/common"
 	"github.com/cf-bigip-ctlr/test_util"
+
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
@@ -23,19 +35,6 @@ import (
 	. "github.com/onsi/gomega/gexec"
 	"github.com/onsi/gomega/ghttp"
 	"gopkg.in/yaml.v2"
-
-	"net"
-	"net/url"
-	"syscall"
-
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
 )
 
 const defaultPruneInterval = 1

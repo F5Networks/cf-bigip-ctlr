@@ -18,16 +18,20 @@ import (
 	"github.com/cf-bigip-ctlr/common/schema"
 	cfg "github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/handlers"
+	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/mbus"
 	"github.com/cf-bigip-ctlr/metrics"
+	fakeMetrics "github.com/cf-bigip-ctlr/metrics/fakes"
 	"github.com/cf-bigip-ctlr/proxy"
 	rregistry "github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
 	. "github.com/cf-bigip-ctlr/router"
 	"github.com/cf-bigip-ctlr/routeservice"
 	"github.com/cf-bigip-ctlr/test"
+	testcommon "github.com/cf-bigip-ctlr/test/common"
 	"github.com/cf-bigip-ctlr/test_util"
 	vvarz "github.com/cf-bigip-ctlr/varz"
+
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	gConfig "github.com/onsi/ginkgo/config"
@@ -36,11 +40,6 @@ import (
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
-
-	fakeMetrics "github.com/cf-bigip-ctlr/metrics/fakes"
-
-	"github.com/cf-bigip-ctlr/logger"
-	testcommon "github.com/cf-bigip-ctlr/test/common"
 )
 
 var _ = Describe("Router", func() {

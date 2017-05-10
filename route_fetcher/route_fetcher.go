@@ -5,11 +5,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"code.cloudfoundry.org/clock"
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
+
+	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/routing-api"
 	"code.cloudfoundry.org/routing-api/models"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"

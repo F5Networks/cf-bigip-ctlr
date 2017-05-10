@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/urfave/negroni"
-
 	"github.com/cf-bigip-ctlr/proxy/utils"
+
+	"github.com/urfave/negroni"
 )
 
 type proxyWriterHandler struct{}

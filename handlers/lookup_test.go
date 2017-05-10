@@ -8,12 +8,12 @@ import (
 
 	"github.com/cf-bigip-ctlr/access_log/schema"
 	"github.com/cf-bigip-ctlr/handlers"
+	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics/fakes"
 	fakeRegistry "github.com/cf-bigip-ctlr/registry/fakes"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
 
-	"github.com/cf-bigip-ctlr/logger"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni"

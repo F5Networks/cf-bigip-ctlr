@@ -1,16 +1,16 @@
 package metrics_test
 
 import (
-	"github.com/cf-bigip-ctlr/metrics/fakes"
-	"code.cloudfoundry.org/routing-api/models"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"net/http"
 	"time"
 
 	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/metrics/fakes"
 	"github.com/cf-bigip-ctlr/route"
+
+	"code.cloudfoundry.org/routing-api/models"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("CompositeReporter", func() {

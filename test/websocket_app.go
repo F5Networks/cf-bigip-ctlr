@@ -4,14 +4,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/nats-io/nats"
-	"github.com/onsi/ginkgo"
-
-	. "github.com/onsi/gomega"
-
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test/common"
 	"github.com/cf-bigip-ctlr/test_util"
+
+	"github.com/nats-io/nats"
+	"github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func NewWebSocketApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, delay time.Duration) *common.TestApp {

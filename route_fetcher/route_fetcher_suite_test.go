@@ -1,10 +1,10 @@
 package route_fetcher_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"testing"
 )
 
 func TestRouteFetcher(t *testing.T) {

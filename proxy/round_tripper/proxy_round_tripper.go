@@ -7,8 +7,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/uber-go/zap"
-
 	"github.com/cf-bigip-ctlr/access_log/schema"
 	router_http "github.com/cf-bigip-ctlr/common/http"
 	"github.com/cf-bigip-ctlr/handlers"
@@ -17,6 +15,8 @@ import (
 	"github.com/cf-bigip-ctlr/proxy/handler"
 	"github.com/cf-bigip-ctlr/proxy/utils"
 	"github.com/cf-bigip-ctlr/route"
+
+	"github.com/uber-go/zap"
 )
 
 const (

@@ -1,16 +1,16 @@
 package health_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
 	"github.com/cf-bigip-ctlr/common/health"
 	"github.com/cf-bigip-ctlr/common/schema"
+
 	"code.cloudfoundry.org/lager"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"encoding/json"
 )
 
 var _ = Describe("Varz", func() {

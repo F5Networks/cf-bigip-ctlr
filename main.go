@@ -3,8 +3,29 @@ package main // import "github.com/cf-bigip-ctlr"
 import (
 	"crypto/tls"
 	"errors"
+	"flag"
+	"fmt"
 	"net/url"
+	"os"
+	"runtime"
 	"sync/atomic"
+	"syscall"
+	"time"
+
+	"github.com/cf-bigip-ctlr/access_log"
+	"github.com/cf-bigip-ctlr/common/schema"
+	"github.com/cf-bigip-ctlr/common/secure"
+	"github.com/cf-bigip-ctlr/common/uuid"
+	"github.com/cf-bigip-ctlr/config"
+	cfLogger "github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/mbus"
+	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/proxy"
+	rregistry "github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/route_fetcher"
+	"github.com/cf-bigip-ctlr/router"
+	"github.com/cf-bigip-ctlr/routeservice"
+	rvarz "github.com/cf-bigip-ctlr/varz"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
@@ -12,36 +33,14 @@ import (
 	"code.cloudfoundry.org/routing-api"
 	uaa_client "code.cloudfoundry.org/uaa-go-client"
 	uaa_config "code.cloudfoundry.org/uaa-go-client/config"
-	"github.com/cf-bigip-ctlr/access_log"
-	"github.com/cf-bigip-ctlr/common/schema"
-	"github.com/cf-bigip-ctlr/common/secure"
-	"github.com/cf-bigip-ctlr/common/uuid"
-	"github.com/cf-bigip-ctlr/config"
-	goRouterLogger "github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/mbus"
-	"github.com/cf-bigip-ctlr/proxy"
-	rregistry "github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/route_fetcher"
-	"github.com/cf-bigip-ctlr/router"
-	"github.com/cf-bigip-ctlr/routeservice"
-	rvarz "github.com/cf-bigip-ctlr/varz"
 	"github.com/cloudfoundry/dropsonde"
 	"github.com/cloudfoundry/dropsonde/metric_sender"
 	"github.com/cloudfoundry/dropsonde/metricbatcher"
 	"github.com/nats-io/nats"
-	"github.com/uber-go/zap"
-
-	"flag"
-	"fmt"
-	"os"
-	"runtime"
-	"syscall"
-	"time"
-
-	"github.com/cf-bigip-ctlr/metrics"
 	"github.com/tedsuo/ifrit"
 	"github.com/tedsuo/ifrit/grouper"
 	"github.com/tedsuo/ifrit/sigmon"
+	"github.com/uber-go/zap"
 )
 
 var configFile string
@@ -88,7 +87,10 @@ func main() {
 	}
 
 	if c.DebugAddr != "" {
-		reconfigurableSink := lager.NewReconfigurableSink(lager.NewWriterSink(os.Stdout, lager.DEBUG), minLagerLogLevel)
+		reconfigurableSink := lager.NewReconfigurableSink(
+			lager.NewWriterSink(os.Stdout, lager.DEBUG),
+			minLagerLogLevel,
+		)
 		debugserver.Run(c.DebugAddr, reconfigurableSink)
 	}
 
@@ -115,9 +117,16 @@ func main() {
 
 		routerGroupGUID = fetchRoutingGroupGUID(logger, c, routingAPIClient)
 	}
-	registry := rregistry.NewRouteRegistry(logger.Session("registry"), c, metricsReporter, routerGroupGUID)
+	registry := rregistry.NewRouteRegistry(
+		logger.Session("registry"),
+		c,
+		metricsReporter,
+		routerGroupGUID,
+	)
 	if c.SuspendPruningIfNatsUnavailable {
-		registry.SuspendPruning(func() bool { return !(natsClient.Status() == nats.CONNECTED) })
+		registry.SuspendPruning(func() bool {
+			return !(natsClient.Status() == nats.CONNECTED)
+		})
 	}
 
 	varz := rvarz.NewVarz(registry)
@@ -137,9 +146,29 @@ func main() {
 		}
 	}
 
-	proxy := buildProxy(logger.Session("proxy"), c, registry, accessLogger, compositeReporter, crypto, cryptoPrev)
+	proxy := buildProxy(
+		logger.Session("proxy"),
+		c,
+		registry,
+		accessLogger,
+		compositeReporter,
+		crypto,
+		cryptoPrev,
+	)
+
 	healthCheck = 0
-	router, err := router.NewRouter(logger.Session("router"), c, proxy, natsClient, registry, varz, &healthCheck, logCounter, nil)
+	router, err := router.NewRouter(
+		logger.Session("router"),
+		c,
+		proxy,
+		natsClient,
+		registry,
+		varz,
+		&healthCheck,
+		logCounter,
+		nil,
+	)
+
 	if err != nil {
 		logger.Fatal("initialize-router-error", zap.Error(err))
 	}
@@ -161,14 +190,14 @@ func main() {
 
 	err = <-monitor.Wait()
 	if err != nil {
-		logger.Error("gorouter.exited-with-failure", zap.Error(err))
+		logger.Error("cf-bigip-ctlr.exited-with-failure", zap.Error(err))
 		os.Exit(1)
 	}
 
 	os.Exit(0)
 }
 
-func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
+func createCrypto(logger cfLogger.Logger, secret string) *secure.AesGCM {
 	// generate secure encryption key using key derivation function (pbkdf2)
 	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
 	crypto, err := secure.NewAesGCM(secretPbkdf2)
@@ -178,7 +207,15 @@ func createCrypto(logger goRouterLogger.Logger, secret string) *secure.AesGCM {
 	return crypto
 }
 
-func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, accessLogger access_log.AccessLogger, reporter metrics.CombinedReporter, crypto secure.Crypto, cryptoPrev secure.Crypto) proxy.Proxy {
+func buildProxy(
+	logger cfLogger.Logger,
+	c *config.Config,
+	registry rregistry.Registry,
+	accessLogger access_log.AccessLogger,
+	reporter metrics.CombinedReporter,
+	crypto secure.Crypto,
+	cryptoPrev secure.Crypto,
+) proxy.Proxy {
 	routeServiceConfig := routeservice.NewRouteServiceConfig(
 		logger,
 		c.RouteServiceEnabled,
@@ -197,9 +234,17 @@ func buildProxy(logger goRouterLogger.Logger, c *config.Config, registry rregist
 		reporter, routeServiceConfig, tlsConfig, &healthCheck)
 }
 
-func fetchRoutingGroupGUID(logger goRouterLogger.Logger, c *config.Config, routingAPIClient routing_api.Client) (routerGroupGUID string) {
+func fetchRoutingGroupGUID(
+	logger cfLogger.Logger,
+	c *config.Config,
+	routingAPIClient routing_api.Client,
+) (routerGroupGUID string) {
 	if c.RouterGroupName == "" {
-		logger.Info("retrieved-router-group", []zap.Field{zap.String("router-group", "-"), zap.String("router-group-guid", "-")}...)
+		logger.Info(
+			"retrieved-router-group",
+			[]zap.Field{zap.String("router-group", "-"),
+				zap.String("router-group-guid", "-")}...,
+		)
 		return
 	}
 
@@ -210,16 +255,26 @@ func fetchRoutingGroupGUID(logger goRouterLogger.Logger, c *config.Config, routi
 	logger.Info("starting-to-fetch-router-groups")
 
 	if rg.Type != "http" {
-		logger.Fatal("expected-router-group-type-http", zap.Error(fmt.Errorf("Router Group '%s' is not of type http", c.RouterGroupName)))
+		logger.Fatal(
+			"expected-router-group-type-http",
+			zap.Error(fmt.Errorf("Router Group '%s' is not of type http", c.RouterGroupName)),
+		)
 	}
 	routerGroupGUID = rg.Guid
 
-	logger.Info("retrieved-router-group", zap.String("router-group", c.RouterGroupName), zap.String("router-group-guid", routerGroupGUID))
+	logger.Info(
+		"retrieved-router-group",
+		zap.String("router-group", c.RouterGroupName),
+		zap.String("router-group-guid", routerGroupGUID),
+	)
 
 	return
 }
 
-func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (routing_api.Client, error) {
+func setupRoutingAPIClient(
+	logger cfLogger.Logger,
+	c *config.Config,
+) (routing_api.Client, error) {
 	routingAPIURI := fmt.Sprintf("%s:%d", c.RoutingApi.Uri, c.RoutingApi.Port)
 	client := routing_api.NewClient(routingAPIURI, false)
 
@@ -247,7 +302,12 @@ func setupRoutingAPIClient(logger goRouterLogger.Logger, c *config.Config) (rout
 	return client, nil
 }
 
-func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry rregistry.Registry, routingAPIClient routing_api.Client) *route_fetcher.RouteFetcher {
+func setupRouteFetcher(
+	logger cfLogger.Logger,
+	c *config.Config,
+	registry rregistry.Registry,
+	routingAPIClient routing_api.Client,
+) *route_fetcher.RouteFetcher {
 	clock := clock.NewClock()
 
 	uaaClient := newUaaClient(logger, clock, c)
@@ -257,11 +317,23 @@ func setupRouteFetcher(logger goRouterLogger.Logger, c *config.Config, registry 
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
 
-	routeFetcher := route_fetcher.NewRouteFetcher(logger, uaaClient, registry, c, routingAPIClient, 1, clock)
+	routeFetcher := route_fetcher.NewRouteFetcher(
+		logger,
+		uaaClient,
+		registry,
+		c,
+		routingAPIClient,
+		1,
+		clock,
+	)
 	return routeFetcher
 }
 
-func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Config) uaa_client.Client {
+func newUaaClient(
+	logger cfLogger.Logger,
+	clock clock.Clock,
+	c *config.Config,
+) uaa_client.Client {
 	if c.RoutingApi.AuthDisabled {
 		logger.Info("using-noop-token-fetcher")
 		return uaa_client.NewNoOpUaaClient()
@@ -270,7 +342,7 @@ func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Con
 	if c.OAuth.Port == -1 {
 		logger.Fatal(
 			"tls-not-enabled",
-			zap.Error(errors.New("GoRouter requires TLS enabled to get OAuth token")),
+			zap.Error(errors.New("cf-bigip-ctlr requires TLS enabled to get OAuth token")),
 			zap.String("token-endpoint", c.OAuth.TokenEndpoint),
 			zap.Int("port", c.OAuth.Port),
 		)
@@ -289,14 +361,19 @@ func newUaaClient(logger goRouterLogger.Logger, clock clock.Clock, c *config.Con
 		ExpirationBufferInSec: c.TokenFetcherExpirationBufferTimeInSeconds,
 	}
 
-	uaaClient, err := uaa_client.NewClient(goRouterLogger.NewLagerAdapter(logger), cfg, clock)
+	uaaClient, err := uaa_client.NewClient(cfLogger.NewLagerAdapter(logger), cfg, clock)
 	if err != nil {
 		logger.Fatal("initialize-token-fetcher-error", zap.Error(err))
 	}
 	return uaaClient
 }
 
-func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomic.Value, startMsg chan<- struct{}) nats.Options {
+func natsOptions(
+	logger cfLogger.Logger,
+	c *config.Config,
+	natsHost *atomic.Value,
+	startMsg chan<- struct{},
+) nats.Options {
 	natsServers := c.NatsServers()
 
 	options := nats.DefaultOptions
@@ -350,7 +427,11 @@ func natsOptions(logger goRouterLogger.Logger, c *config.Config, natsHost *atomi
 	return options
 }
 
-func connectToNatsServer(logger goRouterLogger.Logger, c *config.Config, startMsg chan<- struct{}) *nats.Conn {
+func connectToNatsServer(
+	logger cfLogger.Logger,
+	c *config.Config,
+	startMsg chan<- struct{},
+) *nats.Conn {
 	var natsClient *nats.Conn
 	var natsHost atomic.Value
 	var err error
@@ -384,7 +465,7 @@ func connectToNatsServer(logger goRouterLogger.Logger, c *config.Config, startMs
 }
 
 func createSubscriber(
-	logger goRouterLogger.Logger,
+	logger cfLogger.Logger,
 	c *config.Config,
 	natsClient *nats.Conn,
 	registry rregistry.Registry,
@@ -402,10 +483,17 @@ func createSubscriber(
 		MinimumRegisterIntervalInSeconds: int(c.StartResponseDelayInterval.Seconds()),
 		PruneThresholdInSeconds:          int(c.DropletStaleThreshold.Seconds()),
 	}
-	return mbus.NewSubscriber(logger.Session("subscriber"), natsClient, registry, startMsgChan, opts, routerGroupGUID)
+	return mbus.NewSubscriber(
+		logger.Session("subscriber"),
+		natsClient,
+		registry,
+		startMsgChan,
+		opts,
+		routerGroupGUID,
+	)
 }
 
-func createLogger(component string, level string) (goRouterLogger.Logger, lager.LogLevel) {
+func createLogger(component string, level string) (cfLogger.Logger, lager.LogLevel) {
 	var logLevel zap.Level
 	logLevel.UnmarshalText([]byte(level))
 
@@ -423,6 +511,6 @@ func createLogger(component string, level string) (goRouterLogger.Logger, lager.
 		panic(fmt.Errorf("unknown log level: %s", level))
 	}
 
-	lggr := goRouterLogger.NewLogger(component, logLevel, zap.Output(os.Stdout))
+	lggr := cfLogger.NewLogger(component, logLevel, zap.Output(os.Stdout))
 	return lggr, minLagerLogLevel
 }

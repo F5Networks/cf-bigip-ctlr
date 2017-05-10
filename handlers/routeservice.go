@@ -6,11 +6,11 @@ import (
 	"net/http"
 
 	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/routeservice"
+
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
-
-	"github.com/cf-bigip-ctlr/route"
 )
 
 type routeService struct {

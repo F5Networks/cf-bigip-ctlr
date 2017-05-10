@@ -7,6 +7,7 @@ import (
 	"os/user"
 
 	"github.com/cf-bigip-ctlr/common/secure"
+
 	"github.com/codegangsta/cli"
 )
 

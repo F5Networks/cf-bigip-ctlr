@@ -3,9 +3,8 @@ package config
 import (
 	"crypto/tls"
 	"fmt"
-	"net/url"
-
 	"io/ioutil"
+	"net/url"
 	"runtime"
 	"strings"
 	"time"
