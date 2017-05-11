@@ -185,8 +185,16 @@
 			"Rev": "e33835a643a970c11ac74f6333f5f6866387a101"
 		},
 		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
+		},
+		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "1f49d83d9aa00e6ce4fc8258c71cc7786aec968a"
+		},
+		{
+			"ImportPath": "github.com/juju/ratelimit",
+			"Rev": "acf38b000a03e4ab89e40f20f1e548f4e6ac7f72"
 		},
 		{
 			"ImportPath": "github.com/nats-io/nats",
@@ -424,6 +432,20 @@
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
 			"Rev": "e4d366fc3c7938e2958e662b4258c7a89e1f0e3e"
+		},
+		{
+			"ImportPath": "k8s.io/apimachinery/pkg/util/runtime",
+			"Rev": "84c15da65eb86243c295d566203d7689cc6ac04b"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/util/clock",
+			"Comment": "v2.0.0-alpha.0-247-g22eca11",
+			"Rev": "22eca115bd15e23ca5e645fbf68e30a8738a23de"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/util/workqueue",
+			"Comment": "v2.0.0-alpha.0-247-g22eca11",
+			"Rev": "22eca115bd15e23ca5e645fbf68e30a8738a23de"
 		}
 	]
 }

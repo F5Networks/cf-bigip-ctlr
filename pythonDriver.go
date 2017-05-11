@@ -18,21 +18,21 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/f5router"
 	"github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/writer"
 
 	"github.com/uber-go/zap"
 )
 
 func initializeDriverConfig(
-	configWriter writer.Writer,
+	configWriter *f5router.ConfigWriter,
 	global config.GlobalSection,
 	bigIP config.BigIPConfig,
 	logger logger.Logger,
@@ -41,20 +41,19 @@ func initializeDriverConfig(
 		return fmt.Errorf("config writer argument cannot be nil")
 	}
 
-	sectionNames := []string{"global", "bigip"}
-	for i, v := range []interface{}{global, bigIP} {
-		doneCh, errCh, err := configWriter.SendSection(sectionNames[i], v)
-		if nil != err {
-			return fmt.Errorf("failed writing global config section: %v", err)
-		}
-		select {
-		case <-doneCh:
-		case e := <-errCh:
-			return fmt.Errorf("failed writing section %s - %v: %v",
-				sectionNames[i], e, v)
-		case <-time.After(1000 * time.Millisecond):
-			logger.Warn("no-response-from-config-writer")
-		}
+	sections := make(map[string]interface{})
+	sections["global"] = global
+	sections["bigip"] = bigIP
+
+	output, err := json.Marshal(sections)
+	if nil != err {
+		return fmt.Errorf("failed marshaling config: %v", err)
+	}
+	n, err := configWriter.Write(output)
+	if nil != err {
+		return fmt.Errorf("failed writing config: %v", err)
+	} else if len(output) != n {
+		return fmt.Errorf("short write from initial config")
 	}
 
 	return nil
@@ -129,7 +128,7 @@ func runBigIPDriver(pid chan<- int, cmd *exec.Cmd, logger logger.Logger) {
 
 // Start called to run the python driver
 func startPythonDriver(
-	configWriter writer.Writer,
+	configWriter *f5router.ConfigWriter,
 	global config.GlobalSection,
 	bigIP config.BigIPConfig,
 	pythonBaseDir string,

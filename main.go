@@ -17,6 +17,7 @@ import (
 	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/cf-bigip-ctlr/common/uuid"
 	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/f5router"
 	cfLogger "github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/mbus"
 	"github.com/cf-bigip-ctlr/metrics"
@@ -26,7 +27,6 @@ import (
 	"github.com/cf-bigip-ctlr/router"
 	"github.com/cf-bigip-ctlr/routeservice"
 	rvarz "github.com/cf-bigip-ctlr/varz"
-	"github.com/cf-bigip-ctlr/writer"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
@@ -97,48 +97,6 @@ func main() {
 		debugserver.Run(c.DebugAddr, reconfigurableSink)
 	}
 
-	logger.Info("starting-config-writer")
-	configWriter, err := writer.NewConfigWriter(logger)
-	if nil != err {
-		logger.Fatal("error-creating-configwriter", zap.Error(err))
-	}
-	defer configWriter.Stop()
-
-	gs := config.GlobalSection{
-		LogLevel:       c.Logging.Level,
-		VerifyInterval: c.BigIP.VerifyInterval,
-	}
-
-	folderPath, err := os.Getwd()
-	if err != nil {
-		logger.Error("file-get-error", zap.Error(err))
-	}
-
-	_, err = os.Stat(fmt.Sprintf("%v/python/bigipconfigdriver.py", folderPath))
-	if os.IsNotExist(err) {
-		logger.Error("bigipconfigdriver-does-not-exist", zap.Error(err))
-	}
-
-	logger.Info("starting-python-driver")
-	pythonBaseDir = fmt.Sprintf("%v/python/", folderPath)
-	subPidCh, err := startPythonDriver(configWriter, gs, c.BigIP, pythonBaseDir, logger)
-	if nil != err {
-		logger.Fatal("initialize-python-driver-error", zap.Error(err))
-	}
-	subPid := <-subPidCh
-	defer func(pid int) {
-		if 0 != pid {
-			proc, err := os.FindProcess(pid)
-			if nil != err {
-				logger.Warn("failed-to-find-process", zap.Error(err))
-			}
-			err = proc.Signal(os.Interrupt)
-			if nil != err {
-				logger.Warn("failed-to-stop-process", zap.Int("pid", pid), zap.Error(err))
-			}
-		}
-	}(subPid)
-
 	logger.Info("setting-up-nats-connection")
 	startMsgChan := make(chan struct{})
 	natsClient := connectToNatsServer(logger.Session("nats"), c, startMsgChan)
@@ -162,9 +120,68 @@ func main() {
 
 		routerGroupGUID = fetchRoutingGroupGUID(logger, c, routingAPIClient)
 	}
+
+	f5Router, err := f5router.NewF5Router(logger.Session("f5router"), c)
+	if nil != err {
+		logger.Fatal("f5router-failed-initialization", zap.Error(err))
+	}
+
+	logger.Debug("adding-routing-vip", zap.String("name", "routing-vip-http"),
+		zap.String("address", c.BigIP.ExternalAddr),
+		zap.Int("port", 80),
+	)
+	f5Router.UpdateVirtualServer("routing-vip-http", c.BigIP.ExternalAddr, 80)
+	logger.Debug("adding-routing-vip", zap.String("name", "routing-vip-https"),
+		zap.String("address", c.BigIP.ExternalAddr),
+		zap.Int("port", 443),
+	)
+	f5Router.UpdateVirtualServer("routing-vip-https", c.BigIP.ExternalAddr, 443)
+
+	gs := config.GlobalSection{
+		LogLevel:       c.Logging.Level,
+		VerifyInterval: c.BigIP.VerifyInterval,
+	}
+
+	folderPath, err := os.Getwd()
+	if err != nil {
+		logger.Error("file-get-error", zap.Error(err))
+	}
+
+	_, err = os.Stat(fmt.Sprintf("%v/python/bigipconfigdriver.py", folderPath))
+	if os.IsNotExist(err) {
+		logger.Error("bigipconfigdriver-does-not-exist", zap.Error(err))
+	}
+
+	logger.Info("starting-python-driver")
+	pythonBaseDir = fmt.Sprintf("%v/python/", folderPath)
+	subPidCh, err := startPythonDriver(
+		f5Router.ConfigWriter(),
+		gs,
+		c.BigIP,
+		pythonBaseDir,
+		logger,
+	)
+	if nil != err {
+		logger.Fatal("initialize-python-driver-error", zap.Error(err))
+	}
+	subPid := <-subPidCh
+	defer func(pid int) {
+		if 0 != pid {
+			proc, err := os.FindProcess(pid)
+			if nil != err {
+				logger.Warn("failed-to-find-process", zap.Error(err))
+			}
+			err = proc.Signal(os.Interrupt)
+			if nil != err {
+				logger.Warn("failed-to-stop-process", zap.Int("pid", pid), zap.Error(err))
+			}
+		}
+	}(subPid)
+
 	registry := rregistry.NewRouteRegistry(
 		logger.Session("registry"),
 		c,
+		f5Router,
 		metricsReporter,
 		routerGroupGUID,
 	)
@@ -228,6 +245,7 @@ func main() {
 
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	members = append(members, grouper.Member{Name: "router", Runner: router})
+	members = append(members, grouper.Member{Name: "f5router", Runner: f5Router})
 
 	group := grouper.NewOrdered(os.Interrupt, members)
 

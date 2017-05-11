@@ -32,6 +32,7 @@ type BigIPConfig struct {
 	Partition      []string `yaml:"partition" json:"partition"`
 	Balance        string   `yaml:"balance" json:"balance"`
 	VerifyInterval int      `yaml:"verify-interval" json:"verify-interval"`
+	ExternalAddr   string   `yaml:"external_addr" json:"external-addr"`
 }
 
 type GlobalSection struct {
