@@ -13,3 +13,5 @@ tags
 *.coverprofile
 gorouter
 test_util/rss/rss
+cf-bigip-ctlr
+*.pyc

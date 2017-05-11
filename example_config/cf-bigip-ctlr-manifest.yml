@@ -6,8 +6,10 @@ applications:
                         url: https://10.190.24.32
                         user: admin
                         pass: admin
-                        partition: test
+                        partition:
+                          - k8s
                         balance: round-robin
+                        verify_interval: 30
 
                       status:
                         port: 8087

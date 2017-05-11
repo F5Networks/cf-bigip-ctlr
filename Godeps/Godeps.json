@@ -160,6 +160,11 @@
 			"Rev": "8ba6f23b6e36d03666a14bd9421f5e3efcb59aca"
 		},
 		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Comment": "v1.1.0",
+			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
+		},
+		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
 			"Comment": "v2.3.0-6-gf62f64e",
 			"Rev": "f62f64ea222e5e6d6d86421b5507b0862a3ebf7f"
@@ -352,8 +357,23 @@
 			"Rev": "b48c9a8b2644326d0a44eaaacc8d83e35174a05d"
 		},
 		{
+			"ImportPath": "github.com/pmezard/go-difflib/difflib",
+			"Comment": "v1.0.0",
+			"Rev": "792786c7400a136282c1664665ae0a8db921c6c2"
+		},
+		{
 			"ImportPath": "github.com/rcrowley/go-metrics",
 			"Rev": "eeba7bd0dd01ace6e690fa833b3f22aaec29af43"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/assert",
+			"Comment": "v1.1.4-27-g4d4bfba",
+			"Rev": "4d4bfba8f1d1027c4fdbe371823030df51419987"
+		},
+		{
+			"ImportPath": "github.com/stretchr/testify/require",
+			"Comment": "v1.1.4-27-g4d4bfba",
+			"Rev": "4d4bfba8f1d1027c4fdbe371823030df51419987"
 		},
 		{
 			"ImportPath": "github.com/tedsuo/ifrit",

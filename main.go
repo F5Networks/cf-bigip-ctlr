@@ -26,6 +26,7 @@ import (
 	"github.com/cf-bigip-ctlr/router"
 	"github.com/cf-bigip-ctlr/routeservice"
 	rvarz "github.com/cf-bigip-ctlr/varz"
+	"github.com/cf-bigip-ctlr/writer"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"
@@ -42,6 +43,8 @@ import (
 	"github.com/tedsuo/ifrit/sigmon"
 	"github.com/uber-go/zap"
 )
+
+var pythonBaseDir string
 
 var configFile string
 
@@ -93,6 +96,48 @@ func main() {
 		)
 		debugserver.Run(c.DebugAddr, reconfigurableSink)
 	}
+
+	logger.Info("starting-config-writer")
+	configWriter, err := writer.NewConfigWriter(logger)
+	if nil != err {
+		logger.Fatal("error-creating-configwriter", zap.Error(err))
+	}
+	defer configWriter.Stop()
+
+	gs := config.GlobalSection{
+		LogLevel:       c.Logging.Level,
+		VerifyInterval: c.BigIP.VerifyInterval,
+	}
+
+	folderPath, err := os.Getwd()
+	if err != nil {
+		logger.Error("file-get-error", zap.Error(err))
+	}
+
+	_, err = os.Stat(fmt.Sprintf("%v/python/bigipconfigdriver.py", folderPath))
+	if os.IsNotExist(err) {
+		logger.Error("bigipconfigdriver-does-not-exist", zap.Error(err))
+	}
+
+	logger.Info("starting-python-driver")
+	pythonBaseDir = fmt.Sprintf("%v/python/", folderPath)
+	subPidCh, err := startPythonDriver(configWriter, gs, c.BigIP, pythonBaseDir, logger)
+	if nil != err {
+		logger.Fatal("initialize-python-driver-error", zap.Error(err))
+	}
+	subPid := <-subPidCh
+	defer func(pid int) {
+		if 0 != pid {
+			proc, err := os.FindProcess(pid)
+			if nil != err {
+				logger.Warn("failed-to-find-process", zap.Error(err))
+			}
+			err = proc.Signal(os.Interrupt)
+			if nil != err {
+				logger.Warn("failed-to-stop-process", zap.Int("pid", pid), zap.Error(err))
+			}
+		}
+	}(subPid)
 
 	logger.Info("setting-up-nats-connection")
 	startMsgChan := make(chan struct{})

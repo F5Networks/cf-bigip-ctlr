@@ -1,0 +1,8 @@
+-e git+https://github.com/f5devcentral/f5-cccl.git@9c80bc34d323120f0b3810c05765f8485318ddca#egg=f5-cccl
+f5-icontrol-rest==1.3.0
+f5-sdk==2.2.2
+pyinotify==0.9.6
+ipaddress==1.0.17
+PyJWT==1.4.0
+requests==2.9.1
+sseclient==0.0.14

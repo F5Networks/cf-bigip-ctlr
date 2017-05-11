@@ -26,11 +26,17 @@ type StatusConfig struct {
 }
 
 type BigIPConfig struct {
-	Url       string `yaml:"url"`
-	User      string `yaml:"user"`
-	Pass      string `yaml:"pass"`
-	Partition string `yaml:"partition"`
-	Balance   string `yaml:"balance"`
+	Url            string   `yaml:"url" json:"url"`
+	User           string   `yaml:"user" json:"user"`
+	Pass           string   `yaml:"pass" json:"pass"`
+	Partition      []string `yaml:"partition" json:"partition"`
+	Balance        string   `yaml:"balance" json:"balance"`
+	VerifyInterval int      `yaml:"verify-interval" json:"verify-interval"`
+}
+
+type GlobalSection struct {
+	LogLevel       string `yaml:"log-level" json:"log-level"`
+	VerifyInterval int    `yaml:"verify-interval" json:"verify-interval"`
 }
 
 var defaultStatusConfig = StatusConfig{
