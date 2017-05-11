@@ -3,10 +3,9 @@ package test_util
 import (
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/cf-bigip-ctlr/config"
-
-	"time"
 
 	. "github.com/onsi/gomega"
 )

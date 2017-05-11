@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/routeservice/header"
+
+	"github.com/uber-go/zap"
 )
 
 const (

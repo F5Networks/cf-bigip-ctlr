@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/cf-bigip-ctlr/logger"
+
 	"github.com/uber-go/zap"
 )
 

@@ -2,6 +2,7 @@ package secure_test
 
 import (
 	"github.com/cf-bigip-ctlr/common/secure"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

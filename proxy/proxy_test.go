@@ -23,11 +23,11 @@ import (
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
+
 	"code.cloudfoundry.org/routing-api/models"
 	"github.com/cloudfoundry/dropsonde/factories"
 	"github.com/cloudfoundry/sonde-go/events"
 	uuid "github.com/nu7hatch/gouuid"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

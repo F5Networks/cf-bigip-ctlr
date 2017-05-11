@@ -27,6 +27,7 @@ import (
 	"github.com/cf-bigip-ctlr/test/common"
 	"github.com/cf-bigip-ctlr/test_util"
 	vvarz "github.com/cf-bigip-ctlr/varz"
+
 	"github.com/nats-io/nats"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

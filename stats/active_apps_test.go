@@ -1,13 +1,14 @@
 package stats_test
 
 import (
-	. "github.com/cf-bigip-ctlr/stats"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"fmt"
 	"math/rand"
 	"time"
+
+	. "github.com/cf-bigip-ctlr/stats"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("ActiveApps", func() {

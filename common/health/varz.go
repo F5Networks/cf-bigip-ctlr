@@ -1,9 +1,10 @@
 package health
 
 import (
-	"github.com/cf-bigip-ctlr/common/schema"
 	"encoding/json"
 	"sync"
+
+	"github.com/cf-bigip-ctlr/common/schema"
 )
 
 type GenericVarz struct {

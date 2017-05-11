@@ -1,11 +1,11 @@
 package router_test
 
 import (
-	"github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/test/common"
-
 	"net"
 	"time"
+
+	"github.com/cf-bigip-ctlr/registry"
+	"github.com/cf-bigip-ctlr/test/common"
 )
 
 func appRegistered(registry *registry.RouteRegistry, app *common.TestApp) bool {

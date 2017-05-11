@@ -7,10 +7,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	"github.com/cf-bigip-ctlr/config"
+
 	"code.cloudfoundry.org/routing-api/models"
+	"github.com/uber-go/zap"
 )
 
 type Counter struct {
@@ -80,8 +80,17 @@ type Pool struct {
 	nextIdx           int
 }
 
-func NewEndpoint(appId, host string, port uint16, privateInstanceId string, privateInstanceIndex string,
-	tags map[string]string, staleThresholdInSeconds int, routeServiceUrl string, modificationTag models.ModificationTag) *Endpoint {
+func NewEndpoint(
+	appId,
+	host string,
+	port uint16,
+	privateInstanceId string,
+	privateInstanceIndex string,
+	tags map[string]string,
+	staleThresholdInSeconds int,
+	routeServiceUrl string,
+	modificationTag models.ModificationTag,
+) *Endpoint {
 	return &Endpoint{
 		ApplicationId:        appId,
 		addr:                 fmt.Sprintf("%s:%d", host, port),

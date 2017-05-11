@@ -5,14 +5,14 @@ import (
 	"os"
 	"time"
 
-	"code.cloudfoundry.org/clock/fakeclock"
-
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 	testRegistry "github.com/cf-bigip-ctlr/registry/fakes"
 	"github.com/cf-bigip-ctlr/route"
 	. "github.com/cf-bigip-ctlr/route_fetcher"
 	"github.com/cf-bigip-ctlr/test_util"
+
+	"code.cloudfoundry.org/clock/fakeclock"
 	"code.cloudfoundry.org/routing-api"
 	fake_routing_api "code.cloudfoundry.org/routing-api/fake_routing_api"
 	"code.cloudfoundry.org/routing-api/models"
@@ -20,11 +20,10 @@ import (
 	"code.cloudfoundry.org/uaa-go-client/schema"
 	metrics_fakes "github.com/cloudfoundry/dropsonde/metric_sender/fake"
 	"github.com/cloudfoundry/dropsonde/metrics"
-	"github.com/tedsuo/ifrit"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+	"github.com/tedsuo/ifrit"
 )
 
 var sender *metrics_fakes.FakeMetricSender

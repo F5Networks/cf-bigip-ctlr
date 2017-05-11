@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/cf-bigip-ctlr/test_util/rss/commands"
+
 	"github.com/codegangsta/cli"
 )
 

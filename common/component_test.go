@@ -1,23 +1,23 @@
 package common_test
 
 import (
-	. "github.com/cf-bigip-ctlr/common"
-	"github.com/cf-bigip-ctlr/common/health"
-	"github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/test_util"
-	"github.com/nats-io/nats"
-
-	"code.cloudfoundry.org/localip"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
-
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
+
+	. "github.com/cf-bigip-ctlr/common"
+	"github.com/cf-bigip-ctlr/common/health"
+	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/test_util"
+
+	"code.cloudfoundry.org/localip"
+	"github.com/nats-io/nats"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 type MarshalableValue struct {

@@ -1,13 +1,14 @@
 package schema_test
 
 import (
-	"github.com/cf-bigip-ctlr/common/schema"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/cf-bigip-ctlr/common/schema"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Durations", func() {

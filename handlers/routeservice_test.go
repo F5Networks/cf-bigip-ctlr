@@ -13,14 +13,13 @@ import (
 	"github.com/cf-bigip-ctlr/access_log/schema"
 	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/cf-bigip-ctlr/handlers"
+	logger_fakes "github.com/cf-bigip-ctlr/logger/fakes"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/routeservice"
 	"github.com/cf-bigip-ctlr/routeservice/header"
 	"github.com/cf-bigip-ctlr/test_util"
+
 	"code.cloudfoundry.org/routing-api/models"
-
-	logger_fakes "github.com/cf-bigip-ctlr/logger/fakes"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/urfave/negroni"

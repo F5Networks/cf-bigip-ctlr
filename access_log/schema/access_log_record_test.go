@@ -2,18 +2,17 @@ package schema_test
 
 import (
 	"bytes"
-
-	"github.com/cf-bigip-ctlr/access_log/schema"
-	"github.com/cf-bigip-ctlr/handlers"
-	"code.cloudfoundry.org/routing-api/models"
-
-	"github.com/cf-bigip-ctlr/route"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
-
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/cf-bigip-ctlr/access_log/schema"
+	"github.com/cf-bigip-ctlr/handlers"
+	"github.com/cf-bigip-ctlr/route"
+
+	"code.cloudfoundry.org/routing-api/models"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("AccessLogRecord", func() {

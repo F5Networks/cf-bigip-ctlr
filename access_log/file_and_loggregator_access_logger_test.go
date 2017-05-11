@@ -2,8 +2,11 @@ package access_log_test
 
 import (
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/cf-bigip-ctlr/access_log"
 	"github.com/cf-bigip-ctlr/access_log/schema"
@@ -11,16 +14,12 @@ import (
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
+
 	"code.cloudfoundry.org/routing-api/models"
 	"github.com/cloudfoundry/dropsonde/log_sender/fake"
 	"github.com/cloudfoundry/dropsonde/logs"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"net/http"
-	"net/url"
-	"time"
 )
 
 var _ = Describe("AccessLog", func() {

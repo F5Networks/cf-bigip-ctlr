@@ -7,18 +7,17 @@ import (
 	"github.com/cf-bigip-ctlr/access_log"
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/cf-bigip-ctlr/metrics/fakes"
 	"github.com/cf-bigip-ctlr/proxy"
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/routeservice"
 	"github.com/cf-bigip-ctlr/test_util"
 	"github.com/cf-bigip-ctlr/varz"
-	"code.cloudfoundry.org/routing-api/models"
 
+	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"github.com/cf-bigip-ctlr/metrics/fakes"
 )
 
 var _ = Describe("AccessLogRecord", func() {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/cf-bigip-ctlr/common/uuid"
 	"github.com/cf-bigip-ctlr/logger"
+
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )

@@ -9,6 +9,7 @@ import (
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/stats"
+
 	metrics "github.com/rcrowley/go-metrics"
 )
 
@@ -258,7 +259,12 @@ func (x *RealVarz) CaptureRoutingRequest(b *route.Endpoint) {
 	x.Unlock()
 }
 
-func (x *RealVarz) CaptureRoutingResponseLatency(endpoint *route.Endpoint, statusCode int, startedAt time.Time, duration time.Duration) {
+func (x *RealVarz) CaptureRoutingResponseLatency(
+	endpoint *route.Endpoint,
+	statusCode int,
+	startedAt time.Time,
+	duration time.Duration,
+) {
 	x.Lock()
 
 	var tags string

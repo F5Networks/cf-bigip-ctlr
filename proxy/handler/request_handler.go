@@ -11,14 +11,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	"github.com/cf-bigip-ctlr/access_log/schema"
 	router_http "github.com/cf-bigip-ctlr/common/http"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics"
 	"github.com/cf-bigip-ctlr/proxy/utils"
 	"github.com/cf-bigip-ctlr/route"
+
+	"github.com/uber-go/zap"
 )
 
 const (

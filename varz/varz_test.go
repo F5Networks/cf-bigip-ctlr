@@ -1,6 +1,11 @@
 package varz_test
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics/fakes"
@@ -8,14 +13,10 @@ import (
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
 	. "github.com/cf-bigip-ctlr/varz"
+
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"time"
 )
 
 var _ = Describe("Varz", func() {

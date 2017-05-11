@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/uber-go/zap"
-
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics"
 	"github.com/cf-bigip-ctlr/registry/container"
 	"github.com/cf-bigip-ctlr/route"
+
+	"github.com/uber-go/zap"
 )
 
 //go:generate counterfeiter -o fakes/fake_registry.go . Registry
@@ -58,7 +58,12 @@ type RouteRegistry struct {
 	routerGroupGUID string
 }
 
-func NewRouteRegistry(logger logger.Logger, c *config.Config, reporter metrics.RouteRegistryReporter, routerGroupGUID string) *RouteRegistry {
+func NewRouteRegistry(
+	logger logger.Logger,
+	c *config.Config,
+	reporter metrics.RouteRegistryReporter,
+	routerGroupGUID string,
+) *RouteRegistry {
 	r := &RouteRegistry{}
 	r.logger = logger
 	r.byURI = container.NewTrie()
@@ -167,7 +172,11 @@ func (r *RouteRegistry) Lookup(uri route.Uri) *route.Pool {
 	return pool
 }
 
-func (r *RouteRegistry) LookupWithInstance(uri route.Uri, appID string, appIndex string) *route.Pool {
+func (r *RouteRegistry) LookupWithInstance(
+	uri route.Uri,
+	appID string,
+	appIndex string,
+) *route.Pool {
 	uri = uri.RouteKey()
 	p := r.Lookup(uri)
 

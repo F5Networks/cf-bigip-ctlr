@@ -1,10 +1,10 @@
 package container_test
 
 import (
-	"github.com/cf-bigip-ctlr/route"
-	"code.cloudfoundry.org/routing-api/models"
-
 	"github.com/cf-bigip-ctlr/registry/container"
+	"github.com/cf-bigip-ctlr/route"
+
+	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

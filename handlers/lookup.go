@@ -2,16 +2,16 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
-
-	"fmt"
 
 	router_http "github.com/cf-bigip-ctlr/common/http"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics"
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
+
 	"github.com/uber-go/zap"
 	"github.com/urfave/negroni"
 )

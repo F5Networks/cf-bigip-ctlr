@@ -10,9 +10,9 @@ import (
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route"
+
 	"code.cloudfoundry.org/localip"
 	"code.cloudfoundry.org/routing-api/models"
-
 	"github.com/nats-io/nats"
 	"github.com/uber-go/zap"
 )
