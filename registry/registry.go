@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/f5router"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics"
 	"github.com/cf-bigip-ctlr/registry/container"
@@ -56,11 +57,14 @@ type RouteRegistry struct {
 	timeOfLastUpdate time.Time
 
 	routerGroupGUID string
+
+	f5Router *f5router.F5Router
 }
 
 func NewRouteRegistry(
 	logger logger.Logger,
 	c *config.Config,
+	f5Router *f5router.F5Router,
 	reporter metrics.RouteRegistryReporter,
 	routerGroupGUID string,
 ) *RouteRegistry {
@@ -74,6 +78,7 @@ func NewRouteRegistry(
 
 	r.reporter = reporter
 	r.routerGroupGUID = routerGroupGUID
+	r.f5Router = f5Router
 	return r
 }
 
@@ -93,6 +98,10 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	}
 
 	endpointAdded := pool.Put(endpoint)
+	if endpointAdded {
+		r.logger.Debug("checking-route-update", zap.String("key", routekey.String()))
+		r.f5Router.UpdatePoolEndpoints(routekey.String(), endpoint)
+	}
 
 	r.timeOfLastUpdate = t
 	r.Unlock()
@@ -139,6 +148,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
+			r.logger.Debug("checking-route-remove", zap.String("key", uri.String()))
+			r.f5Router.RemovePoolEndpoints(uri.String(), endpoint)
+
 			r.logger.Debug("endpoint-unregistered", zapData...)
 		} else {
 			r.logger.Debug("endpoint-not-unregistered", zapData...)
