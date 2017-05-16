@@ -18,7 +18,6 @@ package f5router
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -47,15 +46,11 @@ const (
 // NewDriver create ifrit process instance
 func NewDriver(
 	writer *ConfigWriter,
-	global config.GlobalSection,
-	bigIP config.BigIPConfig,
 	pythonBaseDir string,
 	logger logger.Logger,
 ) *Driver {
 	return &Driver{
 		writer:  writer,
-		global:  global,
-		bigIP:   bigIP,
 		baseDir: pythonBaseDir,
 		logger:  logger,
 	}
@@ -71,25 +66,6 @@ func (d *Driver) createDriverCmd() *exec.Cmd {
 	cmd := exec.Command(cmdName, cmdArgs...)
 
 	return cmd
-}
-
-func (d *Driver) initializeDriverConfig() error {
-	sections := make(map[string]interface{})
-	sections["global"] = d.global
-	sections["bigip"] = d.bigIP
-
-	output, err := json.Marshal(sections)
-	if nil != err {
-		return fmt.Errorf("failed marshaling config: %v", err)
-	}
-	n, err := d.writer.Write(output)
-	if nil != err {
-		return fmt.Errorf("failed writing config: %v", err)
-	} else if len(output) != n {
-		return fmt.Errorf("short write from initial config")
-	}
-
-	return nil
 }
 
 func (d *Driver) runBigIPDriver(pid chan<- int, cmd *exec.Cmd) {
@@ -147,11 +123,6 @@ func (d *Driver) runBigIPDriver(pid chan<- int, cmd *exec.Cmd) {
 // Run start the F5Router configuration driver
 func (d *Driver) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	d.logger.Info("f5router-driver-starting")
-
-	err := d.initializeDriverConfig()
-	if nil != err {
-		return err
-	}
 
 	pidCh := make(chan int)
 	go d.runBigIPDriver(pidCh, d.createDriverCmd())

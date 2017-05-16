@@ -27,12 +27,13 @@ type StatusConfig struct {
 
 type BigIPConfig struct {
 	Url            string   `yaml:"url" json:"url"`
-	User           string   `yaml:"user" json:"user"`
-	Pass           string   `yaml:"pass" json:"pass"`
-	Partition      []string `yaml:"partition" json:"partition"`
-	Balance        string   `yaml:"balance" json:"balance"`
-	VerifyInterval int      `yaml:"verify-interval" json:"verify-interval"`
-	ExternalAddr   string   `yaml:"external_addr" json:"external-addr"`
+	User           string   `yaml:"user" json:"username"`
+	Pass           string   `yaml:"pass" json:"password"`
+	Partitions     []string `yaml:"partition" json:"partitions"`
+	Balance        string   `yaml:"balance" json:"-"`
+	VerifyInterval int      `yaml:"verify-interval" json:"-"`
+	ExternalAddr   string   `yaml:"external_addr" json:"-"`
+	SSLProfile     string   `yaml:"ssl_profile" json:"-"`
 }
 
 type GlobalSection struct {
