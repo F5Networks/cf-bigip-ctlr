@@ -126,20 +126,18 @@ func main() {
 		logger.Fatal("f5router-failed-initialization", zap.Error(err))
 	}
 
-	logger.Debug("adding-routing-vip", zap.String("name", "routing-vip-http"),
+	logger.Debug("adding-routing-vip", zap.String("name", f5router.HTTPRouterName),
 		zap.String("address", c.BigIP.ExternalAddr),
 		zap.Int("port", 80),
 	)
-	f5Router.UpdateVirtualServer("routing-vip-http", c.BigIP.ExternalAddr, 80)
-	logger.Debug("adding-routing-vip", zap.String("name", "routing-vip-https"),
-		zap.String("address", c.BigIP.ExternalAddr),
-		zap.Int("port", 443),
-	)
-	f5Router.UpdateVirtualServer("routing-vip-https", c.BigIP.ExternalAddr, 443)
+	f5Router.UpdateVirtualServer(f5router.HTTPRouterName, f5router.HTTP)
 
-	gs := config.GlobalSection{
-		LogLevel:       c.Logging.Level,
-		VerifyInterval: c.BigIP.VerifyInterval,
+	if 0 != len(c.BigIP.SSLProfile) {
+		logger.Debug("adding-routing-vip", zap.String("name", f5router.HTTPSRouterName),
+			zap.String("address", c.BigIP.ExternalAddr),
+			zap.Int("port", 443),
+		)
+		f5Router.UpdateVirtualServer(f5router.HTTPSRouterName, f5router.HTTPS)
 	}
 
 	folderPath, err := os.Getwd()
@@ -157,8 +155,6 @@ func main() {
 
 	driver := f5router.NewDriver(
 		f5Router.ConfigWriter(),
-		gs,
-		c.BigIP,
 		pythonBaseDir,
 		logger,
 	)

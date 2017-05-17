@@ -27,74 +27,68 @@ import (
 )
 
 func TestSort(t *testing.T) {
-	routes := routeConfigs{}
+	l7 := policies{}
 
-	expectedList := make(routeConfigs, 10)
+	expectedList := make(policies, 10)
 
-	vs := routeConfig{}
-	vs.routeItem.Backend.ServiceName = "bar"
-	vs.routeItem.Backend.ServicePort = 80
-	routes = append(routes, &vs)
-	expectedList[1] = &vs
+	p := policy{}
+	p.FullURI = "bar"
+	l7 = append(l7, &p)
+	expectedList[1] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "foo"
-	vs.routeItem.Backend.ServicePort = 2
-	routes = append(routes, &vs)
-	expectedList[5] = &vs
+	p = policy{}
+	p.FullURI = "foo"
+	l7 = append(l7, &p)
+	expectedList[5] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "foo"
-	vs.routeItem.Backend.ServicePort = 8080
-	routes = append(routes, &vs)
-	expectedList[7] = &vs
+	p = policy{}
+	p.FullURI = "foo"
+	l7 = append(l7, &p)
+	expectedList[7] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "baz"
-	vs.routeItem.Backend.ServicePort = 1
-	routes = append(routes, &vs)
-	expectedList[2] = &vs
+	p = policy{}
+	p.FullURI = "baz"
+	l7 = append(l7, &p)
+	expectedList[2] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "foo"
-	vs.routeItem.Backend.ServicePort = 80
-	routes = append(routes, &vs)
-	expectedList[6] = &vs
+	p = policy{}
+	p.FullURI = "foo"
+	l7 = append(l7, &p)
+	expectedList[6] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "foo"
-	vs.routeItem.Backend.ServicePort = 9090
-	routes = append(routes, &vs)
-	expectedList[9] = &vs
+	p = policy{}
+	p.FullURI = "foo"
+	l7 = append(l7, &p)
+	expectedList[9] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "baz"
-	vs.routeItem.Backend.ServicePort = 1000
-	routes = append(routes, &vs)
-	expectedList[3] = &vs
+	p = policy{}
+	p.FullURI = "baz"
+	l7 = append(l7, &p)
+	expectedList[3] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "foo"
-	vs.routeItem.Backend.ServicePort = 8080
-	routes = append(routes, &vs)
-	expectedList[8] = &vs
+	p = policy{}
+	p.FullURI = "foo"
+	l7 = append(l7, &p)
+	expectedList[8] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "foo"
-	vs.routeItem.Backend.ServicePort = 1
-	routes = append(routes, &vs)
-	expectedList[4] = &vs
+	p = policy{}
+	p.FullURI = "foo"
+	l7 = append(l7, &p)
+	expectedList[4] = &p
 
-	vs = routeConfig{}
-	vs.routeItem.Backend.ServiceName = "bar"
-	vs.routeItem.Backend.ServicePort = 1
-	routes = append(routes, &vs)
-	expectedList[0] = &vs
+	p = policy{}
+	p.FullURI = "bar"
+	l7 = append(l7, &p)
+	expectedList[0] = &p
 
-	sort.Sort(routes)
+	sort.Sort(l7)
 
 	for i := range expectedList {
-		require.EqualValues(t, expectedList[i], routes[i],
+		require.EqualValues(t, expectedList[i], l7[i],
 			"Sorted list elements should be equal")
 	}
+}
+
+func TestUpdateEndpoints(t *testing.T) {
+
 }

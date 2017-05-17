@@ -17,12 +17,17 @@
 package f5router
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
@@ -32,93 +37,41 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
-type (
-	// frontend ssl profile
-	sslProfile struct {
-		F5ProfileName string `json:"f5ProfileName,omitempty"`
-	}
-
-	// frontend bindaddr and port
-	virtualAddress struct {
-		BindAddr string `json:"bindAddr,omitempty"`
-		Port     int32  `json:"port,omitempty"`
-	}
-
-	// backend health monitor
-	healthMonitor struct {
-		Interval int    `json:"interval,omitempty"`
-		Protocol string `json:"protocol"`
-		Send     string `json:"send,omitempty"`
-		Timeout  int    `json:"timeout,omitempty"`
-	}
-
-	// virtual server backend
-	backend struct {
-		ServiceName     string          `json:"serviceName"`
-		ServicePort     int32           `json:"servicePort"`
-		PoolMemberAddrs []string        `json:"poolMemberAddrs"`
-		HealthMonitors  []healthMonitor `json:"healthMonitors,omitempty"`
-	}
-
-	// virtual server frontend
-	frontend struct {
-		Name string `json:"virtualServerName"`
-		// Mutual parameter, partition
-		Partition string `json:"partition"`
-
-		// VirtualServer parameters
-		Balance        string          `json:"balance,omitempty"`
-		Mode           string          `json:"mode,omitempty"`
-		VirtualAddress *virtualAddress `json:"virtualAddress,omitempty"`
-		SslProfile     *sslProfile     `json:"sslProfile,omitempty"`
-	}
-
-	routeItem struct {
-		Backend  backend  `json:"backend"`
-		Frontend frontend `json:"frontend"`
-	}
-
-	// RouteConfig main virtual server configuration
-	RouteConfig struct {
-		Item routeItem `json:"virtualServer"`
-	}
-
-	routeMap     map[string]*RouteConfig
-	routeConfigs []*RouteConfig
-
-	// F5Router controller of BigIP configuration objects
-	F5Router struct {
-		c           *config.Config
-		logger      logger.Logger
-		m           routeMap
-		queue       workqueue.RateLimitingInterface
-		writer      *ConfigWriter
-		drainUpdate bool
-	}
-
-	operation int
-	poolData  struct {
-		Name     string
-		URI      string
-		Endpoint string
-		Wildcard bool
-	}
-	virtualData struct {
-		Name string
-		Addr string
-		Port int32
-	}
-
-	workItem struct {
-		op   operation
-		data interface{}
-	}
-)
-
 const (
 	add operation = iota
 	remove
 )
+
+const (
+	// HTTP virtual server without SSL termination on port 80
+	HTTP vsType = iota
+	// HTTPS virtual server with SSL termination on port 443
+	HTTPS
+)
+
+const (
+	// HTTPRouterName HTTP virtual server name
+	HTTPRouterName = "routing-vip-http"
+	// HTTPSRouterName HTTPS virtual server name
+	HTTPSRouterName = "routing-vip-https"
+	// CFRoutingPolicyName Policy name for CF routing
+	CFRoutingPolicyName = "cf-routing-policy"
+)
+
+func (r rules) Len() int           { return len(r) }
+func (r rules) Less(i, j int) bool { return r[i].FullURI < r[j].FullURI }
+func (r rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
+
+func (t vsType) String() string {
+	switch t {
+	case HTTP:
+		return "HTTP"
+	case HTTPS:
+		return "HTTPS"
+	}
+
+	return "Unknown"
+}
 
 // NewF5Router create the F5Router route controller
 func NewF5Router(logger logger.Logger, c *config.Config) (*F5Router, error) {
@@ -127,11 +80,18 @@ func NewF5Router(logger logger.Logger, c *config.Config) (*F5Router, error) {
 		return nil, err
 	}
 	r := F5Router{
-		c:      c,
-		logger: logger,
-		m:      make(routeMap),
-		queue:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		writer: writer,
+		c:         c,
+		logger:    logger,
+		m:         make(routeMap),
+		r:         make(ruleMap),
+		wildcards: make(ruleMap),
+		queue:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		writer:    writer,
+	}
+
+	err = r.writeInitialConfig()
+	if nil != err {
+		return nil, err
 	}
 	return &r, nil
 }
@@ -153,6 +113,28 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.queue.ShutDown()
 	<-done
 	r.logger.Info("f5router-exited")
+	return nil
+}
+
+func (r *F5Router) writeInitialConfig() error {
+	sections := make(map[string]interface{})
+	sections["global"] = config.GlobalSection{
+		LogLevel:       r.c.Logging.Level,
+		VerifyInterval: r.c.BigIP.VerifyInterval,
+	}
+	sections["bigip"] = r.c.BigIP
+
+	output, err := json.Marshal(sections)
+	if nil != err {
+		return fmt.Errorf("failed marshaling initial config: %v", err)
+	}
+	n, err := r.writer.Write(output)
+	if nil != err {
+		return fmt.Errorf("failed writing initial config: %v", err)
+	} else if len(output) != n {
+		return fmt.Errorf("short write from initial config")
+	}
+
 	return nil
 }
 
@@ -212,6 +194,19 @@ func (r *F5Router) process() bool {
 			}
 			sections["bigip"] = r.c.BigIP
 
+			sections["policies"] = policies{r.makeRoutePolicy(CFRoutingPolicyName)}
+
+			ref := &policyRef{
+				Name:      CFRoutingPolicyName,
+				Partition: r.c.BigIP.Partitions[0], //FIXME handle multiple partitions
+			}
+			if vs, ok := r.m[HTTPRouterName]; ok {
+				vs.Item.Frontend.Policies = []*policyRef{ref}
+			}
+			if vs, ok := r.m[HTTPSRouterName]; ok {
+				vs.Item.Frontend.Policies = []*policyRef{ref}
+			}
+
 			services := routeConfigs{}
 			for _, rc := range r.m {
 				services = append(services, rc)
@@ -250,8 +245,8 @@ func (r *F5Router) makePool(
 	name string,
 	uri string,
 	addrs ...string,
-) *RouteConfig {
-	return &RouteConfig{
+) *routeConfig {
+	return &routeConfig{
 		Item: routeItem{
 			Backend: backend{
 				ServiceName:     uri,
@@ -260,13 +255,128 @@ func (r *F5Router) makePool(
 			},
 			Frontend: frontend{
 				Name: name,
-				//TODO need to handle multiple partitions
-				Partition: r.c.BigIP.Partition[0],
+				//FIXME need to handle multiple partitions
+				Partition: r.c.BigIP.Partitions[0],
 				Balance:   r.c.BigIP.Balance,
 				Mode:      "http",
 			},
 		},
 	}
+}
+
+func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
+	_u := "scheme://" + p.URI
+	_u = strings.TrimSuffix(_u, "/")
+	u, err := url.Parse(_u)
+	if nil != err {
+		return nil, err
+	}
+
+	var b bytes.Buffer
+	b.WriteRune('/')
+	b.WriteString(r.c.BigIP.Partitions[0]) //FIXME update to use mutliple partitions
+	b.WriteRune('/')
+	b.WriteString(p.Name)
+
+	a := action{
+		Forward: true,
+		Name:    "0",
+		Pool:    b.String(),
+		Request: true,
+	}
+
+	var c []*condition
+	if true == p.Wildcard {
+		c = append(c, &condition{
+			EndsWith: true,
+			Host:     true,
+			HTTPHost: true,
+			Name:     "0",
+			Index:    0,
+			Request:  true,
+			Values:   []string{u.Host},
+		})
+	} else {
+		c = append(c, &condition{
+			Equals:   true,
+			Host:     true,
+			HTTPHost: true,
+			Name:     "0",
+			Index:    0,
+			Request:  true,
+			Values:   []string{u.Host},
+		})
+
+		if 0 != len(u.Path) {
+			path := strings.TrimPrefix(u.Path, "/")
+			segments := strings.Split(path, "/")
+
+			for i, v := range segments {
+				c = append(c, &condition{
+					Equals:      true,
+					HTTPURI:     true,
+					PathSegment: true,
+					Name:        strconv.Itoa(i + 1),
+					Index:       i + 1,
+					Request:     true,
+					Values:      []string{v},
+				})
+			}
+		}
+	}
+
+	rl := rule{
+		FullURI:    p.URI,
+		Actions:    []*action{&a},
+		Conditions: c,
+		Name:       p.Name,
+	}
+
+	r.logger.Debug("f5router-rule-create", zap.Object("rule", rl))
+	return &rl, nil
+}
+
+func (r *F5Router) makeRoutePolicy(policyName string) *policy {
+	plcy := policy{
+		Controls:  []string{"forwarding"},
+		Legacy:    true,
+		Name:      policyName,
+		Partition: r.c.BigIP.Partitions[0], //FIXME handle multiple partitions
+		Requires:  []string{"http"},
+		Rules:     []*rule{},
+		Strategy:  "first-match",
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	sortRules := func(r ruleMap, rls *rules, ordinal int) {
+		for _, v := range r {
+			*rls = append(*rls, v)
+		}
+
+		sort.Sort(sort.Reverse(*rls))
+
+		for _, v := range *rls {
+			v.Ordinal = ordinal
+			ordinal++
+		}
+		wg.Done()
+	}
+
+	rls := rules{}
+	go sortRules(r.r, &rls, 0)
+
+	w := rules{}
+	go sortRules(r.wildcards, &w, len(r.m))
+
+	wg.Wait()
+
+	rls = append(rls, w...)
+
+	plcy.Rules = rls
+
+	r.logger.Debug("f5router-policy-create", zap.Object("policy", plcy))
+	return &plcy
 }
 
 func (r *F5Router) processPool(op operation, p poolData) (bool, error) {
@@ -301,6 +411,26 @@ func (r *F5Router) processPoolAdd(p poolData) bool {
 			}...)
 		}
 	} else {
+		rule, err := r.makeRouteRule(p)
+		if nil != err {
+			r.logger.Warn("f5router-rule-error", zap.Error(err))
+			return false
+		}
+
+		if true == p.Wildcard {
+			r.wildcards[p.URI] = rule
+			r.logger.Debug("f5router-wildcard-rule-updated",
+				zap.String("name", p.Name),
+				zap.String("uri", p.URI),
+			)
+		} else {
+			r.r[p.URI] = rule
+			r.logger.Debug("f5router-app-rule-updated",
+				zap.String("name", p.Name),
+				zap.String("uri", p.URI),
+			)
+		}
+
 		pool := r.makePool(p.Name, p.URI, p.Endpoint)
 		r.m[p.Name] = pool
 		ret = true
@@ -330,32 +460,26 @@ func (r *F5Router) processPoolRemove(p poolData) bool {
 		if 0 == len(pool.Item.Backend.PoolMemberAddrs) {
 			delete(r.m, p.Name)
 			r.logger.Debug("f5router-pool-removed")
+
+			if true == p.Wildcard {
+				delete(r.wildcards, p.URI)
+				r.logger.Debug("f5router-wildcard-rule-removed",
+					zap.String("name", p.Name),
+					zap.String("uri", p.URI),
+				)
+			} else {
+				delete(r.r, p.URI)
+				r.logger.Debug("f5router-app-rule-removed",
+					zap.String("name", p.Name),
+					zap.String("uri", p.URI),
+				)
+			}
 		}
 	} else {
 		r.logger.Debug("f5router-pool-not-found", zap.String("uri", p.Name))
 	}
 
 	return ret
-}
-
-func (r *F5Router) queuePoolWork(
-	name string,
-	op operation,
-	uri string,
-	wild bool,
-	endpoint *route.Endpoint,
-) {
-	p := poolData{
-		Name:     name,
-		URI:      uri,
-		Endpoint: endpoint.CanonicalAddr(),
-		Wildcard: wild,
-	}
-	w := workItem{
-		op:   op,
-		data: p,
-	}
-	r.queue.Add(w)
 }
 
 func makePoolName(uri string) string {
@@ -376,20 +500,22 @@ func (r *F5Router) UpdatePoolEndpoints(
 		zap.String("endpoint", endpoint.CanonicalAddr()),
 	)
 
-	var (
-		u    string
-		name string
-		wild bool
-	)
+	p := poolData{}
 	if strings.HasPrefix(uri, "*.") {
-		u = strings.TrimPrefix(uri, "*.")
-		name = u
-		wild = true
+		p.URI = strings.TrimPrefix(uri, "*.")
+		p.Name = p.URI
+		p.Wildcard = true
 	} else {
-		u = uri
-		name = makePoolName(uri)
+		p.URI = uri
+		p.Name = makePoolName(uri)
 	}
-	r.queuePoolWork(name, add, u, wild, endpoint)
+
+	p.Endpoint = endpoint.CanonicalAddr()
+	w := workItem{
+		op:   add,
+		data: p,
+	}
+	r.queue.Add(w)
 }
 
 // RemovePoolEndpoints remove endpoint from config, if empty remove
@@ -415,15 +541,37 @@ func (r *F5Router) RemovePoolEndpoints(
 		u = uri
 		name = makePoolName(uri)
 	}
-	r.queuePoolWork(name, remove, u, wild, endpoint)
+
+	p := poolData{
+		Name:     name,
+		URI:      uri,
+		Endpoint: endpoint.CanonicalAddr(),
+		Wildcard: wild,
+	}
+	w := workItem{
+		op:   remove,
+		data: p,
+	}
+	r.queue.Add(w)
 }
 
 func (r *F5Router) makeVirtual(
 	name string,
-	addr string,
-	port int32,
-) *RouteConfig {
-	vs := &RouteConfig{
+	t vsType,
+) *routeConfig {
+	var port int32
+	var ssl *sslProfile
+
+	if t == HTTP {
+		port = 80
+	} else if t == HTTPS {
+		port = 443
+		ssl = &sslProfile{
+			F5ProfileName: r.c.BigIP.SSLProfile,
+		}
+	}
+
+	vs := &routeConfig{
 		Item: routeItem{
 			Backend: backend{
 				ServiceName:     name,
@@ -432,14 +580,15 @@ func (r *F5Router) makeVirtual(
 			},
 			Frontend: frontend{
 				Name: name,
-				//TODO need to handle multiple partitions
-				Partition: r.c.BigIP.Partition[0],
+				//FIXME need to handle multiple partitions
+				Partition: r.c.BigIP.Partitions[0],
 				Balance:   r.c.BigIP.Balance,
 				Mode:      "http",
 				VirtualAddress: &virtualAddress{
-					BindAddr: addr,
+					BindAddr: r.c.BigIP.ExternalAddr,
 					Port:     port,
 				},
+				SSLProfile: ssl,
 			},
 		},
 	}
@@ -457,7 +606,7 @@ func (r *F5Router) processVirtual(op operation, v virtualData) (bool, error) {
 }
 
 func (r *F5Router) processVirtualAdd(v virtualData) bool {
-	vs := r.makeVirtual(v.Name, v.Addr, v.Port)
+	vs := r.makeVirtual(v.Name, v.T)
 	r.m[v.Name] = vs
 	r.logger.Debug("f5router-virtual-server-updated", zap.Object("virtual", vs))
 	return true
@@ -469,44 +618,44 @@ func (r *F5Router) processVirtualRemove(v virtualData) bool {
 	return true
 }
 
-func (r *F5Router) queueVirtualWork(
-	op operation,
+// UpdateVirtualServer create VirtualServer config with VirtualAddress frontend
+func (r *F5Router) UpdateVirtualServer(
 	name string,
-	addr string,
-	port int32,
+	t vsType,
 ) {
+	r.logger.Debug("f5router-updating-virtual-server",
+		zap.String("name", name),
+		zap.String("type", t.String()),
+	)
 	vs := virtualData{
 		Name: name,
-		Addr: addr,
-		Port: port,
+		T:    t,
 	}
 
 	w := workItem{
-		op:   op,
+		op:   add,
 		data: vs,
 	}
 	r.queue.Add(w)
 }
 
-// UpdateVirtualServer create VirtualServer config with VirtualAddress frontend
-func (r *F5Router) UpdateVirtualServer(
-	name string,
-	addr string,
-	port int32,
-) {
-	r.logger.Debug("f5router-updating-virtual-server",
-		zap.String("name", name),
-		zap.String("address", fmt.Sprintf("%s:%d", addr, port)),
-	)
-	r.queueVirtualWork(add, name, addr, port)
-}
-
 // RemoveVirtualServer delete VirtualServer config
 func (r *F5Router) RemoveVirtualServer(
 	name string,
+	t vsType,
 ) {
 	r.logger.Debug("f5router-removing-virtual-server",
 		zap.String("name", name),
+		zap.String("type", t.String()),
 	)
-	r.queueVirtualWork(remove, name, "", -1)
+	vs := virtualData{
+		Name: name,
+		T:    t,
+	}
+
+	w := workItem{
+		op:   remove,
+		data: vs,
+	}
+	r.queue.Add(w)
 }
