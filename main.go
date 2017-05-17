@@ -154,29 +154,14 @@ func main() {
 
 	logger.Info("starting-python-driver")
 	pythonBaseDir = fmt.Sprintf("%v/python/", folderPath)
-	subPidCh, err := startPythonDriver(
+
+	driver := f5router.NewDriver(
 		f5Router.ConfigWriter(),
 		gs,
 		c.BigIP,
 		pythonBaseDir,
 		logger,
 	)
-	if nil != err {
-		logger.Fatal("initialize-python-driver-error", zap.Error(err))
-	}
-	subPid := <-subPidCh
-	defer func(pid int) {
-		if 0 != pid {
-			proc, err := os.FindProcess(pid)
-			if nil != err {
-				logger.Warn("failed-to-find-process", zap.Error(err))
-			}
-			err = proc.Signal(os.Interrupt)
-			if nil != err {
-				logger.Warn("failed-to-stop-process", zap.Int("pid", pid), zap.Error(err))
-			}
-		}
-	}(subPid)
 
 	registry := rregistry.NewRouteRegistry(
 		logger.Session("registry"),
@@ -246,6 +231,7 @@ func main() {
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	members = append(members, grouper.Member{Name: "router", Runner: router})
 	members = append(members, grouper.Member{Name: "f5router", Runner: f5Router})
+	members = append(members, grouper.Member{Name: "f5driver", Runner: driver})
 
 	group := grouper.NewOrdered(os.Interrupt, members)
 
