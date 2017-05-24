@@ -77,11 +77,13 @@ class K8sCloudBigIP(CloudBigIP):
         partitions: List of BIG-IP partitions to manage
     """
 
-    def __init__(self, hostname, port, username, password, partitions):
+    def __init__(self, hostname, port, username, password, partitions,
+                 manage_types):
         """Initialize the K8sCloudBigIP object."""
         super(K8sCloudBigIP, self).__init__(hostname, port, username,
                                             password, partitions,
-                                            token="tmos")
+                                            token="tmos",
+                                            manage_types=manage_types)
 
     def _apply_config(self, config):
         """Apply the configuration to the BIG-IP.
@@ -284,6 +286,9 @@ def create_ltm_config_kubernetes(bigip, config):
     Args:
         config: Kubernetes BigIP config which contains a svc list
     """
+    configuration = {}
+    configuration['policies'] = config.get('policies', [])
+
     f5_services = {}
 
     # partitions this script is responsible for:
@@ -296,6 +301,8 @@ def create_ltm_config_kubernetes(bigip, config):
         backend = svc['virtualServer']['backend']
         frontend = svc['virtualServer']['frontend']
         health_monitors = backend.get('healthMonitors', [])
+        policies = frontend.get('policies', [])
+        profiles = frontend.get('profiles', [])
 
         # Only handle application if it's partition is one that this script
         # is responsible for
@@ -331,7 +338,6 @@ def create_ltm_config_kubernetes(bigip, config):
             f5_service['health'] = []
 
             # Parse the SSL profile into partition and name
-            profiles = []
             if 'sslProfile' in frontend:
                 profile = (
                     frontend['sslProfile']['f5ProfileName'].split('/'))
@@ -344,10 +350,14 @@ def create_ltm_config_kubernetes(bigip, config):
                                      'name': profile[1]})
 
             # Add appropriate profiles
+            profile_http = {'partition': 'Common', 'name': 'http'}
+            profile_tcp = {'partition': 'Common', 'name': 'tcp'}
             if str(frontend['mode']).lower() == 'http':
-                profiles.append({'partition': 'Common', 'name': 'http'})
+                if profile_http not in profiles:
+                    profiles.append(profile_http)
             elif get_protocol(frontend['mode']) == 'tcp':
-                profiles.append({'partition': 'Common', 'name': 'tcp'})
+                if profile_tcp not in profiles:
+                    profiles.append(profile_tcp)
 
             if ('virtualAddress' in frontend and
                     'bindAddr' in frontend['virtualAddress']):
@@ -364,7 +374,8 @@ def create_ltm_config_kubernetes(bigip, config):
                                    frontend['virtualAddress']['port']),
                     'pool': "/%s/%s" % (frontend['partition'], frontend_name),
                     'sourceAddressTranslation': {'type': 'automap'},
-                    'profiles': profiles
+                    'profiles': profiles,
+                    'policies': policies
                 })
 
             monitors = None
@@ -407,7 +418,9 @@ def create_ltm_config_kubernetes(bigip, config):
 
         f5_services.update({frontend_name: f5_service})
 
-    return f5_services
+    configuration['services'] = f5_services
+
+    return configuration
 
 
 class ConfigHandler():
@@ -753,14 +766,14 @@ def _handle_bigip_config(config):
     if (not config) or ('bigip' not in config):
         raise ConfigError('Configuration file missing "bigip" section')
     bigip = config['bigip']
-    if 'user' not in bigip:
+    if 'username' not in bigip:
         raise ConfigError("bigip config: {}".format(config))
-    if 'pass' not in bigip:
+    if 'password' not in bigip:
         raise ConfigError('Configuration file missing '
                           '"bigip:pass" section')
     if 'url' not in bigip:
         raise ConfigError('Configuration file missing "bigip:url" section')
-    if ('partition' not in bigip) or (len(bigip['partition']) == 0):
+    if ('partitions' not in bigip) or (len(bigip['partitions']) == 0):
         raise ConfigError('Configuration file must specify at least one '
                           'partition in the "bigip:partitions" section')
 
@@ -796,9 +809,15 @@ def main():
         #               changes to these fields in subsequent updates). We
         #               may want to make the changes dynamic in the future.
         bigip = K8sCloudBigIP(host, port,
-                              config['bigip']['user'],
-                              config['bigip']['pass'],
-                              config['bigip']['partition'])
+                              config['bigip']['username'],
+                              config['bigip']['password'],
+                              config['bigip']['partitions'],
+                              manage_types=[
+                                  '/tm/ltm/virtual',
+                                  '/tm/ltm/pool',
+                                  '/tm/ltm/monitor',
+                                  '/tm/sys/application/service',
+                                  '/tm/ltm/policy'])
 
         handler = ConfigHandler(args.config_file, bigip, verify_interval)
 
