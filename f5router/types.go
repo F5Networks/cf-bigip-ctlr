@@ -43,8 +43,8 @@ type (
 		Timeout  int    `json:"timeout,omitempty"`
 	}
 
-	// virtual server policy reference
-	policyRef struct {
+	// virtual server policy/profile reference
+	nameRef struct {
 		Name      string `json:"name"`
 		Partition string `json:"partition"`
 	}
@@ -68,7 +68,8 @@ type (
 		Mode           string          `json:"mode,omitempty"`
 		VirtualAddress *virtualAddress `json:"virtualAddress,omitempty"`
 		SSLProfile     *sslProfile     `json:"sslProfile,omitempty"`
-		Policies       []*policyRef    `json:"policies,omitempty"`
+		Policies       []*nameRef      `json:"policies,omitempty"`
+		Profiles       []*nameRef      `json:"profiles,omitempty"`
 	}
 
 	routeItem struct {

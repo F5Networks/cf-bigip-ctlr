@@ -34,6 +34,11 @@ type BigIPConfig struct {
 	VerifyInterval int      `yaml:"verify-interval" json:"-"`
 	ExternalAddr   string   `yaml:"external_addr" json:"-"`
 	SSLProfile     string   `yaml:"ssl_profile" json:"-"`
+	Policies       struct {
+		PreRouting  []string `yaml:"prerouting" json:"-"`
+		PostRouting []string `yaml:"postrouting" json:"-"`
+	} `yaml:"policies" json:"-"`
+	Profiles []string `yaml:"profiles" json:"-"`
 }
 
 type GlobalSection struct {

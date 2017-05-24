@@ -146,6 +146,39 @@ func (r *F5Router) runWorker(done chan<- struct{}) {
 	close(done)
 }
 
+func (r *F5Router) generateNameList(names []string) []*nameRef {
+	var refs []*nameRef
+	for i := range names {
+		p := strings.TrimPrefix(names[i], "/")
+		parts := strings.Split(p, "/")
+		if 2 == len(parts) {
+			refs = append(refs, &nameRef{
+				Name:      parts[1],
+				Partition: parts[0],
+			})
+		} else {
+			r.logger.Warn("f5router-skipping-name",
+				zap.String("parse-error",
+					fmt.Sprintf("skipping name %s, need format /[partition]/[name]",
+						p)),
+			)
+		}
+	}
+
+	return refs
+}
+
+func (r *F5Router) generatePolicyList() []*nameRef {
+	var n []*nameRef
+	n = append(n, r.generateNameList(r.c.BigIP.Policies.PreRouting)...)
+	n = append(n, &nameRef{
+		Name:      CFRoutingPolicyName,
+		Partition: r.c.BigIP.Partitions[0], // FIXME handle multiple partitions
+	})
+	n = append(n, r.generateNameList(r.c.BigIP.Policies.PostRouting)...)
+	return n
+}
+
 func (r *F5Router) process() bool {
 	item, quit := r.queue.Get()
 	if quit {
@@ -196,15 +229,15 @@ func (r *F5Router) process() bool {
 
 			sections["policies"] = policies{r.makeRoutePolicy(CFRoutingPolicyName)}
 
-			ref := &policyRef{
-				Name:      CFRoutingPolicyName,
-				Partition: r.c.BigIP.Partitions[0], //FIXME handle multiple partitions
-			}
+			plcs := r.generatePolicyList()
+			prfls := r.generateNameList(r.c.BigIP.Profiles)
 			if vs, ok := r.m[HTTPRouterName]; ok {
-				vs.Item.Frontend.Policies = []*policyRef{ref}
+				vs.Item.Frontend.Policies = plcs
+				vs.Item.Frontend.Profiles = prfls
 			}
 			if vs, ok := r.m[HTTPSRouterName]; ok {
-				vs.Item.Frontend.Policies = []*policyRef{ref}
+				vs.Item.Frontend.Policies = plcs
+				vs.Item.Frontend.Profiles = prfls
 			}
 
 			services := routeConfigs{}

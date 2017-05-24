@@ -11,6 +11,14 @@ applications:
                         balance: round-robin
                         verify_interval: 30
                         external_addr: 172.16.3.90
+                        ssl_profile: /Common/certs
+                        policies:
+                          prerouting:
+                            - /Common/header-insert
+                          postrouting:
+                            - /Common/redirect
+                        profiles:
+                          - /Common/http
 
                       status:
                         port: 8087
