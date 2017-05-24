@@ -344,7 +344,7 @@ func (r *F5Router) makeRoutePolicy(policyName string) *policy {
 		Partition: r.c.BigIP.Partitions[0], //FIXME handle multiple partitions
 		Requires:  []string{"http"},
 		Rules:     []*rule{},
-		Strategy:  "first-match",
+		Strategy:  "/Common/first-match",
 	}
 
 	var wg sync.WaitGroup
