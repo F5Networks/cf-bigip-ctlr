@@ -340,8 +340,8 @@ func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
 			Values:   []string{u.Host},
 		})
 
-		if 0 != len(u.Path) {
-			path := strings.TrimPrefix(u.Path, "/")
+		if 0 != len(u.EscapedPath()) {
+			path := strings.TrimPrefix(u.EscapedPath(), "/")
 			segments := strings.Split(path, "/")
 
 			for i, v := range segments {
