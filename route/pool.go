@@ -238,7 +238,7 @@ func (p *Pool) Endpoints(defaultLoadBalance, initial string) EndpointIterator {
 	}
 }
 
-func (p *Pool) findById(id string) *Endpoint {
+func (p *Pool) FindById(id string) *Endpoint {
 	var endpoint *Endpoint
 	p.lock.Lock()
 	e := p.index[id]

@@ -126,20 +126,6 @@ func main() {
 		logger.Fatal("f5router-failed-initialization", zap.Error(err))
 	}
 
-	logger.Debug("adding-routing-vip", zap.String("name", f5router.HTTPRouterName),
-		zap.String("address", c.BigIP.ExternalAddr),
-		zap.Int("port", 80),
-	)
-	f5Router.UpdateVirtualServer(f5router.HTTPRouterName, f5router.HTTP)
-
-	if 0 != len(c.BigIP.SSLProfile) {
-		logger.Debug("adding-routing-vip", zap.String("name", f5router.HTTPSRouterName),
-			zap.String("address", c.BigIP.ExternalAddr),
-			zap.Int("port", 443),
-		)
-		f5Router.UpdateVirtualServer(f5router.HTTPSRouterName, f5router.HTTPS)
-	}
-
 	folderPath, err := os.Getwd()
 	if err != nil {
 		logger.Error("file-get-error", zap.Error(err))

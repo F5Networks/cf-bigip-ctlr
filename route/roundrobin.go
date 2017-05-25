@@ -24,7 +24,7 @@ func NewRoundRobin(p *Pool, initial string) EndpointIterator {
 func (r *RoundRobin) Next() *Endpoint {
 	var e *Endpoint
 	if r.initialEndpoint != "" {
-		e = r.pool.findById(r.initialEndpoint)
+		e = r.pool.FindById(r.initialEndpoint)
 		r.initialEndpoint = ""
 	}
 

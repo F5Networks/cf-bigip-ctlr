@@ -89,18 +89,24 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	routekey := uri.RouteKey()
 
+	var updateRoute bool
 	pool := r.byURI.Find(routekey)
 	if pool == nil {
 		contextPath := parseContextPath(uri)
 		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
 		r.byURI.Insert(routekey, pool)
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
+
+		r.f5Router.RouteUpdate(f5router.Add, r.byURI, routekey)
+	} else {
+		if nil != pool.FindById(endpoint.CanonicalAddr()) {
+			updateRoute = true
+		}
 	}
 
 	endpointAdded := pool.Put(endpoint)
-	if endpointAdded {
-		r.logger.Debug("checking-route-update", zap.String("key", routekey.String()))
-		r.f5Router.UpdatePoolEndpoints(routekey.String(), endpoint)
+	if endpointAdded && updateRoute {
+		r.f5Router.RouteUpdate(f5router.Update, r.byURI, routekey)
 	}
 
 	r.timeOfLastUpdate = t
@@ -148,8 +154,7 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.logger.Debug("checking-route-remove", zap.String("key", uri.String()))
-			r.f5Router.RemovePoolEndpoints(uri.String(), endpoint)
+			r.f5Router.RouteUpdate(f5router.Remove, r.byURI, uri)
 
 			r.logger.Debug("endpoint-unregistered", zapData...)
 		} else {
@@ -295,6 +300,11 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		endpoints := t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
 		if len(endpoints) > 0 {
+			if nil == t.Pool {
+				r.f5Router.RouteUpdate(f5router.Remove, t, route.Uri(t.ToPath()))
+			} else {
+				r.f5Router.RouteUpdate(f5router.Update, t, route.Uri(t.ToPath()))
+			}
 			addresses := []string{}
 			for _, e := range endpoints {
 				addresses = append(addresses, e.CanonicalAddr())

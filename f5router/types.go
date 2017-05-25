@@ -20,6 +20,9 @@ import (
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 
+	"github.com/cf-bigip-ctlr/registry/container"
+	"github.com/cf-bigip-ctlr/route"
+
 	"k8s.io/client-go/util/workqueue"
 )
 
@@ -83,38 +86,31 @@ type (
 		Item routeItem `json:"virtualServer"`
 	}
 
-	routeMap     map[string]*routeConfig
-	ruleMap      map[string]*rule
+	routeMap     map[route.Uri]*routeConfig
+	ruleMap      map[route.Uri]*rule
 	routeConfigs []*routeConfig
 
 	// F5Router controller of BigIP configuration objects
 	F5Router struct {
-		c           *config.Config
-		logger      logger.Logger
-		m           routeMap
-		r           ruleMap
-		wildcards   ruleMap
-		queue       workqueue.RateLimitingInterface
-		writer      *ConfigWriter
-		drainUpdate bool
+		c            *config.Config
+		logger       logger.Logger
+		m            routeMap
+		r            ruleMap
+		wildcards    ruleMap
+		queue        workqueue.RateLimitingInterface
+		writer       *ConfigWriter
+		routeVSHTTP  *routeConfig
+		routeVSHTTPS *routeConfig
+		drainUpdate  bool
 	}
 
-	operation int
-	vsType    int
-	poolData  struct {
-		Name     string
-		URI      string
-		Endpoint string
-		Wildcard bool
-	}
-	virtualData struct {
+	operation   int
+	vsType      int
+	routeUpdate struct {
 		Name string
-		T    vsType
-	}
-
-	workItem struct {
-		op   operation
-		data interface{}
+		URI  route.Uri
+		T    *container.Trie
+		Op   operation
 	}
 
 	action struct {
