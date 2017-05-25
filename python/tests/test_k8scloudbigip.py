@@ -55,7 +55,11 @@ class KubernetesTest(BigIPTest):
         partition = 'k8s'
         with patch.object(BigIP, '_get_tmos_version'):
             bigip = ctlr.K8sCloudBigIP('1.2.3.4', '443', 'admin',
-                                       'default', [partition])
+                                       'default', [partition], manage_types=[
+                                           '/tm/ltm/virtual',
+                                           '/tm/ltm/pool',
+                                           '/tm/ltm/monitor',
+                                           '/tm/sys/application/service'])
         super(KubernetesTest, self).setUp(partition, bigip)
 
         self.bigip.fdb_records_update_orig = self.bigip.fdb_records_update

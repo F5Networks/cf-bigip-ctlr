@@ -693,9 +693,9 @@ def test_handle_bigip_config(request):
         handler = bigipconfigdriver.ConfigHandler(config_file, bigip, 0)
 
         obj = {}
-        obj['bigip'] = {'user': 'admin', 'pass': 'changeme',
+        obj['bigip'] = {'username': 'admin', 'password': 'changeme',
                         'url': 'http://10.10.10.10:443',
-                        'partition': ['common', 'velcro']}
+                        'partitions': ['common', 'velcro']}
 
         with open(config_file, 'w+') as f:
             def fin():
