@@ -31,6 +31,7 @@ import (
 
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/registry/container"
 	"github.com/cf-bigip-ctlr/route"
 
 	"github.com/uber-go/zap"
@@ -38,8 +39,12 @@ import (
 )
 
 const (
-	add operation = iota
-	remove
+	// Add operation
+	Add operation = iota
+	// Update operation
+	Update
+	// Remove operation
+	Remove
 )
 
 const (
@@ -62,15 +67,30 @@ func (r rules) Len() int           { return len(r) }
 func (r rules) Less(i, j int) bool { return r[i].FullURI < r[j].FullURI }
 func (r rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 
-func (t vsType) String() string {
-	switch t {
-	case HTTP:
-		return "HTTP"
-	case HTTPS:
-		return "HTTPS"
+func (op operation) String() string {
+	switch op {
+	case Add:
+		return "Add"
+	case Update:
+		return "Update"
+	case Remove:
+		return "Remove"
 	}
 
 	return "Unknown"
+}
+
+func makePoolName(uri string) string {
+	var name string
+	if strings.HasPrefix(uri, "*.") {
+		name = strings.TrimPrefix(uri, "*.")
+	} else {
+		sum := sha256.Sum256([]byte(uri))
+		index := strings.Index(uri, ".")
+
+		name = fmt.Sprintf("%s-%x", uri[:index], sum[:8])
+	}
+	return name
 }
 
 // NewF5Router create the F5Router route controller
@@ -93,6 +113,11 @@ func NewF5Router(logger logger.Logger, c *config.Config) (*F5Router, error) {
 	if nil != err {
 		return nil, err
 	}
+
+	r.routeVSHTTP = r.makeVirtual(HTTPRouterName, HTTP)
+	if 0 != len(c.BigIP.SSLProfile) {
+		r.routeVSHTTPS = r.makeVirtual(HTTPSRouterName, HTTPS)
+	}
 	return &r, nil
 }
 
@@ -114,6 +139,50 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	<-done
 	r.logger.Info("f5router-exited")
 	return nil
+}
+
+func (r *F5Router) makeVirtual(
+	name string,
+	t vsType,
+) *routeConfig {
+	var port int32
+	var ssl *sslProfile
+
+	if t == HTTP {
+		port = 80
+	} else if t == HTTPS {
+		port = 443
+		ssl = &sslProfile{
+			F5ProfileName: r.c.BigIP.SSLProfile,
+		}
+	}
+
+	vs := &routeConfig{
+		Item: routeItem{
+			Backend: backend{
+				ServiceName:     name,
+				ServicePort:     -1,         // unused
+				PoolMemberAddrs: []string{}, // unused
+			},
+			Frontend: frontend{
+				Name: name,
+				//FIXME need to handle multiple partitions
+				Partition: r.c.BigIP.Partitions[0],
+				Balance:   r.c.BigIP.Balance,
+				Mode:      "http",
+				VirtualAddress: &virtualAddress{
+					BindAddr: r.c.BigIP.ExternalAddr,
+					Port:     port,
+				},
+				SSLProfile: ssl,
+			},
+		},
+	}
+	plcs := r.generatePolicyList()
+	prfls := r.generateNameList(r.c.BigIP.Profiles)
+	vs.Item.Frontend.Policies = plcs
+	vs.Item.Frontend.Profiles = prfls
+	return vs
 }
 
 func (r *F5Router) writeInitialConfig() error {
@@ -188,7 +257,7 @@ func (r *F5Router) process() bool {
 
 	defer r.queue.Done(item)
 
-	workItem, ok := item.(workItem)
+	ru, ok := item.(routeUpdate)
 	if false == ok {
 		r.logger.Warn("f5router-unknown-workitem",
 			zap.Error(errors.New("workqueue delivered unsupported work type")))
@@ -197,16 +266,13 @@ func (r *F5Router) process() bool {
 
 	var tryUpdate bool
 	var err error
-	switch work := workItem.data.(type) {
-	case poolData:
-		r.logger.Debug("f5router-received-pool-request")
-		tryUpdate, err = r.processPool(workItem.op, work)
-	case virtualData:
-		r.logger.Debug("f5router-received-virtual-request")
-		tryUpdate, err = r.processVirtual(workItem.op, work)
-	default:
-		r.logger.Warn("f5router-unknown-request",
-			zap.Error(errors.New("workqueue item contains unsupported work request")))
+	r.logger.Debug("f5router-received-pool-request")
+	if ru.Op == Add {
+		tryUpdate = r.processRouteAdd(ru)
+	} else if ru.Op == Update {
+		tryUpdate = true
+	} else if ru.Op == Remove {
+		tryUpdate = r.processRouteRemove(ru)
 	}
 
 	if false == r.drainUpdate {
@@ -229,21 +295,22 @@ func (r *F5Router) process() bool {
 
 			sections["policies"] = policies{r.makeRoutePolicy(CFRoutingPolicyName)}
 
-			plcs := r.generatePolicyList()
-			prfls := r.generateNameList(r.c.BigIP.Profiles)
-			if vs, ok := r.m[HTTPRouterName]; ok {
-				vs.Item.Frontend.Policies = plcs
-				vs.Item.Frontend.Profiles = prfls
-			}
-			if vs, ok := r.m[HTTPSRouterName]; ok {
-				vs.Item.Frontend.Policies = plcs
-				vs.Item.Frontend.Profiles = prfls
+			services := routeConfigs{}
+			services = append(services, r.routeVSHTTP)
+			if nil != r.routeVSHTTP {
+				services = append(services, r.routeVSHTTPS)
 			}
 
-			services := routeConfigs{}
-			for _, rc := range r.m {
-				services = append(services, rc)
-			}
+			ru.T.EachNodeWithPool(func(t *container.Trie) {
+				var addrs []string
+				t.Pool.Each(func(e *route.Endpoint) {
+					addrs = append(addrs, e.CanonicalAddr())
+				})
+				uri := t.ToPath()
+				p := r.makePool(makePoolName(uri), uri, addrs...)
+				services = append(services, p)
+			})
+
 			sections["services"] = services
 
 			r.logger.Debug("f5router-drain", zap.Object("writing", sections))
@@ -297,8 +364,8 @@ func (r *F5Router) makePool(
 	}
 }
 
-func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
-	_u := "scheme://" + p.URI
+func (r *F5Router) makeRouteRule(ru routeUpdate) (*rule, error) {
+	_u := "scheme://" + ru.URI.String()
 	_u = strings.TrimSuffix(_u, "/")
 	u, err := url.Parse(_u)
 	if nil != err {
@@ -309,7 +376,7 @@ func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
 	b.WriteRune('/')
 	b.WriteString(r.c.BigIP.Partitions[0]) //FIXME update to use mutliple partitions
 	b.WriteRune('/')
-	b.WriteString(p.Name)
+	b.WriteString(ru.Name)
 
 	a := action{
 		Forward: true,
@@ -319,7 +386,7 @@ func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
 	}
 
 	var c []*condition
-	if true == p.Wildcard {
+	if true == strings.HasPrefix(ru.URI.String(), "*.") {
 		c = append(c, &condition{
 			EndsWith: true,
 			Host:     true,
@@ -327,7 +394,7 @@ func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
 			Name:     "0",
 			Index:    0,
 			Request:  true,
-			Values:   []string{u.Host},
+			Values:   []string{strings.TrimPrefix(u.Host, "*.")},
 		})
 	} else {
 		c = append(c, &condition{
@@ -359,10 +426,10 @@ func (r *F5Router) makeRouteRule(p poolData) (*rule, error) {
 	}
 
 	rl := rule{
-		FullURI:    p.URI,
+		FullURI:    ru.URI.String(),
 		Actions:    []*action{&a},
 		Conditions: c,
-		Name:       p.Name,
+		Name:       ru.Name,
 	}
 
 	r.logger.Debug("f5router-rule-create", zap.Object("rule", rl))
@@ -412,283 +479,72 @@ func (r *F5Router) makeRoutePolicy(policyName string) *policy {
 	return &plcy
 }
 
-func (r *F5Router) processPool(op operation, p poolData) (bool, error) {
-	if op == add {
-		return r.processPoolAdd(p), nil
-	} else if op == remove {
-		return r.processPoolRemove(p), nil
-	} else {
-		return false, fmt.Errorf("received unsupported pool operation %v", op)
-	}
-}
-
-func (r *F5Router) processPoolAdd(p poolData) bool {
+func (r *F5Router) processRouteAdd(ru routeUpdate) bool {
 	var ret bool
-	if pool, ok := r.m[p.Name]; ok {
-		var found bool
-		for _, e := range pool.Item.Backend.PoolMemberAddrs {
-			if e == p.Endpoint {
-				found = true
-				break
-			}
-		}
-		if false == found {
-			pool.Item.Backend.PoolMemberAddrs =
-				append(pool.Item.Backend.PoolMemberAddrs, p.Endpoint)
-			ret = true
-			r.logger.Debug("f5router-pool-updated", zap.Object("pool-config", pool))
-		} else {
-			r.logger.Debug("f5router-pool-not-updated", []zap.Field{
-				zap.String("wanted", p.Endpoint),
-				zap.Object("have", pool),
-			}...)
-		}
-	} else {
-		rule, err := r.makeRouteRule(p)
-		if nil != err {
-			r.logger.Warn("f5router-rule-error", zap.Error(err))
-			return false
-		}
-
-		if true == p.Wildcard {
-			r.wildcards[p.URI] = rule
-			r.logger.Debug("f5router-wildcard-rule-updated",
-				zap.String("name", p.Name),
-				zap.String("uri", p.URI),
-			)
-		} else {
-			r.r[p.URI] = rule
-			r.logger.Debug("f5router-app-rule-updated",
-				zap.String("name", p.Name),
-				zap.String("uri", p.URI),
-			)
-		}
-
-		pool := r.makePool(p.Name, p.URI, p.Endpoint)
-		r.m[p.Name] = pool
-		ret = true
-		r.logger.Debug("f5router-pool-created", zap.Object("pool-config", pool))
+	rule, err := r.makeRouteRule(ru)
+	if nil != err {
+		r.logger.Warn("f5router-rule-error", zap.Error(err))
+		return false
 	}
 
-	return ret
-}
-
-func (r *F5Router) processPoolRemove(p poolData) bool {
-	var ret bool
-	if pool, ok := r.m[p.Name]; ok {
-		for i, e := range pool.Item.Backend.PoolMemberAddrs {
-			if e == p.Endpoint {
-				pool.Item.Backend.PoolMemberAddrs = append(
-					pool.Item.Backend.PoolMemberAddrs[:i],
-					pool.Item.Backend.PoolMemberAddrs[i+1:]...)
-				break
-			}
-		}
-		r.logger.Debug("f5router-pool-endpoint-removed",
-			zap.String("removed", p.Endpoint),
-			zap.Object("remaining", pool),
+	if true == strings.HasPrefix(ru.URI.String(), "*.") {
+		r.wildcards[ru.URI] = rule
+		r.logger.Debug("f5router-wildcard-rule-updated",
+			zap.String("name", ru.Name),
+			zap.String("uri", ru.URI.String()),
 		)
-		ret = true
-
-		if 0 == len(pool.Item.Backend.PoolMemberAddrs) {
-			delete(r.m, p.Name)
-			r.logger.Debug("f5router-pool-removed")
-
-			if true == p.Wildcard {
-				delete(r.wildcards, p.URI)
-				r.logger.Debug("f5router-wildcard-rule-removed",
-					zap.String("name", p.Name),
-					zap.String("uri", p.URI),
-				)
-			} else {
-				delete(r.r, p.URI)
-				r.logger.Debug("f5router-app-rule-removed",
-					zap.String("name", p.Name),
-					zap.String("uri", p.URI),
-				)
-			}
-		}
 	} else {
-		r.logger.Debug("f5router-pool-not-found", zap.String("uri", p.Name))
+		r.r[ru.URI] = rule
+		r.logger.Debug("f5router-app-rule-updated",
+			zap.String("name", ru.Name),
+			zap.String("uri", ru.URI.String()),
+		)
 	}
 
 	return ret
 }
 
-func makePoolName(uri string) string {
-	sum := sha256.Sum256([]byte(uri))
-	index := strings.Index(uri, ".")
+func (r *F5Router) processRouteRemove(ru routeUpdate) bool {
+	var ret bool
+	pool := ru.T.Find(ru.URI)
+	if nil == pool || pool.IsEmpty() {
+		if true == strings.HasPrefix(ru.URI.String(), "*.") {
+			delete(r.wildcards, ru.URI)
+			r.logger.Debug("f5router-wildcard-rule-removed",
+				zap.String("name", ru.Name),
+				zap.String("uri", ru.URI.String()),
+			)
+		} else {
+			delete(r.r, ru.URI)
+			r.logger.Debug("f5router-app-rule-removed",
+				zap.String("name", ru.Name),
+				zap.String("uri", ru.URI.String()),
+			)
+		}
+		ret = true
+	} else {
+		r.logger.Debug("f5router-route-not-found", zap.String("uri", ru.Name))
+	}
 
-	name := fmt.Sprintf("%s-%x", uri[:index], sum[:8])
-	return name
+	return ret
 }
 
-// UpdatePoolEndpoints create Pool-Only config or update existing endpoint
-func (r *F5Router) UpdatePoolEndpoints(
-	uri string,
-	endpoint *route.Endpoint,
+// RouteUpdate send update information to processor
+func (r *F5Router) RouteUpdate(
+	op operation,
+	t *container.Trie,
+	uri route.Uri,
 ) {
 	r.logger.Debug("f5router-updating-pool",
-		zap.String("uri", uri),
-		zap.String("endpoint", endpoint.CanonicalAddr()),
+		zap.String("operation", op.String()),
+		zap.String("uri", uri.String()),
 	)
 
-	p := poolData{}
-	if strings.HasPrefix(uri, "*.") {
-		p.URI = strings.TrimPrefix(uri, "*.")
-		p.Name = p.URI
-		p.Wildcard = true
-	} else {
-		p.URI = uri
-		p.Name = makePoolName(uri)
-	}
-
-	p.Endpoint = endpoint.CanonicalAddr()
-	w := workItem{
-		op:   add,
-		data: p,
-	}
-	r.queue.Add(w)
-}
-
-// RemovePoolEndpoints remove endpoint from config, if empty remove
-// VirtualServer
-func (r *F5Router) RemovePoolEndpoints(
-	uri string,
-	endpoint *route.Endpoint,
-) {
-	r.logger.Debug("f5router-removing-pool",
-		zap.String("uri", uri),
-		zap.String("endpoint", endpoint.CanonicalAddr()),
-	)
-	var (
-		u    string
-		name string
-		wild bool
-	)
-	if strings.HasPrefix(uri, "*.") {
-		u = strings.TrimPrefix(uri, "*.")
-		name = u
-		wild = true
-	} else {
-		u = uri
-		name = makePoolName(uri)
-	}
-
-	p := poolData{
-		Name:     name,
-		URI:      uri,
-		Endpoint: endpoint.CanonicalAddr(),
-		Wildcard: wild,
-	}
-	w := workItem{
-		op:   remove,
-		data: p,
-	}
-	r.queue.Add(w)
-}
-
-func (r *F5Router) makeVirtual(
-	name string,
-	t vsType,
-) *routeConfig {
-	var port int32
-	var ssl *sslProfile
-
-	if t == HTTP {
-		port = 80
-	} else if t == HTTPS {
-		port = 443
-		ssl = &sslProfile{
-			F5ProfileName: r.c.BigIP.SSLProfile,
-		}
-	}
-
-	vs := &routeConfig{
-		Item: routeItem{
-			Backend: backend{
-				ServiceName:     name,
-				ServicePort:     -1,         // unused
-				PoolMemberAddrs: []string{}, // unused
-			},
-			Frontend: frontend{
-				Name: name,
-				//FIXME need to handle multiple partitions
-				Partition: r.c.BigIP.Partitions[0],
-				Balance:   r.c.BigIP.Balance,
-				Mode:      "http",
-				VirtualAddress: &virtualAddress{
-					BindAddr: r.c.BigIP.ExternalAddr,
-					Port:     port,
-				},
-				SSLProfile: ssl,
-			},
-		},
-	}
-	return vs
-}
-
-func (r *F5Router) processVirtual(op operation, v virtualData) (bool, error) {
-	if op == add {
-		return r.processVirtualAdd(v), nil
-	} else if op == remove {
-		return r.processVirtualRemove(v), nil
-	} else {
-		return false, fmt.Errorf("received unsupported virtual operation %v", op)
-	}
-}
-
-func (r *F5Router) processVirtualAdd(v virtualData) bool {
-	vs := r.makeVirtual(v.Name, v.T)
-	r.m[v.Name] = vs
-	r.logger.Debug("f5router-virtual-server-updated", zap.Object("virtual", vs))
-	return true
-}
-
-func (r *F5Router) processVirtualRemove(v virtualData) bool {
-	delete(r.m, v.Name)
-	r.logger.Debug("f5router-virtual-server-removed", zap.String("virtual", v.Name))
-	return true
-}
-
-// UpdateVirtualServer create VirtualServer config with VirtualAddress frontend
-func (r *F5Router) UpdateVirtualServer(
-	name string,
-	t vsType,
-) {
-	r.logger.Debug("f5router-updating-virtual-server",
-		zap.String("name", name),
-		zap.String("type", t.String()),
-	)
-	vs := virtualData{
-		Name: name,
+	ru := routeUpdate{
+		Name: makePoolName(uri.String()),
+		URI:  uri,
 		T:    t,
+		Op:   op,
 	}
-
-	w := workItem{
-		op:   add,
-		data: vs,
-	}
-	r.queue.Add(w)
-}
-
-// RemoveVirtualServer delete VirtualServer config
-func (r *F5Router) RemoveVirtualServer(
-	name string,
-	t vsType,
-) {
-	r.logger.Debug("f5router-removing-virtual-server",
-		zap.String("name", name),
-		zap.String("type", t.String()),
-	)
-	vs := virtualData{
-		Name: name,
-		T:    t,
-	}
-
-	w := workItem{
-		op:   remove,
-		data: vs,
-	}
-	r.queue.Add(w)
+	r.queue.Add(ru)
 }

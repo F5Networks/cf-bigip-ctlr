@@ -23,7 +23,7 @@ func NewLeastConnection(p *Pool, initial string) EndpointIterator {
 func (r *LeastConnection) Next() *Endpoint {
 	var e *Endpoint
 	if r.initialEndpoint != "" {
-		e = r.pool.findById(r.initialEndpoint)
+		e = r.pool.FindById(r.initialEndpoint)
 		r.initialEndpoint = ""
 	}
 
