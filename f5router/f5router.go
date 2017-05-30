@@ -136,7 +136,7 @@ func NewF5Router(
 	}
 
 	r.routeVSHTTP = r.makeVirtual(HTTPRouterName, HTTP)
-	if 0 != len(c.BigIP.SSLProfile) {
+	if 0 != len(c.BigIP.SSLProfiles) {
 		r.routeVSHTTPS = r.makeVirtual(HTTPSRouterName, HTTPS)
 	}
 	return &r, nil
@@ -183,14 +183,21 @@ func (r *F5Router) makeVirtual(
 	t vsType,
 ) *routeConfig {
 	var port int32
-	var ssl *sslProfile
+	var ssl *sslProfiles
 
 	if t == HTTP {
 		port = 80
 	} else if t == HTTPS {
 		port = 443
-		ssl = &sslProfile{
-			F5ProfileName: r.c.BigIP.SSLProfile,
+		var prefixSSL []string
+		for _, val := range r.c.BigIP.SSLProfiles {
+			if !strings.HasPrefix(val, "/") {
+				val = "/" + val
+			}
+			prefixSSL = append(prefixSSL, val)
+		}
+		ssl = &sslProfiles{
+			F5ProfileNames: prefixSSL,
 		}
 	}
 
@@ -211,7 +218,7 @@ func (r *F5Router) makeVirtual(
 					BindAddr: r.c.BigIP.ExternalAddr,
 					Port:     port,
 				},
-				SSLProfile: ssl,
+				SSLProfiles: ssl,
 			},
 		},
 	}

@@ -33,8 +33,8 @@ type (
 	}
 
 	// frontend ssl profile
-	sslProfile struct {
-		F5ProfileName string `json:"f5ProfileName,omitempty"`
+	sslProfiles struct {
+		F5ProfileNames []string `json:"f5ProfileNames,omitempty"`
 	}
 
 	// frontend bindaddr and port
@@ -75,7 +75,7 @@ type (
 		Balance        string          `json:"balance,omitempty"`
 		Mode           string          `json:"mode,omitempty"`
 		VirtualAddress *virtualAddress `json:"virtualAddress,omitempty"`
-		SSLProfile     *sslProfile     `json:"sslProfile,omitempty"`
+		SSLProfiles    *sslProfiles    `json:"sslProfiles,omitempty"`
 		Policies       []*nameRef      `json:"policies,omitempty"`
 		Profiles       []*nameRef      `json:"profiles,omitempty"`
 	}
