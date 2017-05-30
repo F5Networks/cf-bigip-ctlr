@@ -25,25 +25,36 @@ type StatusConfig struct {
 	Pass string `yaml:"pass"`
 }
 
-type BigIPConfig struct {
-	Url            string   `yaml:"url" json:"url"`
-	User           string   `yaml:"user" json:"username"`
-	Pass           string   `yaml:"pass" json:"password"`
-	Partitions     []string `yaml:"partition" json:"partitions"`
-	Balance        string   `yaml:"balance" json:"-"`
-	VerifyInterval int      `yaml:"verify-interval" json:"-"`
-	ExternalAddr   string   `yaml:"external_addr" json:"-"`
-	SSLProfile     string   `yaml:"ssl_profile" json:"-"`
-	Policies       struct {
-		PreRouting  []string `yaml:"prerouting" json:"-"`
-		PostRouting []string `yaml:"postrouting" json:"-"`
-	} `yaml:"policies" json:"-"`
-	Profiles []string `yaml:"profiles" json:"-"`
+type RoutingPolicies struct {
+	PreRouting  []string `yaml:"prerouting" json:"-"`
+	PostRouting []string `yaml:"postrouting" json:"-"`
 }
 
-type GlobalSection struct {
-	LogLevel       string `yaml:"log-level" json:"log-level"`
-	VerifyInterval int    `yaml:"verify-interval" json:"verify-interval"`
+// BigIPConfig configuration parameters for bigip integration
+type BigIPConfig struct {
+	URL            string          `yaml:"url" json:"url"`
+	User           string          `yaml:"user" json:"username"`
+	Pass           string          `yaml:"pass" json:"password"`
+	Partitions     []string        `yaml:"partition" json:"partitions"`
+	Balance        string          `yaml:"balance" json:"-"`
+	VerifyInterval int             `yaml:"verify-interval" json:"-"`
+	ExternalAddr   string          `yaml:"external_addr" json:"-"`
+	SSLProfile     string          `yaml:"ssl_profile" json:"-"`
+	Policies       RoutingPolicies `yaml:"policies" json:"-"`
+	Profiles       []string        `yaml:"profiles" json:"-"`
+}
+
+var defaultBigIPConfig = BigIPConfig{
+	URL:            "",
+	User:           "",
+	Pass:           "",
+	Partitions:     []string{},
+	Balance:        "round-robin",
+	VerifyInterval: 30,
+	ExternalAddr:   "",
+	SSLProfile:     "",
+	Policies:       RoutingPolicies{},
+	Profiles:       []string{},
 }
 
 var defaultStatusConfig = StatusConfig{
@@ -173,6 +184,7 @@ type Config struct {
 }
 
 var defaultConfig = Config{
+	BigIP:   defaultBigIPConfig,
 	Status:  defaultStatusConfig,
 	Nats:    []NatsConfig{defaultNatsConfig},
 	Logging: defaultLoggingConfig,

@@ -27,6 +27,11 @@ import (
 )
 
 type (
+	globalConfig struct {
+		LogLevel       string `json:"log-level"`
+		VerifyInterval int    `json:"verify-interval"`
+	}
+
 	// frontend ssl profile
 	sslProfile struct {
 		F5ProfileName string `json:"f5ProfileName,omitempty"`
@@ -94,11 +99,10 @@ type (
 	F5Router struct {
 		c            *config.Config
 		logger       logger.Logger
-		m            routeMap
 		r            ruleMap
 		wildcards    ruleMap
 		queue        workqueue.RateLimitingInterface
-		writer       *ConfigWriter
+		writer       Writer
 		routeVSHTTP  *routeConfig
 		routeVSHTTPS *routeConfig
 		drainUpdate  bool
