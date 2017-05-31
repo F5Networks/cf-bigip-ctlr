@@ -67,6 +67,23 @@ func (r rules) Len() int           { return len(r) }
 func (r rules) Less(i, j int) bool { return r[i].FullURI < r[j].FullURI }
 func (r rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 
+func (slice routeConfigs) Len() int {
+	return len(slice)
+}
+
+func (slice routeConfigs) Less(i, j int) bool {
+	return slice[i].Item.Backend.ServiceName <
+		slice[j].Item.Backend.ServiceName ||
+		(slice[i].Item.Backend.ServiceName ==
+			slice[j].Item.Backend.ServiceName &&
+			slice[i].Item.Backend.ServicePort <
+				slice[j].Item.Backend.ServicePort)
+}
+
+func (slice routeConfigs) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
 func (op operation) String() string {
 	switch op {
 	case Add:
@@ -94,19 +111,23 @@ func makePoolName(uri string) string {
 }
 
 // NewF5Router create the F5Router route controller
-func NewF5Router(logger logger.Logger, c *config.Config) (*F5Router, error) {
-	writer, err := NewConfigWriter(logger)
-	if nil != err {
-		return nil, err
-	}
+func NewF5Router(
+	logger logger.Logger,
+	c *config.Config,
+	writer Writer,
+) (*F5Router, error) {
 	r := F5Router{
 		c:         c,
 		logger:    logger,
-		m:         make(routeMap),
 		r:         make(ruleMap),
 		wildcards: make(ruleMap),
 		queue:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 		writer:    writer,
+	}
+
+	err := r.validateConfig()
+	if nil != err {
+		return nil, err
 	}
 
 	err = r.writeInitialConfig()
@@ -121,11 +142,6 @@ func NewF5Router(logger logger.Logger, c *config.Config) (*F5Router, error) {
 	return &r, nil
 }
 
-// ConfigWriter return the internal config writer instance
-func (r *F5Router) ConfigWriter() *ConfigWriter {
-	return r.writer
-}
-
 // Run start the F5Router controller
 func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.logger.Info("f5router-starting")
@@ -138,6 +154,27 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.queue.ShutDown()
 	<-done
 	r.logger.Info("f5router-exited")
+	return nil
+}
+
+func (r *F5Router) validateConfig() error {
+	if nil == r.c {
+		return errors.New("no configuration provided")
+	}
+
+	if nil == r.writer {
+		return errors.New("no functional writer provided")
+	}
+
+	if 0 == len(r.c.BigIP.URL) ||
+		0 == len(r.c.BigIP.User) ||
+		0 == len(r.c.BigIP.Pass) ||
+		0 == len(r.c.BigIP.Partitions) ||
+		0 == len(r.c.BigIP.ExternalAddr) {
+		return fmt.Errorf(
+			"required parameter missing; URL, User, Pass, Partitions, ExternalAddr "+
+				"must have value: %+v", r.c.BigIP)
+	}
 	return nil
 }
 
@@ -187,7 +224,7 @@ func (r *F5Router) makeVirtual(
 
 func (r *F5Router) writeInitialConfig() error {
 	sections := make(map[string]interface{})
-	sections["global"] = config.GlobalSection{
+	sections["global"] = globalConfig{
 		LogLevel:       r.c.Logging.Level,
 		VerifyInterval: r.c.BigIP.VerifyInterval,
 	}
@@ -287,7 +324,7 @@ func (r *F5Router) process() bool {
 			r.drainUpdate = false
 
 			sections := make(map[string]interface{})
-			sections["global"] = config.GlobalSection{
+			sections["global"] = globalConfig{
 				LogLevel:       r.c.Logging.Level,
 				VerifyInterval: r.c.BigIP.VerifyInterval,
 			}
@@ -297,7 +334,7 @@ func (r *F5Router) process() bool {
 
 			services := routeConfigs{}
 			services = append(services, r.routeVSHTTP)
-			if nil != r.routeVSHTTP {
+			if nil != r.routeVSHTTPS {
 				services = append(services, r.routeVSHTTPS)
 			}
 
@@ -310,6 +347,7 @@ func (r *F5Router) process() bool {
 				p := r.makePool(makePoolName(uri), uri, addrs...)
 				services = append(services, p)
 			})
+			sort.Sort(services)
 
 			sections["services"] = services
 
@@ -467,7 +505,7 @@ func (r *F5Router) makeRoutePolicy(policyName string) *policy {
 	go sortRules(r.r, &rls, 0)
 
 	w := rules{}
-	go sortRules(r.wildcards, &w, len(r.m))
+	go sortRules(r.wildcards, &w, len(r.r))
 
 	wg.Wait()
 
@@ -480,7 +518,6 @@ func (r *F5Router) makeRoutePolicy(policyName string) *policy {
 }
 
 func (r *F5Router) processRouteAdd(ru routeUpdate) bool {
-	var ret bool
 	rule, err := r.makeRouteRule(ru)
 	if nil != err {
 		r.logger.Warn("f5router-rule-error", zap.Error(err))
@@ -501,7 +538,7 @@ func (r *F5Router) processRouteAdd(ru routeUpdate) bool {
 		)
 	}
 
-	return ret
+	return true
 }
 
 func (r *F5Router) processRouteRemove(ru routeUpdate) bool {

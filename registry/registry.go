@@ -99,7 +99,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 		r.f5Router.RouteUpdate(f5router.Add, r.byURI, routekey)
 	} else {
-		if nil != pool.FindById(endpoint.CanonicalAddr()) {
+		if nil == pool.FindById(endpoint.CanonicalAddr()) {
 			updateRoute = true
 		}
 	}

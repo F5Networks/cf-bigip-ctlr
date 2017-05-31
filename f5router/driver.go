@@ -32,8 +32,8 @@ import (
 
 // Driver type which provides ifrit process interface
 type Driver struct {
-	writer  *ConfigWriter
-	global  config.GlobalSection
+	fname   string
+	global  globalConfig
 	bigIP   config.BigIPConfig
 	baseDir string
 	logger  logger.Logger
@@ -45,12 +45,12 @@ const (
 
 // NewDriver create ifrit process instance
 func NewDriver(
-	writer *ConfigWriter,
+	configFile string,
 	pythonBaseDir string,
 	logger logger.Logger,
 ) *Driver {
 	return &Driver{
-		writer:  writer,
+		fname:   configFile,
 		baseDir: pythonBaseDir,
 		logger:  logger,
 	}
@@ -61,7 +61,8 @@ func (d *Driver) createDriverCmd() *exec.Cmd {
 
 	cmdArgs := []string{
 		fmt.Sprintf("%s/%s", d.baseDir, command),
-		"--config-file", d.writer.GetOutputFilename()}
+		"--config-file", d.fname,
+	}
 
 	cmd := exec.Command(cmdName, cmdArgs...)
 
@@ -73,26 +74,6 @@ func (d *Driver) runBigIPDriver(pid chan<- int, cmd *exec.Cmd) {
 
 	// the config driver python logging goes to stderr by default
 	cmdOut, err := cmd.StderrPipe()
-	scanOut := bufio.NewScanner(cmdOut)
-	go func() {
-		for true {
-			if scanOut.Scan() {
-				if strings.Contains(scanOut.Text(), "DEBUG]") {
-					d.logger.Debug(scanOut.Text())
-				} else if strings.Contains(scanOut.Text(), "Warn]") {
-					d.logger.Warn(scanOut.Text())
-				} else if strings.Contains(scanOut.Text(), "ERROR]") {
-					d.logger.Error(scanOut.Text())
-				} else if strings.Contains(scanOut.Text(), "CRITICAL]") {
-					d.logger.Error(scanOut.Text())
-				} else {
-					d.logger.Info(scanOut.Text())
-				}
-			} else {
-				break
-			}
-		}
-	}()
 
 	err = cmd.Start()
 	if nil != err {
@@ -102,6 +83,24 @@ func (d *Driver) runBigIPDriver(pid chan<- int, cmd *exec.Cmd) {
 
 	pid <- cmd.Process.Pid
 
+	scanOut := bufio.NewScanner(cmdOut)
+	for true {
+		if scanOut.Scan() {
+			if strings.Contains(scanOut.Text(), "DEBUG]") {
+				d.logger.Debug(scanOut.Text())
+			} else if strings.Contains(scanOut.Text(), "Warn]") {
+				d.logger.Warn(scanOut.Text())
+			} else if strings.Contains(scanOut.Text(), "ERROR]") {
+				d.logger.Error(scanOut.Text())
+			} else if strings.Contains(scanOut.Text(), "CRITICAL]") {
+				d.logger.Error(scanOut.Text())
+			} else {
+				d.logger.Info(scanOut.Text())
+			}
+		} else {
+			break
+		}
+	}
 	err = cmd.Wait()
 	var waitStatus syscall.WaitStatus
 	if exitError, ok := err.(*exec.ExitError); ok {

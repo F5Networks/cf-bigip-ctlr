@@ -121,26 +121,30 @@ func main() {
 		routerGroupGUID = fetchRoutingGroupGUID(logger, c, routingAPIClient)
 	}
 
-	f5Router, err := f5router.NewF5Router(logger.Session("f5router"), c)
+	writer, err := f5router.NewConfigWriter(logger.Session("f5writer"))
+	defer func() {
+		writer.Close()
+	}()
+	f5Router, err := f5router.NewF5Router(logger.Session("f5router"), c, writer)
 	if nil != err {
 		logger.Fatal("f5router-failed-initialization", zap.Error(err))
 	}
 
 	folderPath, err := os.Getwd()
 	if err != nil {
-		logger.Error("file-get-error", zap.Error(err))
+		logger.Fatal("file-get-error", zap.Error(err))
 	}
 
 	_, err = os.Stat(fmt.Sprintf("%v/python/bigipconfigdriver.py", folderPath))
 	if os.IsNotExist(err) {
-		logger.Error("bigipconfigdriver-does-not-exist", zap.Error(err))
+		logger.Fatal("bigipconfigdriver-does-not-exist", zap.Error(err))
 	}
 
 	logger.Info("starting-python-driver")
 	pythonBaseDir = fmt.Sprintf("%v/python/", folderPath)
 
 	driver := f5router.NewDriver(
-		f5Router.ConfigWriter(),
+		writer.GetOutputFilename(),
 		pythonBaseDir,
 		logger,
 	)

@@ -28,6 +28,12 @@ import (
 	"github.com/uber-go/zap"
 )
 
+// Writer interface to support unit testing
+type Writer interface {
+	GetOutputFilename() string
+	Write(input []byte) (n int, err error)
+}
+
 // ConfigWriter Writer instance to output configuration
 type ConfigWriter struct {
 	configFile string
@@ -64,6 +70,13 @@ func NewConfigWriter(logger logger.Logger) (*ConfigWriter, error) {
 	return cw, nil
 }
 
+// Close close file and delete temp file
+func (cw *ConfigWriter) Close() {
+	os.RemoveAll(filepath.Dir(cw.configFile))
+
+	cw.logger.Info("f5router-configwriter-file-closed")
+}
+
 // GetOutputFilename return config filename
 func (cw *ConfigWriter) GetOutputFilename() string {
 	return cw.configFile
@@ -84,6 +97,13 @@ func (cw *ConfigWriter) Write(input []byte) (n int, err error) {
 		}
 	}()
 
+	return cw._write(f, input)
+}
+
+func (cw *ConfigWriter) _write(
+	f pseudoFileInterface,
+	input []byte,
+) (n int, err error) {
 	flock := syscall.Flock_t{
 		Type:   syscall.F_WRLCK,
 		Start:  0,
