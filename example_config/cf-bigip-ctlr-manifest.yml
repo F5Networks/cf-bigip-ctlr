@@ -11,7 +11,9 @@ applications:
                         balance: round-robin
                         verify_interval: 30
                         external_addr: 172.16.3.90
-                        ssl_profile: /Common/certs
+                        ssl_profiles:
+                           - /Common/clientssl
+                           - Common/serverssl
                         policies:
                           prerouting:
                             - /Common/header-insert

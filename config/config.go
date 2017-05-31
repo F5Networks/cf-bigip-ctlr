@@ -39,7 +39,7 @@ type BigIPConfig struct {
 	Balance        string          `yaml:"balance" json:"-"`
 	VerifyInterval int             `yaml:"verify-interval" json:"-"`
 	ExternalAddr   string          `yaml:"external_addr" json:"-"`
-	SSLProfile     string          `yaml:"ssl_profile" json:"-"`
+	SSLProfiles    []string        `yaml:"ssl_profiles" json:"-"`
 	Policies       RoutingPolicies `yaml:"policies" json:"-"`
 	Profiles       []string        `yaml:"profiles" json:"-"`
 }
@@ -52,7 +52,7 @@ var defaultBigIPConfig = BigIPConfig{
 	Balance:        "round-robin",
 	VerifyInterval: 30,
 	ExternalAddr:   "",
-	SSLProfile:     "",
+	SSLProfiles:    []string{},
 	Policies:       RoutingPolicies{},
 	Profiles:       []string{},
 }

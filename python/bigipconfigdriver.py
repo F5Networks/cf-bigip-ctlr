@@ -337,17 +337,18 @@ def create_ltm_config_kubernetes(bigip, config):
             f5_service['pool'] = {}
             f5_service['health'] = []
 
-            # Parse the SSL profile into partition and name
-            if 'sslProfile' in frontend:
-                profile = (
-                    frontend['sslProfile']['f5ProfileName'].split('/'))
-                if len(profile) != 2:
-                    log.error("Could not parse partition and name from "
-                              "SSL profile: %s",
-                              frontend['sslProfile']['f5ProfileName'])
-                else:
-                    profiles.append({'partition': profile[0],
-                                     'name': profile[1]})
+            # Parse the SSL profiles into partition and name
+            if 'sslProfiles' in frontend:
+                for profile in frontend['sslProfiles']['f5ProfileNames']:
+                    pf = profile.lstrip('/').split('/')
+                    if len(pf) != 2:
+                        log.error("Could not parse partition and name from "
+                                  "SSL profile: %s",
+                                  profile)
+                    else:
+                        pf_dict = {'partition': pf[0], 'name': pf[1]}
+                        if pf_dict not in profiles:
+                            profiles.append(pf_dict)
 
             # Add appropriate profiles
             profile_http = {'partition': 'Common', 'name': 'http'}
@@ -410,11 +411,6 @@ def create_ltm_config_kubernetes(bigip, config):
                     'state': 'user-up',
                     'session': 'user-enabled'
                 }})
-        else:
-            log.warning(
-                'Virtual server "{}" has service "{}", which is empty - '
-                'configuring 0 pool members.'.format(
-                    frontend_name, backend['serviceName']))
 
         f5_services.update({frontend_name: f5_service})
 
