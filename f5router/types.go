@@ -43,14 +43,6 @@ type (
 		Port     int32  `json:"port,omitempty"`
 	}
 
-	// backend health monitor
-	healthMonitor struct {
-		Interval int    `json:"interval,omitempty"`
-		Protocol string `json:"protocol"`
-		Send     string `json:"send,omitempty"`
-		Timeout  int    `json:"timeout,omitempty"`
-	}
-
 	// virtual server policy/profile reference
 	nameRef struct {
 		Name      string `json:"name"`
@@ -59,10 +51,10 @@ type (
 
 	// virtual server backend backend
 	backend struct {
-		ServiceName     string          `json:"serviceName"`
-		ServicePort     int32           `json:"servicePort"`
-		PoolMemberAddrs []string        `json:"poolMemberAddrs"`
-		HealthMonitors  []healthMonitor `json:"healthMonitors,omitempty"`
+		ServiceName     string   `json:"serviceName"`
+		ServicePort     int32    `json:"servicePort"`
+		PoolMemberAddrs []string `json:"poolMemberAddrs"`
+		HealthMonitors  []string `json:"healthMonitors,omitempty"`
 	}
 
 	// virtual server frontend

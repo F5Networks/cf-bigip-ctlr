@@ -42,6 +42,7 @@ type BigIPConfig struct {
 	SSLProfiles    []string        `yaml:"ssl_profiles" json:"-"`
 	Policies       RoutingPolicies `yaml:"policies" json:"-"`
 	Profiles       []string        `yaml:"profiles" json:"-"`
+	HealthMonitors []string        `yaml:"health_monitors" json:"-"`
 }
 
 var defaultBigIPConfig = BigIPConfig{

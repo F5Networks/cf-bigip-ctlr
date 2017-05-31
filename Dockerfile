@@ -9,7 +9,6 @@ WORKDIR $APPPATH
 
 COPY cf-bigip-ctlr $APPPATH/bin
 COPY python/ $APPPATH/python
-COPY requirements.txt /tmp/requirements.txt
 
 RUN apk --no-cache --update add --virtual pip-install-deps git && \
     pip install -r $APPPATH/python/k8s-runtime-requirements.txt && \
