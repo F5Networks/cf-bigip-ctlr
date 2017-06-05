@@ -110,6 +110,18 @@ func makePoolName(uri string) string {
 	return name
 }
 
+// Helper to add a leading slash to bigip paths
+func fixupNames(names []string) []string {
+	var fixed []string
+	for _, val := range names {
+		if !strings.HasPrefix(val, "/") {
+			val = "/" + val
+		}
+		fixed = append(fixed, val)
+	}
+	return fixed
+}
+
 // NewF5Router create the F5Router route controller
 func NewF5Router(
 	logger logger.Logger,
@@ -175,6 +187,11 @@ func (r *F5Router) validateConfig() error {
 			"required parameter missing; URL, User, Pass, Partitions, ExternalAddr "+
 				"must have value: %+v", r.c.BigIP)
 	}
+
+	if 0 == len(r.c.BigIP.HealthMonitors) {
+		r.c.BigIP.HealthMonitors = []string{"/Common/tcp_half_open"}
+	}
+
 	return nil
 }
 
@@ -189,13 +206,7 @@ func (r *F5Router) makeVirtual(
 		port = 80
 	} else if t == HTTPS {
 		port = 443
-		var prefixSSL []string
-		for _, val := range r.c.BigIP.SSLProfiles {
-			if !strings.HasPrefix(val, "/") {
-				val = "/" + val
-			}
-			prefixSSL = append(prefixSSL, val)
-		}
+		prefixSSL := fixupNames(r.c.BigIP.SSLProfiles)
 		ssl = &sslProfiles{
 			F5ProfileNames: prefixSSL,
 		}
@@ -391,12 +402,14 @@ func (r *F5Router) makePool(
 	uri string,
 	addrs ...string,
 ) *routeConfig {
+	prefixHealthMonitors := fixupNames(r.c.BigIP.HealthMonitors)
 	return &routeConfig{
 		Item: routeItem{
 			Backend: backend{
 				ServiceName:     uri,
 				ServicePort:     -1, // unused
 				PoolMemberAddrs: addrs,
+				HealthMonitors:  prefixHealthMonitors,
 			},
 			Frontend: frontend{
 				Name: name,

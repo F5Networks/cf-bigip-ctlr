@@ -13,7 +13,7 @@ applications:
                         external_addr: 172.16.3.90
                         ssl_profiles:
                            - /Common/clientssl
-                           - Common/serverssl
+                           - /Common/serverssl
                         policies:
                           prerouting:
                             - /Common/header-insert
@@ -21,6 +21,8 @@ applications:
                             - /Common/redirect
                         profiles:
                           - /Common/http
+                        health_monitors:
+                          - /Common/tcp_half_open
 
                       status:
                         port: 8087

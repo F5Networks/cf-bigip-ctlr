@@ -384,20 +384,26 @@ def create_ltm_config_kubernetes(bigip, config):
             for index, health in enumerate(health_monitors):
                 log.debug("Healthcheck for service %s: %s",
                           backend['serviceName'], health)
-                if index == 0:
-                    health['name'] = frontend_name
+                if type(health) == dict:
+                    if index == 0:
+                        health['name'] = frontend_name
+                    else:
+                        health['name'] = frontend_name + '_' + str(index)
+                        monitors = monitors + ' and '
+                    f5_service['health'].append(health)
+
+                    # monitors is a string of health-monitor names
+                    # delimited by ' and '
+                    monitor = "/%s/%s" % (frontend['partition'],
+                                          f5_service['health'][index]['name'])
+
+                    monitors = (monitors + monitor) if monitors is not None \
+                        else monitor
                 else:
-                    health['name'] = frontend_name + '_' + str(index)
-                    monitors = monitors + ' and '
-                f5_service['health'].append(health)
-
-                # monitors is a string of health-monitor names
-                # delimited by ' and '
-                monitor = "/%s/%s" % (frontend['partition'],
-                                      f5_service['health'][index]['name'])
-
-                monitors = (monitors + monitor) if monitors is not None \
-                    else monitor
+                    if monitors is not None:
+                        monitors = monitors + ' and '
+                    monitors = (monitors + health) if monitors is not None \
+                        else health
 
             f5_service['pool'].update({
                 'monitor': monitors,
