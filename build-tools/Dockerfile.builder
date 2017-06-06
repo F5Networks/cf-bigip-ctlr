@@ -45,8 +45,10 @@ COPY requirements.docs.txt /tmp/requirements.docs.txt
 
 RUN apk add --no-cache \
 		bash \
+		gcc \
 		git \
 		make \
+		musl-dev \
 		su-exec && \
 	pip install setuptools flake8 && \
 	pip install -r /tmp/cf-build-requirements.txt && \

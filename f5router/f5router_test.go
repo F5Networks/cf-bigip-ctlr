@@ -20,10 +20,12 @@ import (
 	"crypto/sha256"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/registry/container"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test_util"
@@ -400,18 +402,22 @@ func TestRouteUpdates(t *testing.T) {
 		wrote <- struct{}{}
 	}
 
+	var wg sync.WaitGroup
 	data.EachNodeWithPool(func(t *container.Trie) {
 		t.Pool.Each(func(e *route.Endpoint) {
+			wg.Add(1)
 			go func(t *container.Trie, uri string) {
 				router.RouteUpdate(
-					Add,
+					registry.Add,
 					t,
 					route.Uri(uri),
 				)
+				wg.Done()
 			}(data, t.ToPath())
 		})
 	})
 
+	wg.Wait()
 	ready := make(chan struct{})
 	os := make(chan os.Signal)
 	done := make(chan struct{})
@@ -449,7 +455,7 @@ func TestRouteUpdates(t *testing.T) {
 	assert.True(t, removed)
 
 	router.RouteUpdate(
-		Remove,
+		registry.Remove,
 		data,
 		route.Uri("*.foo.cf.com"),
 	)
@@ -465,7 +471,7 @@ func TestRouteUpdates(t *testing.T) {
 	data.Insert(route.Uri("qux.cf.com"), p)
 
 	router.RouteUpdate(
-		Add,
+		registry.Add,
 		data,
 		route.Uri("qux.cf.com"),
 	)

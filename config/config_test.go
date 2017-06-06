@@ -190,7 +190,7 @@ logging:
 			Expect(config.Logging.Syslog).To(Equal("syslog"))
 			Expect(config.Logging.Level).To(Equal("debug2"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(true))
-			Expect(config.Logging.JobName).To(Equal("gorouter"))
+			Expect(config.Logging.JobName).To(Equal("cf-bigip-ctlr"))
 		})
 
 		It("sets the rest of config", func() {

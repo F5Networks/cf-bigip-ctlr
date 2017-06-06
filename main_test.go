@@ -14,14 +14,12 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/handlers"
 	"github.com/cf-bigip-ctlr/route"
 	"github.com/cf-bigip-ctlr/test"
 	"github.com/cf-bigip-ctlr/test/common"
@@ -68,8 +66,16 @@ var _ = Describe("Router Integration", func() {
 		cfg.DrainWait = time.Duration(drainWait) * time.Second
 	}
 
-	createConfig := func(cfgFile string, statusPort, proxyPort uint16, pruneInterval, pruneThreshold, drainWait int, suspendPruning bool, natsPorts ...uint16) *config.Config {
-		cfg := test_util.SpecConfig(statusPort, proxyPort, natsPorts...)
+	createConfig := func(
+		cfgFile string,
+		statusPort uint16,
+		pruneInterval int,
+		pruneThreshold int,
+		drainWait int,
+		suspendPruning bool,
+		natsPorts ...uint16,
+	) *config.Config {
+		cfg := test_util.SpecConfig(statusPort, natsPorts...)
 
 		configDrainSetup(cfg, pruneInterval, pruneThreshold, drainWait)
 
@@ -86,15 +92,16 @@ var _ = Describe("Router Integration", func() {
 			SkipSSLValidation: false,
 			CACerts:           caCertsPath,
 		}
+		cfg.BigIP = config.BigIPConfig{
+			URL:          "http://bigip.example.com",
+			User:         "test",
+			Pass:         "insecure",
+			Partitions:   []string{"cloud-foundry"},
+			ExternalAddr: "127.0.0.1",
+			DriverCmd:    "testdata/fake_driver.py",
+		}
 
 		writeConfig(cfg, cfgFile)
-		return cfg
-	}
-
-	createSSLConfig := func(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
-		cfg := test_util.SpecSSLConfig(statusPort, proxyPort, SSLPort, natsPorts...)
-
-		configDrainSetup(cfg, defaultPruneInterval, defaultPruneThreshold, 0)
 		return cfg
 	}
 
@@ -111,7 +118,8 @@ var _ = Describe("Router Integration", func() {
 		}, 70*time.Second).Should(SatisfyAll(
 			ContainSubstring(`starting`),
 			MatchRegexp(`Successfully-connected-to-nats.*localhost:\d+`),
-			ContainSubstring(`gorouter.started`),
+			ContainSubstring(`f5router-started`),
+			ContainSubstring(`f5router-driver-started`),
 		))
 		gorouterSession = session
 		return session
@@ -146,294 +154,12 @@ var _ = Describe("Router Integration", func() {
 		}
 	})
 
-	Context("TLS", func() {
-		var config *config.Config
-		var localIP string
-		var statusPort uint16
-		var proxyPort uint16
-		var cfgFile string
-		var dialTls func(version uint16) error
-
-		BeforeEach(func() {
-			var err error
-			localIP, err = localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
-
-			statusPort = test_util.NextAvailPort()
-			proxyPort = test_util.NextAvailPort()
-
-			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
-		})
-		JustBeforeEach(func() {
-			writeConfig(config, cfgFile)
-			dialTls = func(version uint16) error {
-
-				tlsConfig := &tls.Config{
-					MaxVersion:         version,
-					InsecureSkipVerify: true,
-				}
-
-				t := &http.Transport{TLSClientConfig: tlsConfig}
-				client := &http.Client{Transport: t}
-				_, err := client.Get(fmt.Sprintf("https://localhost:%d", config.SSLPort))
-				return err
-			}
-		})
-		Context("when no cipher suite is supported by both client and server", func() {
-			BeforeEach(func() {
-				_, filename, _, _ := runtime.Caller(0)
-				testPath, err := filepath.Abs(filepath.Join(filename, "..", "test", "assets"))
-				Expect(err).NotTo(HaveOccurred())
-				config.SSLKeyPath = filepath.Join(testPath, "ecdsa_certs", "eckey.pem")
-				config.SSLCertPath = filepath.Join(testPath, "ecdsa_certs", "cert.pem")
-				config.CipherString = "TLS_RSA_WITH_RC4_128_SHA"
-			})
-
-			It("throws an error", func() {
-				gorouterSession = startGorouterSession(cfgFile)
-				err := dialTls(tls.VersionTLS12)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("handshake failure"))
-			})
-		})
-
-		It("supports minimum TLS 1.2", func() {
-			gorouterSession = startGorouterSession(cfgFile)
-
-			dialTls := func(version uint16) error {
-
-				tlsConfig := &tls.Config{
-					MaxVersion:         version,
-					InsecureSkipVerify: true,
-				}
-
-				t := &http.Transport{TLSClientConfig: tlsConfig}
-				client := &http.Client{Transport: t}
-				_, err := client.Get(fmt.Sprintf("https://localhost:%d", config.SSLPort))
-				return err
-			}
-
-			Expect(dialTls(tls.VersionSSL30)).To(HaveOccurred())
-			Expect(dialTls(tls.VersionTLS10)).To(HaveOccurred())
-			Expect(dialTls(tls.VersionTLS11)).To(HaveOccurred())
-			Expect(dialTls(tls.VersionTLS12)).ToNot(HaveOccurred())
-		})
-	})
-
-	Context("Drain", func() {
-		var config *config.Config
-		var localIP string
-		var statusPort uint16
-		var proxyPort uint16
-		var cfgFile string
-
-		BeforeEach(func() {
-			var err error
-			localIP, err = localip.LocalIP()
-			Expect(err).ToNot(HaveOccurred())
-
-			statusPort = test_util.NextAvailPort()
-			proxyPort = test_util.NextAvailPort()
-
-			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 1, false, natsPort)
-		})
-
-		JustBeforeEach(func() {
-			gorouterSession = startGorouterSession(cfgFile)
-		})
-
-		It("responds to healthcheck", func() {
-			req := test_util.NewRequest("GET", "", "/", nil)
-			req.Header.Set("User-Agent", "HTTP-Monitor/1.1")
-			conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", proxyPort))
-			Expect(err).ToNot(HaveOccurred())
-			http_conn := test_util.NewHttpConn(conn)
-			http_conn.WriteRequest(req)
-			resp, body := http_conn.ReadResponse()
-			Expect(resp.Status).To(Equal("200 OK"))
-			Expect(body).To(Equal("ok\n"))
-		})
-
-		It("waits for all requests to finish", func() {
-			mbusClient, err := newMessageBus(config)
-			Expect(err).ToNot(HaveOccurred())
-
-			requestMade := make(chan bool)
-			requestProcessing := make(chan bool)
-			responseRead := make(chan bool)
-
-			longApp := common.NewTestApp([]route.Uri{"longapp.vcap.me"}, proxyPort, mbusClient, nil, "")
-			longApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				requestMade <- true
-				<-requestProcessing
-				_, ioErr := ioutil.ReadAll(r.Body)
-				defer r.Body.Close()
-				Expect(ioErr).ToNot(HaveOccurred())
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte{'b'})
-			})
-			longApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-
-			Eventually(func() bool {
-				return appRegistered(routesUri, longApp)
-			}).Should(BeTrue())
-
-			go func() {
-				defer GinkgoRecover()
-				//Open a connection that never goes active
-				Eventually(func() bool {
-					conn, dialErr := net.DialTimeout("tcp",
-						fmt.Sprintf("%s:%d", localIP, proxyPort), 30*time.Second)
-					if dialErr == nil {
-						return conn.Close() == nil
-					}
-					return false
-				}).Should(BeTrue())
-
-				//Open a connection that goes active
-				resp, httpErr := http.Get(longApp.Endpoint())
-				Expect(httpErr).ShouldNot(HaveOccurred())
-				Expect(resp.StatusCode).Should(Equal(http.StatusOK))
-				bytes, httpErr := ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
-				Expect(httpErr).ShouldNot(HaveOccurred())
-				Expect(bytes).Should(Equal([]byte{'b'}))
-				responseRead <- true
-			}()
-
-			grouter := gorouterSession
-			gorouterSession = nil
-
-			<-requestMade
-
-			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
-
-			requestProcessing <- true
-
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(grouter, 5).Should(Exit(0))
-			Eventually(responseRead).Should(Receive(BeTrue()))
-		})
-
-		It("returns error when the gorouter terminates before a request completes", func() {
-			mbusClient, err := newMessageBus(config)
-			Expect(err).ToNot(HaveOccurred())
-
-			blocker := make(chan bool)
-			resultCh := make(chan error, 1)
-			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
-			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				blocker <- true
-				<-blocker
-			})
-			timeoutApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
-
-			go func() {
-				defer GinkgoRecover()
-				_, httpErr := http.Get(timeoutApp.Endpoint())
-				resultCh <- httpErr
-			}()
-
-			<-blocker
-			defer func() {
-				blocker <- true
-			}()
-
-			grouter := gorouterSession
-			gorouterSession = nil
-			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
-			Expect(err).ToNot(HaveOccurred())
-			Eventually(grouter, 5).Should(Exit(0))
-
-			var result error
-			Eventually(resultCh, 5).Should(Receive(&result))
-			Expect(result).ToNot(BeNil())
-		})
-
-		It("prevents new connections", func() {
-			mbusClient, err := newMessageBus(config)
-			Expect(err).ToNot(HaveOccurred())
-
-			blocker := make(chan bool)
-			timeoutApp := common.NewTestApp([]route.Uri{"timeout.vcap.me"}, proxyPort, mbusClient, nil, "")
-			timeoutApp.AddHandler("/", func(w http.ResponseWriter, r *http.Request) {
-				blocker <- true
-				<-blocker
-			})
-			timeoutApp.Listen()
-			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
-			Eventually(func() bool { return appRegistered(routesUri, timeoutApp) }).Should(BeTrue())
-
-			go func() {
-				http.Get(timeoutApp.Endpoint())
-			}()
-
-			<-blocker
-			defer func() {
-				blocker <- true
-			}()
-
-			grouter := gorouterSession
-			gorouterSession = nil
-			err = grouter.Command.Process.Signal(syscall.SIGUSR1)
-			Expect(err).ToNot(HaveOccurred())
-			Eventually(grouter, 5).Should(Exit(0))
-
-			_, err = http.Get(timeoutApp.Endpoint())
-			Expect(err).To(HaveOccurred())
-			urlErr := err.(*url.Error)
-			opErr := urlErr.Err.(*net.OpError)
-			Expect(opErr.Op).To(Equal("dial"))
-		})
-
-		Context("when ssl is enabled", func() {
-			BeforeEach(func() {
-				config := createSSLConfig(statusPort, proxyPort, test_util.NextAvailPort(), defaultPruneInterval, defaultPruneThreshold, natsPort)
-				writeConfig(config, cfgFile)
-			})
-
-			It("drains properly", func() {
-				grouter := gorouterSession
-				gorouterSession = nil
-				err := grouter.Command.Process.Signal(syscall.SIGUSR1)
-
-				Expect(err).ToNot(HaveOccurred())
-				Eventually(grouter, 5).Should(Exit(0))
-			})
-		})
-
-		Context("when multiple signals are received", func() {
-			It("drains properly", func() {
-				grouter := gorouterSession
-				gorouterSession = nil
-				err := grouter.Command.Process.Signal(syscall.SIGUSR1)
-				Expect(err).ToNot(HaveOccurred())
-
-				// send more signals to ensure gorouter still drains gracefully
-				go func() {
-					for i := 0; i < 10; i++ {
-						grouter.Command.Process.Signal(syscall.SIGUSR1)
-						time.Sleep(5 * time.Millisecond)
-					}
-				}()
-				Eventually(grouter).Should(Say("gorouter.stopped"))
-			})
-		})
-	})
-
 	Context("When Dropsonde is misconfigured", func() {
 		It("fails to start", func() {
 			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+			config := createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			config.Logging.MetronAddress = ""
 			writeConfig(config, cfgFile)
 
@@ -445,13 +171,12 @@ var _ = Describe("Router Integration", func() {
 
 	It("logs component logs", func() {
 		statusPort := test_util.NextAvailPort()
-		proxyPort := test_util.NextAvailPort()
 		cfgFile := filepath.Join(tmpdir, "config.yml")
-		createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+		createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
-		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Router registered successfully"))
+		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Controller registered successfully"))
 	})
 
 	It("has Nats connectivity", func() {
@@ -459,26 +184,21 @@ var _ = Describe("Router Integration", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		statusPort := test_util.NextAvailPort()
-		proxyPort := test_util.NextAvailPort()
 
 		cfgFile := filepath.Join(tmpdir, "config.yml")
-		config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+		config := createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
 		gorouterSession = startGorouterSession(cfgFile)
 
 		mbusClient, err := newMessageBus(config)
 		Expect(err).ToNot(HaveOccurred())
 
-		zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
+		zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, mbusClient, nil)
 		zombieApp.Listen()
 
-		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, proxyPort, mbusClient, nil)
+		runningApp := test.NewGreetApp([]route.Uri{"innocent.bystander.vcap.me"}, mbusClient, nil)
 		runningApp.AddHandler("/some-path", func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
-			traceHeader := r.Header.Get(handlers.B3TraceIdHeader)
-			spanIDHeader := r.Header.Get(handlers.B3SpanIdHeader)
-			Expect(traceHeader).ToNot(BeEmpty())
-			Expect(spanIDHeader).ToNot(BeEmpty())
 			w.WriteHeader(http.StatusOK)
 		})
 
@@ -521,16 +241,16 @@ var _ = Describe("Router Integration", func() {
 		time.Sleep(10 * (staleCheckInterval + staleThreshold))
 
 		// While NATS is down all routes should go down
-		zombieApp.VerifyAppStatus(404)
-		runningApp.VerifyAppStatus(404)
+		Eventually(func() bool { return appUnregistered(routesUri, zombieApp) }).Should(BeTrue())
+		Eventually(func() bool { return appUnregistered(routesUri, runningApp) }).Should(BeTrue())
 
 		natsRunner.Start()
 
 		// After NATS starts up the zombie should stay gone
-		zombieApp.VerifyAppStatus(404)
-		runningApp.VerifyAppStatus(200)
+		Eventually(func() bool { return appUnregistered(routesUri, zombieApp) }).Should(BeTrue())
+		Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
-		uri := fmt.Sprintf("http://%s:%d/%s", "innocent.bystander.vcap.me", proxyPort, "some-path")
+		uri := fmt.Sprintf("http://%s:%d/%s", "innocent.bystander.vcap.me", runningApp.Port(), "some-path")
 		_, err = http.Get(uri)
 		Expect(err).ToNot(HaveOccurred())
 	})
@@ -541,10 +261,9 @@ var _ = Describe("Router Integration", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
 
 			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+			config := createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			config.NatsClientPingInterval = 1 * time.Second
 			writeConfig(config, cfgFile)
 			gorouterSession = startGorouterSession(cfgFile)
@@ -552,7 +271,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(config)
 			Expect(err).ToNot(HaveOccurred())
 
-			zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, proxyPort, mbusClient, nil)
+			zombieApp := test.NewGreetApp([]route.Uri{"zombie.vcap.me"}, mbusClient, nil)
 			zombieApp.Listen()
 
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -589,7 +308,6 @@ var _ = Describe("Router Integration", func() {
 			config         *config.Config
 			cfgFile        string
 			natsPort2      uint16
-			proxyPort      uint16
 			statusPort     uint16
 			natsRunner2    *test_util.NATSRunner
 			pruneInterval  int
@@ -601,12 +319,11 @@ var _ = Describe("Router Integration", func() {
 			natsRunner2 = test_util.NewNATSRunner(int(natsPort2))
 
 			statusPort = test_util.NextAvailPort()
-			proxyPort = test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 			pruneInterval = 2
 			pruneThreshold = 10
-			config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, false, natsPort, natsPort2)
+			config = createConfig(cfgFile, statusPort, pruneInterval, pruneThreshold, 0, false, natsPort, natsPort2)
 		})
 
 		AfterEach(func() {
@@ -624,7 +341,7 @@ var _ = Describe("Router Integration", func() {
 			mbusClient, err := newMessageBus(config)
 			Expect(err).ToNot(HaveOccurred())
 
-			runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+			runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, mbusClient, nil)
 			runningApp.Listen()
 
 			routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -671,13 +388,12 @@ var _ = Describe("Router Integration", func() {
 				natsRunner2 = test_util.NewNATSRunner(int(natsPort2))
 
 				statusPort = test_util.NextAvailPort()
-				proxyPort = test_util.NextAvailPort()
 
 				cfgFile = filepath.Join(tmpdir, "config.yml")
 				pruneInterval = 2
 				pruneThreshold = 10
 				suspendPruningIfNatsUnavailable := true
-				config = createConfig(cfgFile, statusPort, proxyPort, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, natsPort, natsPort2)
+				config = createConfig(cfgFile, statusPort, pruneInterval, pruneThreshold, 0, suspendPruningIfNatsUnavailable, natsPort, natsPort2)
 			})
 
 			It("does not prune routes when nats is unavailable", func() {
@@ -687,7 +403,7 @@ var _ = Describe("Router Integration", func() {
 				mbusClient, err := newMessageBus(config)
 				Expect(err).ToNot(HaveOccurred())
 
-				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, proxyPort, mbusClient, nil)
+				runningApp := test.NewGreetApp([]route.Uri{"demo.vcap.me"}, mbusClient, nil)
 				runningApp.Listen()
 
 				routesUri := fmt.Sprintf("http://%s:%s@%s:%d/routes", config.Status.User, config.Status.Pass, localIP, statusPort)
@@ -726,31 +442,13 @@ var _ = Describe("Router Integration", func() {
 		})
 	})
 
-	Context("when the route_services_secret and the route_services_secret_decrypt_only are valid", func() {
-		It("starts fine", func() {
-			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
-
-			cfgFile := filepath.Join(tmpdir, "config.yml")
-			config := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
-			config.RouteServiceSecret = "route-service-secret"
-			config.RouteServiceSecretPrev = "my-previous-route-service-secret"
-			writeConfig(config, cfgFile)
-
-			// The process should not have any error.
-			session := startGorouterSession(cfgFile)
-			stopGorouter(session)
-		})
-	})
-
 	Context("when no oauth config is specified", func() {
 		Context("and routing api is disabled", func() {
 			It("is able to start up", func() {
 				statusPort := test_util.NextAvailPort()
-				proxyPort := test_util.NextAvailPort()
 
 				cfgFile := filepath.Join(tmpdir, "config.yml")
-				cfg := createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+				cfg := createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 				cfg.OAuth = config.OAuthConfig{}
 				writeConfig(cfg, cfgFile)
 
@@ -769,11 +467,10 @@ var _ = Describe("Router Integration", func() {
 
 		BeforeEach(func() {
 			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
 
-			cfg = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+			cfg = createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			writeConfig(cfg, cfgFile)
 		})
 
@@ -796,10 +493,9 @@ var _ = Describe("Router Integration", func() {
 
 		BeforeEach(func() {
 			statusPort := test_util.NextAvailPort()
-			proxyPort := test_util.NextAvailPort()
 
 			cfgFile = filepath.Join(tmpdir, "config.yml")
-			config = createConfig(cfgFile, statusPort, proxyPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+			config = createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
 			responseBytes = []byte(`[{
 				"guid": "abc123",
@@ -909,7 +605,7 @@ var _ = Describe("Router Integration", func() {
 						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 						Expect(err).ToNot(HaveOccurred())
-						expectedLog := `retrieved-router-group","source":"gorouter.stdout","data":{"router-group":"router_group_name","router-group-guid":"abc123"}`
+						expectedLog := `retrieved-router-group","source":"cf-bigip-ctlr.stdout","data":{"router-group":"router_group_name","router-group-guid":"abc123"}`
 						Eventually(session).Should(Say(expectedLog))
 					})
 					Context("when given an invalid router group", func() {
@@ -954,7 +650,7 @@ var _ = Describe("Router Integration", func() {
 						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
 						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
 						Expect(err).ToNot(HaveOccurred())
-						expectedLog := `retrieved-router-group","source":"gorouter.stdout","data":{"router-group":"-","router-group-guid":"-"}`
+						expectedLog := `retrieved-router-group","source":"cf-bigip-ctlr.stdout","data":{"router-group":"-","router-group-guid":"-"}`
 						Eventually(session).Should(Say(expectedLog))
 					})
 				})

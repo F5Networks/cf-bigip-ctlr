@@ -1,40 +1,18 @@
 package test_util
 
 import (
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/cf-bigip-ctlr/config"
-
-	. "github.com/onsi/gomega"
 )
 
-func SpecConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
-	return generateConfig(statusPort, proxyPort, natsPorts...)
+func SpecConfig(statusPort uint16, natsPorts ...uint16) *config.Config {
+	return generateConfig(statusPort, natsPorts...)
 }
 
-func SpecSSLConfig(statusPort, proxyPort, SSLPort uint16, natsPorts ...uint16) *config.Config {
-	c := generateConfig(statusPort, proxyPort, natsPorts...)
-
-	c.EnableSSL = true
-
-	_, filename, _, _ := runtime.Caller(0)
-	testPath, err := filepath.Abs(filepath.Join(filename, "..", "..", "test", "assets"))
-	Expect(err).NotTo(HaveOccurred())
-
-	c.SSLKeyPath = filepath.Join(testPath, "certs", "server.key")
-	c.SSLCertPath = filepath.Join(testPath, "certs", "server.pem")
-	c.SSLPort = SSLPort
-	c.CipherString = "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
-
-	return c
-}
-
-func generateConfig(statusPort, proxyPort uint16, natsPorts ...uint16) *config.Config {
+func generateConfig(statusPort uint16, natsPorts ...uint16) *config.Config {
 	c := config.DefaultConfig()
 
-	c.Port = proxyPort
 	c.Index = 2
 	c.TraceKey = "my_trace_key"
 

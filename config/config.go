@@ -43,6 +43,7 @@ type BigIPConfig struct {
 	Policies       RoutingPolicies `yaml:"policies" json:"-"`
 	Profiles       []string        `yaml:"profiles" json:"-"`
 	HealthMonitors []string        `yaml:"health_monitors" json:"-"`
+	DriverCmd      string          `yaml:"driver_path" json:"-"`
 }
 
 var defaultBigIPConfig = BigIPConfig{
@@ -56,11 +57,12 @@ var defaultBigIPConfig = BigIPConfig{
 	SSLProfiles:    []string{},
 	Policies:       RoutingPolicies{},
 	Profiles:       []string{},
+	DriverCmd:      "",
 }
 
 var defaultStatusConfig = StatusConfig{
 	Host: "0.0.0.0",
-	Port: 8082,
+	Port: 8080,
 	User: "",
 	Pass: "",
 }
@@ -231,7 +233,7 @@ func (c *Config) Process() {
 		c.GoMaxProcs = runtime.NumCPU()
 	}
 
-	c.Logging.JobName = "gorouter"
+	c.Logging.JobName = "cf-bigip-ctlr"
 	if c.StartResponseDelayInterval > c.DropletStaleThreshold {
 		c.DropletStaleThreshold = c.StartResponseDelayInterval
 	}

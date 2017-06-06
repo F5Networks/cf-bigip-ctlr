@@ -20,7 +20,6 @@ type TestApp struct {
 	mutex sync.Mutex
 
 	port         uint16      // app listening port
-	rPort        uint16      // router listening port
 	urls         []route.Uri // host registered host name
 	mbusClient   *nats.Conn
 	tags         map[string]string
@@ -31,7 +30,6 @@ type TestApp struct {
 
 func NewTestApp(
 	urls []route.Uri,
-	rPort uint16,
 	mbusClient *nats.Conn,
 	tags map[string]string,
 	routeService string,
@@ -41,7 +39,6 @@ func NewTestApp(
 	port, _ := localip.LocalPort()
 
 	app.port = port
-	app.rPort = rPort
 	app.urls = urls
 	app.mbusClient = mbusClient
 	app.tags = tags
@@ -61,7 +58,7 @@ func (a *TestApp) Urls() []route.Uri {
 }
 
 func (a *TestApp) Endpoint() string {
-	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.rPort)
+	return fmt.Sprintf("http://%s:%d/", a.urls[0], a.port)
 }
 
 func (a *TestApp) Listen() {
@@ -131,7 +128,7 @@ func (a *TestApp) VerifyAppStatus(status int) {
 
 func (a *TestApp) CheckAppStatus(status int) error {
 	for _, url := range a.urls {
-		uri := fmt.Sprintf("http://%s:%d", url, a.rPort)
+		uri := fmt.Sprintf("http://%s:%d", url, a.port)
 		resp, err := http.Get(uri)
 		if err != nil {
 			return err

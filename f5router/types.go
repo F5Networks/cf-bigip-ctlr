@@ -20,6 +20,7 @@ import (
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
 
+	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/registry/container"
 	"github.com/cf-bigip-ctlr/route"
 
@@ -100,13 +101,12 @@ type (
 		drainUpdate  bool
 	}
 
-	operation   int
 	vsType      int
 	routeUpdate struct {
 		Name string
 		URI  route.Uri
 		T    *container.Trie
-		Op   operation
+		Op   registry.Operation
 	}
 
 	action struct {

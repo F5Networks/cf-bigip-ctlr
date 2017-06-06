@@ -30,29 +30,30 @@ import (
 	"github.com/uber-go/zap"
 )
 
+const (
+	// DefaultCmd default config driver
+	DefaultCmd = "python/bigipconfigdriver.py"
+)
+
 // Driver type which provides ifrit process interface
 type Driver struct {
-	fname   string
-	global  globalConfig
-	bigIP   config.BigIPConfig
-	baseDir string
-	logger  logger.Logger
+	fname     string
+	global    globalConfig
+	bigIP     config.BigIPConfig
+	driverCmd string
+	logger    logger.Logger
 }
-
-const (
-	command string = "bigipconfigdriver.py"
-)
 
 // NewDriver create ifrit process instance
 func NewDriver(
 	configFile string,
-	pythonBaseDir string,
+	driverCmd string,
 	logger logger.Logger,
 ) *Driver {
 	return &Driver{
-		fname:   configFile,
-		baseDir: pythonBaseDir,
-		logger:  logger,
+		fname:     configFile,
+		driverCmd: driverCmd,
+		logger:    logger,
 	}
 }
 
@@ -60,7 +61,7 @@ func (d *Driver) createDriverCmd() *exec.Cmd {
 	cmdName := "python"
 
 	cmdArgs := []string{
-		fmt.Sprintf("%s/%s", d.baseDir, command),
+		d.driverCmd,
 		"--config-file", d.fname,
 	}
 
@@ -69,7 +70,11 @@ func (d *Driver) createDriverCmd() *exec.Cmd {
 	return cmd
 }
 
-func (d *Driver) runBigIPDriver(pid chan<- int, cmd *exec.Cmd) {
+func (d *Driver) runBigIPDriver(
+	pid chan<- int,
+	done chan<- struct{},
+	cmd *exec.Cmd,
+) {
 	defer close(pid)
 
 	// the config driver python logging goes to stderr by default
@@ -117,6 +122,8 @@ func (d *Driver) runBigIPDriver(pid chan<- int, cmd *exec.Cmd) {
 		waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
 		d.logger.Warn("f5router-driver-exited-normally", zap.Int("exit-status", waitStatus.ExitStatus()))
 	}
+
+	close(done)
 }
 
 // Run start the F5Router configuration driver
@@ -124,7 +131,8 @@ func (d *Driver) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	d.logger.Info("f5router-driver-starting")
 
 	pidCh := make(chan int)
-	go d.runBigIPDriver(pidCh, d.createDriverCmd())
+	done := make(chan struct{})
+	go d.runBigIPDriver(pidCh, done, d.createDriverCmd())
 
 	pid := <-pidCh
 	close(ready)
@@ -146,6 +154,7 @@ func (d *Driver) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 		)
 		return err
 	}
+	<-done
 	d.logger.Info("f5router-driver-stopped")
 
 	return nil

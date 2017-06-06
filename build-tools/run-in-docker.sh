@@ -32,6 +32,7 @@ RUN_ARGS=( \
   -e BUILD_IMG_TAG="${BUILD_IMG_TAG}"
   -e LOCAL_USER_ID=$(id -u)
   -e BUILDDIR=/build/out
+  -e BUILD_VARIANT="${BUILD_VARIANT}"
 )
 
 # Add -it if caller is a terminal
