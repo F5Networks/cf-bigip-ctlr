@@ -17,12 +17,9 @@
 package f5router
 
 import (
-	"crypto/sha256"
 	"os"
 	"sort"
 	"sync"
-	"testing"
-	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/registry"
@@ -31,17 +28,388 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/routing-api/models"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega/gbytes"
 )
 
-var (
-	expectedSum = [][32]uint8{
-		[32]uint8{0x17, 0x5f, 0x5c, 0xd5, 0x46, 0x45, 0xd9, 0xde, 0x8e, 0x54, 0x95, 0xa4, 0x53, 0x92, 0xc5, 0x84, 0xb3, 0xe3, 0x1c, 0xb8, 0x7f, 0xc5, 0x50, 0xa9, 0x34, 0x34, 0xd4, 0x99, 0x4f, 0x2f, 0xa3, 0x21},
-		[32]uint8{0x2, 0x59, 0x7e, 0x60, 0xd6, 0x20, 0xe1, 0x66, 0x66, 0xe, 0x4d, 0xbd, 0xf9, 0x1d, 0x49, 0x57, 0x1f, 0xfb, 0xe6, 0xaf, 0x29, 0xfa, 0xd0, 0x80, 0x69, 0x42, 0xae, 0xa8, 0x1d, 0x6f, 0x90, 0x62},
-		[32]uint8{0x51, 0xed, 0x2a, 0xed, 0x82, 0xd, 0x74, 0x22, 0x1f, 0x99, 0x53, 0x84, 0xda, 0xf3, 0x3, 0xb0, 0x36, 0xd8, 0x5, 0x82, 0x29, 0xf5, 0xc0, 0x77, 0x3b, 0x55, 0x62, 0x0, 0x23, 0x55, 0x6a, 0x65},
-	}
-)
+var _ = Describe("F5Router", func() {
+	Describe("sorting", func() {
+		Context("route config", func() {
+			It("should sort correctly", func() {
+				routeconfigs := routeConfigs{}
+
+				expectedList := make(routeConfigs, 10)
+
+				rc := routeConfig{}
+				rc.Item.Backend.ServiceName = "bar"
+				rc.Item.Backend.ServicePort = 80
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[1] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "foo"
+				rc.Item.Backend.ServicePort = 2
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[5] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "foo"
+				rc.Item.Backend.ServicePort = 8080
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[7] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "baz"
+				rc.Item.Backend.ServicePort = 1
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[2] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "foo"
+				rc.Item.Backend.ServicePort = 80
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[6] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "foo"
+				rc.Item.Backend.ServicePort = 9090
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[9] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "baz"
+				rc.Item.Backend.ServicePort = 1000
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[3] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "foo"
+				rc.Item.Backend.ServicePort = 8080
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[8] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "foo"
+				rc.Item.Backend.ServicePort = 1
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[4] = &rc
+
+				rc = routeConfig{}
+				rc.Item.Backend.ServiceName = "bar"
+				rc.Item.Backend.ServicePort = 1
+				routeconfigs = append(routeconfigs, &rc)
+				expectedList[0] = &rc
+
+				sort.Sort(routeconfigs)
+
+				for i := range expectedList {
+					Expect(routeconfigs[i]).To(Equal(expectedList[i]),
+						"Sorted list elements should be equal")
+				}
+			})
+		})
+
+		Context("rules", func() {
+			It("should sort correctly", func() {
+				l7 := rules{}
+
+				expectedList := make(rules, 10)
+
+				p := rule{}
+				p.FullURI = "bar"
+				l7 = append(l7, &p)
+				expectedList[1] = &p
+
+				p = rule{}
+				p.FullURI = "foo"
+				l7 = append(l7, &p)
+				expectedList[5] = &p
+
+				p = rule{}
+				p.FullURI = "foo"
+				l7 = append(l7, &p)
+				expectedList[7] = &p
+
+				p = rule{}
+				p.FullURI = "baz"
+				l7 = append(l7, &p)
+				expectedList[2] = &p
+
+				p = rule{}
+				p.FullURI = "foo"
+				l7 = append(l7, &p)
+				expectedList[6] = &p
+
+				p = rule{}
+				p.FullURI = "foo"
+				l7 = append(l7, &p)
+				expectedList[9] = &p
+
+				p = rule{}
+				p.FullURI = "baz"
+				l7 = append(l7, &p)
+				expectedList[3] = &p
+
+				p = rule{}
+				p.FullURI = "foo"
+				l7 = append(l7, &p)
+				expectedList[8] = &p
+
+				p = rule{}
+				p.FullURI = "foo"
+				l7 = append(l7, &p)
+				expectedList[4] = &p
+
+				p = rule{}
+				p.FullURI = "bar"
+				l7 = append(l7, &p)
+				expectedList[0] = &p
+
+				sort.Sort(l7)
+
+				for i := range expectedList {
+					Expect(l7[i]).To(Equal(expectedList[i]),
+						"Sorted list elements should be equal")
+				}
+			})
+		})
+	})
+
+	Describe("verify configs", func() {
+		It("should process the config correctly", func() {
+			logger := test_util.NewTestZapLogger("router-test")
+			mw := &MockWriter{}
+			c := config.DefaultConfig()
+
+			r, err := NewF5Router(logger, nil, mw)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
+			r, err = NewF5Router(logger, c, nil)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
+			c.BigIP.URL = "http://example.com"
+			r, err = NewF5Router(logger, c, mw)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
+			c.BigIP.User = "admin"
+			r, err = NewF5Router(logger, c, mw)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
+			c.BigIP.Pass = "pass"
+			r, err = NewF5Router(logger, c, mw)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
+			c.BigIP.Partitions = []string{"cf"}
+			r, err = NewF5Router(logger, c, mw)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
+			c.BigIP.ExternalAddr = "127.0.0.1"
+			r, err = NewF5Router(logger, c, mw)
+			Expect(r).NotTo(BeNil())
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	Describe("running router", func() {
+		var mw *MockWriter
+		var router *F5Router
+		var err error
+		var logger *test_util.TestZapLogger
+		var c *config.Config
+
+		BeforeEach(func() {
+			logger = test_util.NewTestZapLogger("router-test")
+			c = makeConfig()
+			mw = &MockWriter{}
+
+			router, err = NewF5Router(logger, c, mw)
+
+			Expect(router).NotTo(BeNil(), "%v", router)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			if nil != logger {
+				logger.Close()
+			}
+		})
+
+		It("should run", func() {
+			done := make(chan struct{})
+			os := make(chan os.Signal)
+			ready := make(chan struct{})
+
+			go func() {
+				defer GinkgoRecover()
+				Expect(func() {
+					err = router.Run(os, ready)
+					Expect(err).NotTo(HaveOccurred())
+					close(done)
+				}).NotTo(Panic())
+			}()
+			// wait for the router to be ready
+			Eventually(ready).Should(BeClosed(), "timed out waiting for ready")
+			// send a kill signal to the router
+			os <- MockSignal(123)
+			//wait for the router to stop
+			Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
+		})
+
+		It("should update routes", func() {
+			data := createTrie()
+			done := make(chan struct{})
+			os := make(chan os.Signal)
+			ready := make(chan struct{})
+			update := 0
+
+			go func() {
+				defer GinkgoRecover()
+				Expect(func() {
+					err = router.Run(os, ready)
+					Expect(err).NotTo(HaveOccurred())
+					close(done)
+				}).NotTo(Panic())
+			}()
+
+			data.EachNodeWithPool(func(t *container.Trie) {
+				t.Pool.Each(func(e *route.Endpoint) {
+					go func(t *container.Trie, uri string) {
+						router.RouteUpdate(
+							registry.Add,
+							t,
+							route.Uri(uri),
+						)
+					}(data, t.ToPath())
+				})
+			})
+
+			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
+			update++
+
+			// make some changes and update the verification function
+			p := data.Find(route.Uri("bar.cf.com"))
+			Expect(p).NotTo(BeNil())
+			removed := p.Remove(makeEndpoint("127.0.1.1"))
+			Expect(removed).To(BeTrue())
+
+			p = data.Find(route.Uri("baz.cf.com/segment1"))
+			Expect(p).NotTo(BeNil())
+			removed = p.Remove(makeEndpoint("127.0.3.2"))
+			Expect(removed).To(BeTrue())
+
+			p = data.Find(route.Uri("baz.cf.com"))
+			Expect(p).NotTo(BeNil())
+			added := p.Put(makeEndpoint("127.0.2.2"))
+			Expect(added).To(BeTrue())
+
+			removed = data.Delete(route.Uri("*.foo.cf.com"))
+			Expect(removed).To(BeTrue())
+
+			removed = data.Delete(route.Uri("foo.cf.com"))
+			Expect(removed).To(BeTrue())
+
+			router.RouteUpdate(
+				registry.Remove,
+				data,
+				route.Uri("*.foo.cf.com"),
+			)
+
+			router.RouteUpdate(
+				registry.Remove,
+				data,
+				route.Uri("foo.cf.com"),
+			)
+
+			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
+			update++
+
+			p = route.NewPool(1, "qux.cf.com")
+			p.Put(makeEndpoint("127.0.7.1"))
+			data.Insert(route.Uri("qux.cf.com"), p)
+
+			router.RouteUpdate(
+				registry.Add,
+				data,
+				route.Uri("qux.cf.com"),
+			)
+
+			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
+
+			os <- MockSignal(123)
+			Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
+		})
+
+		It("should handle ssl and health monitors", func() {
+			data := createTrie()
+			done := make(chan struct{})
+			os := make(chan os.Signal)
+			ready := make(chan struct{})
+
+			c.BigIP.HealthMonitors = []string{"Common/potato"}
+			c.BigIP.SSLProfiles = []string{"Common/clientssl"}
+			c.BigIP.Profiles = []string{"Common/http", "/Common/fakeprofile"}
+
+			router, err = NewF5Router(logger, c, mw)
+
+			go func() {
+				defer GinkgoRecover()
+				Expect(func() {
+					err = router.Run(os, ready)
+					Expect(err).NotTo(HaveOccurred())
+					close(done)
+				}).NotTo(Panic())
+			}()
+			Eventually(ready).Should(BeClosed())
+			data.EachNodeWithPool(func(t *container.Trie) {
+				t.Pool.Each(func(e *route.Endpoint) {
+					go func(t *container.Trie, uri string) {
+						router.RouteUpdate(
+							registry.Add,
+							t,
+							route.Uri(uri),
+						)
+					}(data, t.ToPath())
+				})
+			})
+
+			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[3]))
+		})
+
+		Context("fail cases", func() {
+			It("should error when not passing a URI for route update", func() {
+				data := createTrie()
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+
+				router.RouteUpdate(
+					registry.Remove,
+					data,
+					route.Uri(""),
+				)
+
+				Eventually(logger).Should(Say("f5router-skipping-update"))
+			})
+		})
+
+	})
+})
 
 type testRoutes struct {
 	Key         route.Uri
@@ -50,8 +418,8 @@ type testRoutes struct {
 }
 
 type MockWriter struct {
-	Input   []byte
-	OnWrite func()
+	sync.Mutex
+	input []byte
 }
 
 func (mw *MockWriter) GetOutputFilename() string {
@@ -59,12 +427,20 @@ func (mw *MockWriter) GetOutputFilename() string {
 }
 
 func (mw *MockWriter) Write(input []byte) (n int, err error) {
-	mw.Input = input
+	mw.Lock()
+	defer mw.Unlock()
+	mw.input = input
 
-	if nil != mw.OnWrite {
-		mw.OnWrite()
-	}
 	return len(input), nil
+}
+
+func (mw *MockWriter) Input() []byte {
+	mw.Lock()
+	defer mw.Unlock()
+	dest := make([]byte, len(mw.input))
+	l := copy(dest, mw.input)
+	Expect(len(mw.input)).To(Equal(l))
+	return dest
 }
 
 type MockSignal int
@@ -86,219 +462,6 @@ func makeConfig() *config.Config {
 	c.BigIP.ExternalAddr = "127.0.0.1"
 
 	return c
-}
-
-func TestRouteConfigSort(t *testing.T) {
-	routeconfigs := routeConfigs{}
-
-	expectedList := make(routeConfigs, 10)
-
-	rc := routeConfig{}
-	rc.Item.Backend.ServiceName = "bar"
-	rc.Item.Backend.ServicePort = 80
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[1] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "foo"
-	rc.Item.Backend.ServicePort = 2
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[5] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "foo"
-	rc.Item.Backend.ServicePort = 8080
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[7] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "baz"
-	rc.Item.Backend.ServicePort = 1
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[2] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "foo"
-	rc.Item.Backend.ServicePort = 80
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[6] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "foo"
-	rc.Item.Backend.ServicePort = 9090
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[9] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "baz"
-	rc.Item.Backend.ServicePort = 1000
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[3] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "foo"
-	rc.Item.Backend.ServicePort = 8080
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[8] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "foo"
-	rc.Item.Backend.ServicePort = 1
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[4] = &rc
-
-	rc = routeConfig{}
-	rc.Item.Backend.ServiceName = "bar"
-	rc.Item.Backend.ServicePort = 1
-	routeconfigs = append(routeconfigs, &rc)
-	expectedList[0] = &rc
-
-	sort.Sort(routeconfigs)
-
-	for i := range expectedList {
-		require.EqualValues(t, expectedList[i], routeconfigs[i],
-			"Sorted list elements should be equal")
-	}
-}
-
-func TestRulesSort(t *testing.T) {
-	l7 := rules{}
-
-	expectedList := make(rules, 10)
-
-	p := rule{}
-	p.FullURI = "bar"
-	l7 = append(l7, &p)
-	expectedList[1] = &p
-
-	p = rule{}
-	p.FullURI = "foo"
-	l7 = append(l7, &p)
-	expectedList[5] = &p
-
-	p = rule{}
-	p.FullURI = "foo"
-	l7 = append(l7, &p)
-	expectedList[7] = &p
-
-	p = rule{}
-	p.FullURI = "baz"
-	l7 = append(l7, &p)
-	expectedList[2] = &p
-
-	p = rule{}
-	p.FullURI = "foo"
-	l7 = append(l7, &p)
-	expectedList[6] = &p
-
-	p = rule{}
-	p.FullURI = "foo"
-	l7 = append(l7, &p)
-	expectedList[9] = &p
-
-	p = rule{}
-	p.FullURI = "baz"
-	l7 = append(l7, &p)
-	expectedList[3] = &p
-
-	p = rule{}
-	p.FullURI = "foo"
-	l7 = append(l7, &p)
-	expectedList[8] = &p
-
-	p = rule{}
-	p.FullURI = "foo"
-	l7 = append(l7, &p)
-	expectedList[4] = &p
-
-	p = rule{}
-	p.FullURI = "bar"
-	l7 = append(l7, &p)
-	expectedList[0] = &p
-
-	sort.Sort(l7)
-
-	for i := range expectedList {
-		require.EqualValues(t, expectedList[i], l7[i],
-			"Sorted list elements should be equal")
-	}
-}
-
-func TestBadConfig(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	mw := &MockWriter{}
-	c := config.DefaultConfig()
-
-	r, err := NewF5Router(logger, nil, mw)
-	assert.Nil(t, r)
-	assert.Error(t, err)
-
-	r, err = NewF5Router(logger, c, nil)
-	assert.Nil(t, r)
-	assert.Error(t, err)
-
-	c.BigIP.URL = "http://example.com"
-	r, err = NewF5Router(logger, c, mw)
-	assert.Nil(t, r)
-	assert.Error(t, err)
-
-	c.BigIP.User = "admin"
-	r, err = NewF5Router(logger, c, mw)
-	assert.Nil(t, r)
-	assert.Error(t, err)
-
-	c.BigIP.Pass = "pass"
-	r, err = NewF5Router(logger, c, mw)
-	assert.Nil(t, r)
-	assert.Error(t, err)
-
-	c.BigIP.Partitions = []string{"cf"}
-	r, err = NewF5Router(logger, c, mw)
-	assert.Nil(t, r)
-	assert.Error(t, err)
-
-	c.BigIP.ExternalAddr = "127.0.0.1"
-	r, err = NewF5Router(logger, c, mw)
-	assert.NotNil(t, r)
-	assert.NoError(t, err)
-}
-
-func TestRun(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	mw := &MockWriter{}
-	c := makeConfig()
-
-	router, err := NewF5Router(logger, c, mw)
-	require.NotNil(t, router)
-	require.NoError(t, err)
-
-	ready := make(chan struct{})
-	os := make(chan os.Signal)
-	go func() {
-		select {
-		case _, ok := <-ready:
-			assert.False(t, ok, "ready returned and not closed")
-		case <-time.After(10 * time.Second):
-			require.FailNow(t, "timed out waiting for ready")
-		}
-
-		os <- MockSignal(123)
-	}()
-
-	done := make(chan struct{})
-	go func() {
-		assert.NotPanics(t, func() {
-			err = router.Run(os, ready)
-			assert.NoError(t, err)
-			close(done)
-		})
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "timed out waiting for Run to complete")
-	}
 }
 
 func makeEndpoints(addrs ...string) []*route.Endpoint {
@@ -377,115 +540,4 @@ func createTrie() *container.Trie {
 	}
 
 	return data
-}
-
-func TestRouteUpdates(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	mw := &MockWriter{}
-	c := makeConfig()
-
-	router, err := NewF5Router(logger, c, mw)
-	require.NotNil(t, router)
-	require.NoError(t, err)
-
-	data := createTrie()
-
-	// set this after NewF5Router is created as it writes an
-	// initial config - either that or make the callback
-	// smarter
-	wrote := make(chan struct{})
-	var update = 0
-	mw.OnWrite = func() {
-		sum := sha256.Sum256(mw.Input)
-		assert.Equal(t, expectedSum[update], sum)
-		update++
-		wrote <- struct{}{}
-	}
-
-	var wg sync.WaitGroup
-	data.EachNodeWithPool(func(t *container.Trie) {
-		t.Pool.Each(func(e *route.Endpoint) {
-			wg.Add(1)
-			go func(t *container.Trie, uri string) {
-				router.RouteUpdate(
-					registry.Add,
-					t,
-					route.Uri(uri),
-				)
-				wg.Done()
-			}(data, t.ToPath())
-		})
-	})
-
-	wg.Wait()
-	ready := make(chan struct{})
-	os := make(chan os.Signal)
-	done := make(chan struct{})
-	go func() {
-		assert.NotPanics(t, func() {
-			err = router.Run(os, ready)
-			assert.NoError(t, err)
-			close(done)
-		})
-	}()
-
-	select {
-	case <-wrote:
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "timed out waiting for config write to complete")
-	}
-
-	// make some changes and update the verification function
-	p := data.Find(route.Uri("bar.cf.com"))
-	require.NotNil(t, p)
-	removed := p.Remove(makeEndpoint("127.0.1.1"))
-	assert.True(t, removed)
-
-	p = data.Find(route.Uri("baz.cf.com/segment1"))
-	require.NotNil(t, p)
-	removed = p.Remove(makeEndpoint("127.0.3.2"))
-	assert.True(t, removed)
-
-	p = data.Find(route.Uri("baz.cf.com"))
-	require.NotNil(t, p)
-	added := p.Put(makeEndpoint("127.0.2.2"))
-	assert.True(t, added)
-
-	removed = data.Delete(route.Uri("*.foo.cf.com"))
-	assert.True(t, removed)
-
-	router.RouteUpdate(
-		registry.Remove,
-		data,
-		route.Uri("*.foo.cf.com"),
-	)
-
-	select {
-	case <-wrote:
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "timed out waiting for config write to complete")
-	}
-
-	p = route.NewPool(1, "qux.cf.com")
-	p.Put(makeEndpoint("127.0.7.1"))
-	data.Insert(route.Uri("qux.cf.com"), p)
-
-	router.RouteUpdate(
-		registry.Add,
-		data,
-		route.Uri("qux.cf.com"),
-	)
-
-	select {
-	case <-wrote:
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "timed out waiting for config write to complete")
-	}
-
-	os <- MockSignal(123)
-	select {
-	case <-done:
-	case <-time.After(10 * time.Second):
-		require.FailNow(t, "timed out waiting for Run to complete")
-	}
 }
