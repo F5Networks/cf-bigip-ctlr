@@ -9,7 +9,7 @@ Recommended reading before diving into Gorouter code:
 - [http.ResponseWriter](https://golang.org/pkg/net/http/#ResponseWriter)
 - [http.Request](https://golang.org/pkg/net/http/#Request)
 
-- [Gorouter README.md](https://github.com/cloudfoundry/gorouter#gorouter)
+- [Gorouter README.md](https://github.com/cloudfoundry/gorouter)
 
 ## Golang TCP Networking Basics
 Nearly all of the networking logic in Golang is dealt with the same pattern
@@ -150,7 +150,7 @@ the Gorouter:
 
 ## What are all these extra components in the Gorouter request flow?
 Most of the request processing logic lives in the [negroni
-handlers](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/proxy/proxy.go#l107-l120).
+handlers](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/proxy/proxy.go#L107).
 Note that it usually isn't possible to implement any Response modification logic
 in these handlers! That logic is mostly handled by the `ProxyRoundTripper`
 
@@ -170,7 +170,7 @@ Nearly all of the important logic is implemented as part of a
 1. [checks HTTP protocol version](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/handlers/protocolcheck.go)
 1. [**looks up backends for requested route**](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/handlers/lookup.go)
 1. [determines whether or not the request should go to a route service](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/handlers/routeservice.go)
-1. [handles TCP or WebSocket upgrade](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/proxy/proxy.go#L167-L210)
+1. [handles TCP or WebSocket upgrade](https://github.com/cloudfoundry/gorouter/blob/3ceca97b71afe458679d2893f1c6b3c04f5b995a/proxy/proxy.go#L167)
 1. [**httputil.ReverseProxy** transforms the request into a request to the next hop](https://golang.org/src/net/http/httputil/reverseproxy.go?h=ReverseProxy#L28)
 
 ### ProxyRoundTripper
