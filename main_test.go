@@ -19,11 +19,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/route"
-	"github.com/cf-bigip-ctlr/test"
-	"github.com/cf-bigip-ctlr/test/common"
-	"github.com/cf-bigip-ctlr/test_util"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/test"
+	"github.com/F5Networks/cf-bigip-ctlr/test/common"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"

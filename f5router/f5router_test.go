@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/registry/container"
-	"github.com/cf-bigip-ctlr/route"
-	"github.com/cf-bigip-ctlr/test_util"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/registry/container"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/routing-api/models"
 	"github.com/stretchr/testify/assert"

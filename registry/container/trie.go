@@ -3,7 +3,7 @@ package container
 import (
 	"strings"
 
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 )
 
 // package name inspired by golang package that includes heap, list and ring.

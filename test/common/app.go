@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cf-bigip-ctlr/common/uuid"
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"

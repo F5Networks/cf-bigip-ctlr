@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cf-bigip-ctlr/common/schema"
+	"github.com/F5Networks/cf-bigip-ctlr/common/schema"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

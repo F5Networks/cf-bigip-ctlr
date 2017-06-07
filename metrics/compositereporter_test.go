@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cf-bigip-ctlr/metrics"
-	"github.com/cf-bigip-ctlr/metrics/fakes"
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics/fakes"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"

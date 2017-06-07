@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 
 	"github.com/cloudfoundry/dropsonde/metrics"
 )

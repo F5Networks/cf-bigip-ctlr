@@ -3,7 +3,7 @@ package mbus_test
 import (
 	"encoding/json"
 
-	. "github.com/cf-bigip-ctlr/mbus"
+	. "github.com/F5Networks/cf-bigip-ctlr/mbus"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

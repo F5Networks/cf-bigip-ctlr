@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/cf-bigip-ctlr/common/schema"
+	"github.com/F5Networks/cf-bigip-ctlr/common/schema"
 )
 
 type GenericVarz struct {

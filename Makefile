@@ -1,4 +1,4 @@
-PACKAGE  := github.com/cf-bigip-ctlr
+PACKAGE  := github.com/F5Networks/cf-bigip-ctlr
 
 BASE     := $(GOPATH)/src/$(PACKAGE)
 GOOS     = $(shell go env GOOS)

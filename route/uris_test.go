@@ -1,7 +1,7 @@
 package route_test
 
 import (
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -27,9 +27,9 @@ var _ = BeforeSuite(func() {
 
 	variant, ok := os.LookupEnv("BUILD_VARIANT")
 	if !ok || variant == "release" {
-		path, err = gexec.Build("github.com/cf-bigip-ctlr")
+		path, err = gexec.Build("github.com/F5Networks/cf-bigip-ctlr")
 	} else if variant == "debug" {
-		path, err = gexec.Build("github.com/cf-bigip-ctlr", "-race")
+		path, err = gexec.Build("github.com/F5Networks/cf-bigip-ctlr", "-race")
 	} else {
 		Expect(variant).To(
 			Or(

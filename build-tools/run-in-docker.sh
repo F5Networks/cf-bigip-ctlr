@@ -17,7 +17,7 @@ CURDIR="$(dirname $BASH_SOURCE)"
 : ${build_img:=${BUILD_IMG_TAG}}
 
 # Need to make the directory before docker, to keep it owned by local user
-srcdir=src/github.com/cf-bigip-ctlr
+srcdir=src/github.com/F5Networks/cf-bigip-ctlr
 wkspace=${PWD}/_docker_workspace
 mkdir -p $wkspace/$srcdir
 

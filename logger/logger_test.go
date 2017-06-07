@@ -3,8 +3,8 @@ package logger_test
 import (
 	"fmt"
 
-	. "github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/test_util"
+	. "github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cf-bigip-ctlr/test_util"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

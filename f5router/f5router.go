@@ -29,11 +29,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/registry/container"
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/registry/container"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 
 	"github.com/uber-go/zap"
 	"k8s.io/client-go/util/workqueue"

@@ -4,7 +4,7 @@ import (
 	"net"
 	"net/http"
 
-	. "github.com/cf-bigip-ctlr/common/http"
+	. "github.com/F5Networks/cf-bigip-ctlr/common/http"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

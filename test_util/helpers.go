@@ -3,7 +3,7 @@ package test_util
 import (
 	"time"
 
-	"github.com/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
 )
 
 func SpecConfig(statusPort uint16, natsPorts ...uint16) *config.Config {

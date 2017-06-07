@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/logger"
 
 	"github.com/uber-go/zap"
 )

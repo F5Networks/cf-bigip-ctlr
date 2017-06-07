@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
 
 	"code.cloudfoundry.org/routing-api/models"
 	"github.com/uber-go/zap"

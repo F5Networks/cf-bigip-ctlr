@@ -1,7 +1,7 @@
 package uuid_test
 
 import (
-	"github.com/cf-bigip-ctlr/common/uuid"
+	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

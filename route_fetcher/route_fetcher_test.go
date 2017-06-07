@@ -5,12 +5,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/logger"
-	testRegistry "github.com/cf-bigip-ctlr/registry/fakes"
-	"github.com/cf-bigip-ctlr/route"
-	. "github.com/cf-bigip-ctlr/route_fetcher"
-	"github.com/cf-bigip-ctlr/test_util"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/logger"
+	testRegistry "github.com/F5Networks/cf-bigip-ctlr/registry/fakes"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
+	. "github.com/F5Networks/cf-bigip-ctlr/route_fetcher"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/clock/fakeclock"
 	"code.cloudfoundry.org/routing-api"
