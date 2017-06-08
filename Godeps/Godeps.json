@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/cf-bigip-ctlr",
-	"GoVersion": "go1.7",
+	"GoVersion": "go1.8",
 	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
@@ -63,10 +63,6 @@
 			"Rev": "cf81a3f10c84f8c50094b58724492f30cfed240b"
 		},
 		{
-			"ImportPath": "github.com/armon/go-proxyproto",
-			"Rev": "3daa90aec0039a806299b9078f4422fee950f33c"
-		},
-		{
 			"ImportPath": "github.com/bmizerany/pat",
 			"Rev": "b8a35001b773c267eb260a691f4e5499a3531600"
 		},
@@ -77,11 +73,6 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde/emitter",
-			"Comment": "v1.0.0-6-g37777ab",
-			"Rev": "37777abf5516f0f787de1f9b399d70173310cb7d"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/dropsonde/emitter/fake",
 			"Comment": "v1.0.0-6-g37777ab",
 			"Rev": "37777abf5516f0f787de1f9b399d70173310cb7d"
 		},
@@ -112,11 +103,6 @@
 		},
 		{
 			"ImportPath": "github.com/cloudfoundry/dropsonde/log_sender",
-			"Comment": "v1.0.0-6-g37777ab",
-			"Rev": "37777abf5516f0f787de1f9b399d70173310cb7d"
-		},
-		{
-			"ImportPath": "github.com/cloudfoundry/dropsonde/log_sender/fake",
 			"Comment": "v1.0.0-6-g37777ab",
 			"Rev": "37777abf5516f0f787de1f9b399d70173310cb7d"
 		},
@@ -153,11 +139,6 @@
 		{
 			"ImportPath": "github.com/cloudfoundry/sonde-go/events",
 			"Rev": "d6ed492b509e180ee7675ed15237906041e53a6e"
-		},
-		{
-			"ImportPath": "github.com/codegangsta/cli",
-			"Comment": "v1.19.1-28-g8ba6f23",
-			"Rev": "8ba6f23b6e36d03666a14bd9421f5e3efcb59aca"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -411,11 +392,6 @@
 		{
 			"ImportPath": "github.com/uber-go/zap",
 			"Rev": "a5783ee4b216a927da8f839c45cfbf9d694e1467"
-		},
-		{
-			"ImportPath": "github.com/urfave/negroni",
-			"Comment": "v0.2.0-65-g3f7ce7b",
-			"Rev": "3f7ce7b928e14ff890b067e5bbbc80af73690a9c"
 		},
 		{
 			"ImportPath": "github.com/vito/go-sse/sse",

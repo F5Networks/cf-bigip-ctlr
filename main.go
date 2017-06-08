@@ -1,7 +1,6 @@
 package main // import "github.com/cf-bigip-ctlr"
 
 import (
-	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,20 +11,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cf-bigip-ctlr/access_log"
-	"github.com/cf-bigip-ctlr/common/schema"
-	"github.com/cf-bigip-ctlr/common/secure"
 	"github.com/cf-bigip-ctlr/common/uuid"
 	"github.com/cf-bigip-ctlr/config"
+	"github.com/cf-bigip-ctlr/controller"
 	"github.com/cf-bigip-ctlr/f5router"
 	cfLogger "github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/mbus"
 	"github.com/cf-bigip-ctlr/metrics"
-	"github.com/cf-bigip-ctlr/proxy"
 	rregistry "github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/route_fetcher"
-	"github.com/cf-bigip-ctlr/router"
-	"github.com/cf-bigip-ctlr/routeservice"
 	rvarz "github.com/cf-bigip-ctlr/varz"
 
 	"code.cloudfoundry.org/clock"
@@ -48,8 +42,6 @@ var pythonBaseDir string
 
 var configFile string
 
-var healthCheck int32
-
 func main() {
 	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
 	if !ok {
@@ -58,7 +50,6 @@ func main() {
 	}
 
 	c := config.DefaultConfig()
-	logCounter := schema.NewLogCounter()
 
 	if configFile != "" {
 		c = config.InitConfigFromFile(configFile)
@@ -81,7 +72,7 @@ func main() {
 
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
-		logger.Error("dropsonde-initialize-error", zap.Error(err))
+		logger.Fatal("dropsonde-initialize-error", zap.Error(err))
 	}
 
 	// setup number of procs
@@ -130,22 +121,25 @@ func main() {
 		logger.Fatal("f5router-failed-initialization", zap.Error(err))
 	}
 
-	folderPath, err := os.Getwd()
-	if err != nil {
-		logger.Fatal("file-get-error", zap.Error(err))
-	}
+	var dp string
+	if 0 == len(c.BigIP.DriverCmd) {
+		folderPath, err := os.Getwd()
+		if err != nil {
+			logger.Fatal("file-get-error", zap.Error(err))
+		}
 
-	_, err = os.Stat(fmt.Sprintf("%v/python/bigipconfigdriver.py", folderPath))
+		dp = fmt.Sprintf("%v/%v", folderPath, f5router.DefaultCmd)
+	} else {
+		dp = c.BigIP.DriverCmd
+	}
+	_, err = os.Stat(dp)
 	if os.IsNotExist(err) {
-		logger.Fatal("bigipconfigdriver-does-not-exist", zap.Error(err))
+		logger.Fatal("driver-file-does-not-exist", zap.Error(err))
 	}
-
-	logger.Info("starting-python-driver")
-	pythonBaseDir = fmt.Sprintf("%v/python/", folderPath)
 
 	driver := f5router.NewDriver(
 		writer.GetOutputFilename(),
-		pythonBaseDir,
+		dp,
 		logger,
 	)
 
@@ -163,48 +157,17 @@ func main() {
 	}
 
 	varz := rvarz.NewVarz(registry)
-	compositeReporter := metrics.NewCompositeReporter(varz, metricsReporter)
-
-	accessLogger, err := access_log.CreateRunningAccessLogger(logger.Session("access-log"), c)
-	if err != nil {
-		logger.Fatal("error-creating-access-logger", zap.Error(err))
-	}
-
-	var crypto secure.Crypto
-	var cryptoPrev secure.Crypto
-	if c.RouteServiceEnabled {
-		crypto = createCrypto(logger, c.RouteServiceSecret)
-		if c.RouteServiceSecretPrev != "" {
-			cryptoPrev = createCrypto(logger, c.RouteServiceSecretPrev)
-		}
-	}
-
-	proxy := buildProxy(
-		logger.Session("proxy"),
+	controller, err := controller.NewController(
+		logger.Session("controller"),
 		c,
-		registry,
-		accessLogger,
-		compositeReporter,
-		crypto,
-		cryptoPrev,
-	)
-
-	healthCheck = 0
-	router, err := router.NewRouter(
-		logger.Session("router"),
-		c,
-		proxy,
 		natsClient,
 		registry,
 		varz,
-		&healthCheck,
-		logCounter,
-		nil,
 	)
-
-	if err != nil {
-		logger.Fatal("initialize-router-error", zap.Error(err))
+	if nil != err {
+		logger.Fatal("failed-starting-controller", zap.Error(err))
 	}
+
 	members := grouper.Members{}
 
 	if c.RoutingApiEnabled() {
@@ -215,7 +178,8 @@ func main() {
 	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan, routerGroupGUID)
 
 	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
-	members = append(members, grouper.Member{Name: "router", Runner: router})
+	// controller handles StartResponseDelayInterval - start it before configuration ops
+	members = append(members, grouper.Member{Name: "controller", Runner: controller})
 	members = append(members, grouper.Member{Name: "f5router", Runner: f5Router})
 	members = append(members, grouper.Member{Name: "f5driver", Runner: driver})
 
@@ -230,43 +194,6 @@ func main() {
 	}
 
 	os.Exit(0)
-}
-
-func createCrypto(logger cfLogger.Logger, secret string) *secure.AesGCM {
-	// generate secure encryption key using key derivation function (pbkdf2)
-	secretPbkdf2 := secure.NewPbkdf2([]byte(secret), 16)
-	crypto, err := secure.NewAesGCM(secretPbkdf2)
-	if err != nil {
-		logger.Fatal("error-creating-route-service-crypto", zap.Error(err))
-	}
-	return crypto
-}
-
-func buildProxy(
-	logger cfLogger.Logger,
-	c *config.Config,
-	registry rregistry.Registry,
-	accessLogger access_log.AccessLogger,
-	reporter metrics.CombinedReporter,
-	crypto secure.Crypto,
-	cryptoPrev secure.Crypto,
-) proxy.Proxy {
-	routeServiceConfig := routeservice.NewRouteServiceConfig(
-		logger,
-		c.RouteServiceEnabled,
-		c.RouteServiceTimeout,
-		crypto,
-		cryptoPrev,
-		c.RouteServiceRecommendHttps,
-	)
-
-	tlsConfig := &tls.Config{
-		CipherSuites:       c.CipherSuites,
-		InsecureSkipVerify: c.SkipSSLValidation,
-	}
-
-	return proxy.NewProxy(logger, accessLogger, c, registry,
-		reporter, routeServiceConfig, tlsConfig, &healthCheck)
 }
 
 func fetchRoutingGroupGUID(

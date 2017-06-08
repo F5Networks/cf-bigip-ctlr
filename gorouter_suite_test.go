@@ -1,6 +1,7 @@
 package main_test
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -17,11 +18,28 @@ var (
 
 func TestGorouter(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Gorouter Suite")
+	RunSpecs(t, "CF BigIP Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
-	path, err := gexec.Build("github.com/cf-bigip-ctlr", "-race")
+	var path string
+	var err error
+
+	variant, ok := os.LookupEnv("BUILD_VARIANT")
+	if !ok || variant == "release" {
+		path, err = gexec.Build("github.com/cf-bigip-ctlr")
+	} else if variant == "debug" {
+		path, err = gexec.Build("github.com/cf-bigip-ctlr", "-race")
+	} else {
+		Expect(variant).To(
+			Or(
+				Equal("debug"),
+				Equal("release"),
+				Equal(""),
+			),
+		)
+	}
+
 	Expect(err).ToNot(HaveOccurred())
 	gorouterPath = path
 	SetDefaultEventuallyTimeout(15 * time.Second)

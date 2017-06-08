@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/f5router"
 	"github.com/cf-bigip-ctlr/logger"
 	"github.com/cf-bigip-ctlr/metrics"
 	"github.com/cf-bigip-ctlr/registry/container"
@@ -27,6 +26,36 @@ type Registry interface {
 	NumUris() int
 	NumEndpoints() int
 	MarshalJSON() ([]byte, error)
+}
+
+// Operation of registry change
+type Operation int
+
+const (
+	// Add operation
+	Add Operation = iota
+	// Update operation
+	Update
+	// Remove operation
+	Remove
+)
+
+func (op Operation) String() string {
+	switch op {
+	case Add:
+		return "Add"
+	case Update:
+		return "Update"
+	case Remove:
+		return "Remove"
+	}
+
+	return "Unknown"
+}
+
+// Listener optional listener for route registry updates
+type Listener interface {
+	RouteUpdate(op Operation, t *container.Trie, uri route.Uri)
 }
 
 type PruneStatus int
@@ -58,13 +87,13 @@ type RouteRegistry struct {
 
 	routerGroupGUID string
 
-	f5Router *f5router.F5Router
+	listener Listener
 }
 
 func NewRouteRegistry(
 	logger logger.Logger,
 	c *config.Config,
-	f5Router *f5router.F5Router,
+	listener Listener,
 	reporter metrics.RouteRegistryReporter,
 	routerGroupGUID string,
 ) *RouteRegistry {
@@ -78,7 +107,7 @@ func NewRouteRegistry(
 
 	r.reporter = reporter
 	r.routerGroupGUID = routerGroupGUID
-	r.f5Router = f5Router
+	r.listener = listener
 	return r
 }
 
@@ -97,7 +126,9 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		r.byURI.Insert(routekey, pool)
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 
-		r.f5Router.RouteUpdate(f5router.Add, r.byURI, routekey)
+		if nil != r.listener {
+			r.listener.RouteUpdate(Add, r.byURI, routekey)
+		}
 	} else {
 		if nil == pool.FindById(endpoint.CanonicalAddr()) {
 			updateRoute = true
@@ -105,8 +136,8 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 	}
 
 	endpointAdded := pool.Put(endpoint)
-	if endpointAdded && updateRoute {
-		r.f5Router.RouteUpdate(f5router.Update, r.byURI, routekey)
+	if endpointAdded && updateRoute && nil != r.listener {
+		r.listener.RouteUpdate(Update, r.byURI, routekey)
 	}
 
 	r.timeOfLastUpdate = t
@@ -154,7 +185,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
 		if endpointRemoved {
-			r.f5Router.RouteUpdate(f5router.Remove, r.byURI, uri)
+			if nil != r.listener {
+				r.listener.RouteUpdate(Remove, r.byURI, uri)
+			}
 
 			r.logger.Debug("endpoint-unregistered", zapData...)
 		} else {
@@ -300,10 +333,12 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		endpoints := t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
 		if len(endpoints) > 0 {
-			if nil == t.Pool {
-				r.f5Router.RouteUpdate(f5router.Remove, t, route.Uri(t.ToPath()))
-			} else {
-				r.f5Router.RouteUpdate(f5router.Update, t, route.Uri(t.ToPath()))
+			if nil != r.listener {
+				if nil == t.Pool {
+					r.listener.RouteUpdate(Remove, t, route.Uri(t.ToPath()))
+				} else {
+					r.listener.RouteUpdate(Update, t, route.Uri(t.ToPath()))
+				}
 			}
 			addresses := []string{}
 			for _, e := range endpoints {

@@ -11,8 +11,8 @@ import (
 	"github.com/nats-io/nats"
 )
 
-func NewGreetApp(urls []route.Uri, rPort uint16, mbusClient *nats.Conn, tags map[string]string) *common.TestApp {
-	app := common.NewTestApp(urls, rPort, mbusClient, tags, "")
+func NewGreetApp(urls []route.Uri, mbusClient *nats.Conn, tags map[string]string) *common.TestApp {
+	app := common.NewTestApp(urls, mbusClient, tags, "")
 	app.AddHandler("/", greetHandler)
 	app.AddHandler("/forwardedprotoheader", headerHandler)
 

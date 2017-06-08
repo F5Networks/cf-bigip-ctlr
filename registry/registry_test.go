@@ -39,7 +39,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		routerGroupGuid = "pineapple-router-group-guid"
 
-		r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+		r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 		modTag = models.ModificationTag{}
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
 			"id1", "0",
@@ -200,7 +200,7 @@ var _ = Describe("RouteRegistry", func() {
 			Context("when router-group-guid is not provided", func() {
 				BeforeEach(func() {
 					routerGroupGuid = ""
-					r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+					r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 				})
 
 				It("defaults to `-`", func() {
@@ -453,7 +453,7 @@ var _ = Describe("RouteRegistry", func() {
 			Context("when router-group-guid is not provided", func() {
 				BeforeEach(func() {
 					routerGroupGuid = ""
-					r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+					r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 					r.Register("a.route", fooEndpoint)
 				})
 
@@ -695,14 +695,13 @@ var _ = Describe("RouteRegistry", func() {
 
 			Expect(r.NumUris()).To(Equal(0))
 			r.MarshalJSON()
-			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/
-        path3.*endpoints.*router-group-guid.*pineapple-router-group-guid`))
+			Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*router-group-guid.*pineapple-router-group-guid`))
 		})
 
 		Context("when router-group-guid is not provided", func() {
 			BeforeEach(func() {
 				routerGroupGuid = ""
-				r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+				r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 			})
 
 			It("logs the route info for stale routes and router-group-guid defaults to `-`", func() {
@@ -716,8 +715,7 @@ var _ = Describe("RouteRegistry", func() {
 
 				Expect(r.NumUris()).To(Equal(0))
 				r.MarshalJSON()
-				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/
-          path3.*endpoints.*router-group-guid.*"-"`))
+				Expect(logger).To(gbytes.Say(`"log_level":1.*prune.*bar.com/path1/path2/path3.*endpoints.*router-group-guid.*"-"`))
 			})
 		})
 
@@ -822,7 +820,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.DropletStaleThreshold = 45 * time.Millisecond
 				reporter = new(fakes.FakeRouteRegistryReporter)
 
-				r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+				r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 			})
 
 			It("sends route metrics to the reporter", func() {
@@ -850,7 +848,7 @@ var _ = Describe("RouteRegistry", func() {
 				configObj.DropletStaleThreshold = 1 * time.Second
 				reporter = new(fakes.FakeRouteRegistryReporter)
 
-				r = NewRouteRegistry(logger, configObj, reporter, routerGroupGuid)
+				r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 			})
 
 			It("does not log the route info for fresh routes when pruning", func() {
@@ -955,8 +953,7 @@ var _ = Describe("RouteRegistry", func() {
 
 		marshalled, err := json.Marshal(r)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(string(marshalled)).To(Equal(`{"foo":[{"address":"192.168.1.1:1234",
-      "ttl":-1,"route_service_url":"https://my-routeService.com","tags":null}]}`))
+		Expect(string(marshalled)).To(Equal(`{"foo":[{"address":"192.168.1.1:1234","ttl":-1,"route_service_url":"https://my-routeService.com","tags":null}]}`))
 		r.Unregister("foo", m)
 		marshalled, err = json.Marshal(r)
 		Expect(err).NotTo(HaveOccurred())

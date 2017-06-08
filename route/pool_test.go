@@ -380,9 +380,7 @@ var _ = Describe("Pool", func() {
 		json, err := pool.MarshalJSON()
 		Expect(err).ToNot(HaveOccurred())
 
-		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,
-      "route_service_url":"https://my-rs.com","tags":null},
-      {"address":"5.6.7.8:5678","ttl":-1,"tags":null}]`))
+		Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,"route_service_url":"https://my-rs.com","tags":null},{"address":"5.6.7.8:5678","ttl":-1,"tags":null}]`))
 	})
 
 	Context("when endpoints do not have empty tags", func() {
@@ -396,9 +394,7 @@ var _ = Describe("Pool", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,
-        "route_service_url":"https://my-rs.com",
-        "tags":{"some-key":"some-value"}}]`))
+			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,"route_service_url":"https://my-rs.com","tags":{"some-key":"some-value"}}]`))
 		})
 	})
 
@@ -412,8 +408,7 @@ var _ = Describe("Pool", func() {
 			pool.Put(e)
 			json, err := pool.MarshalJSON()
 			Expect(err).ToNot(HaveOccurred())
-			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,
-        "route_service_url":"https://my-rs.com","tags":{}}]`))
+			Expect(string(json)).To(Equal(`[{"address":"1.2.3.4:5678","ttl":-1,"route_service_url":"https://my-rs.com","tags":{}}]`))
 		})
 	})
 })

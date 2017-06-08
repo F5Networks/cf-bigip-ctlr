@@ -31,20 +31,12 @@ import (
 
 	"github.com/cf-bigip-ctlr/config"
 	"github.com/cf-bigip-ctlr/logger"
+	"github.com/cf-bigip-ctlr/registry"
 	"github.com/cf-bigip-ctlr/registry/container"
 	"github.com/cf-bigip-ctlr/route"
 
 	"github.com/uber-go/zap"
 	"k8s.io/client-go/util/workqueue"
-)
-
-const (
-	// Add operation
-	Add operation = iota
-	// Update operation
-	Update
-	// Remove operation
-	Remove
 )
 
 const (
@@ -82,19 +74,6 @@ func (slice routeConfigs) Less(i, j int) bool {
 
 func (slice routeConfigs) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
-}
-
-func (op operation) String() string {
-	switch op {
-	case Add:
-		return "Add"
-	case Update:
-		return "Update"
-	case Remove:
-		return "Remove"
-	}
-
-	return "Unknown"
 }
 
 func makePoolName(uri string) string {
@@ -162,6 +141,8 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	go r.runWorker(done)
 
 	close(ready)
+
+	r.logger.Info("f5router-started")
 	<-signals
 	r.queue.ShutDown()
 	<-done
@@ -322,11 +303,11 @@ func (r *F5Router) process() bool {
 	var tryUpdate bool
 	var err error
 	r.logger.Debug("f5router-received-pool-request")
-	if ru.Op == Add {
+	if ru.Op == registry.Add {
 		tryUpdate = r.processRouteAdd(ru)
-	} else if ru.Op == Update {
+	} else if ru.Op == registry.Update {
 		tryUpdate = true
-	} else if ru.Op == Remove {
+	} else if ru.Op == registry.Remove {
 		tryUpdate = r.processRouteRemove(ru)
 	}
 
@@ -588,10 +569,18 @@ func (r *F5Router) processRouteRemove(ru routeUpdate) bool {
 
 // RouteUpdate send update information to processor
 func (r *F5Router) RouteUpdate(
-	op operation,
+	op registry.Operation,
 	t *container.Trie,
 	uri route.Uri,
 ) {
+	if 0 == len(uri) {
+		r.logger.Warn("f5router-skipping-update",
+			zap.String("reason", "empty uri"),
+			zap.String("operation", op.String()),
+		)
+		return
+	}
+
 	r.logger.Debug("f5router-updating-pool",
 		zap.String("operation", op.String()),
 		zap.String("uri", uri.String()),
