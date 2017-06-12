@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 )
 
 // Deprecated: this interface is marked for removal. It should be removed upon

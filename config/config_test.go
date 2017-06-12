@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"time"
 
-	. "github.com/cf-bigip-ctlr/config"
+	. "github.com/F5Networks/cf-bigip-ctlr/config"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

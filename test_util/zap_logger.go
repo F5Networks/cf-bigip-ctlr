@@ -3,7 +3,7 @@ package test_util
 import (
 	"strings"
 
-	"github.com/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/logger"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega/gbytes"

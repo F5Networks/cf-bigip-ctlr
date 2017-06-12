@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/metrics/fakes"
-	. "github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/route"
-	"github.com/cf-bigip-ctlr/test_util"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics/fakes"
+	. "github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"

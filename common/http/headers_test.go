@@ -3,8 +3,8 @@ package http_test
 import (
 	"net/http"
 
-	commonhttp "github.com/cf-bigip-ctlr/common/http"
-	"github.com/cf-bigip-ctlr/common/http/fakes"
+	commonhttp "github.com/F5Networks/cf-bigip-ctlr/common/http"
+	"github.com/F5Networks/cf-bigip-ctlr/common/http/fakes"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

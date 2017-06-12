@@ -1,4 +1,4 @@
-package main // import "github.com/cf-bigip-ctlr"
+package main // import "github.com/F5Networks/cf-bigip-ctlr"
 
 import (
 	"errors"
@@ -11,16 +11,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cf-bigip-ctlr/common/uuid"
-	"github.com/cf-bigip-ctlr/config"
-	"github.com/cf-bigip-ctlr/controller"
-	"github.com/cf-bigip-ctlr/f5router"
-	cfLogger "github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/mbus"
-	"github.com/cf-bigip-ctlr/metrics"
-	rregistry "github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/route_fetcher"
-	rvarz "github.com/cf-bigip-ctlr/varz"
+	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/controller"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router"
+	cfLogger "github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/mbus"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics"
+	rregistry "github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/route_fetcher"
+	rvarz "github.com/F5Networks/cf-bigip-ctlr/varz"
 
 	"code.cloudfoundry.org/clock"
 	"code.cloudfoundry.org/debugserver"

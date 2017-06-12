@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/cf-bigip-ctlr",
+	"ImportPath": "github.com/F5Networks/cf-bigip-ctlr",
 	"GoVersion": "go1.8",
 	"GodepVersion": "v79",
 	"Packages": [

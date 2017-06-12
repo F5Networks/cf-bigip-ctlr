@@ -3,8 +3,8 @@ package logger_test
 import (
 	"errors"
 
-	. "github.com/cf-bigip-ctlr/logger"
-	"github.com/cf-bigip-ctlr/logger/fakes"
+	. "github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/logger/fakes"
 
 	"code.cloudfoundry.org/lager"
 	. "github.com/onsi/ginkgo"

@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cf-bigip-ctlr/common/secure"
+	"github.com/F5Networks/cf-bigip-ctlr/common/secure"
 )
 
 type FakeCrypto struct {

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cf-bigip-ctlr/metrics"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics"
 )
 
 type FakeRouteRegistryReporter struct {

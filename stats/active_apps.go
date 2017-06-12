@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cf-bigip-ctlr/stats/container"
+	"github.com/F5Networks/cf-bigip-ctlr/stats/container"
 )
 
 const (

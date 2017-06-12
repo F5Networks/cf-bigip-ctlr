@@ -4,8 +4,8 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cf-bigip-ctlr/registry"
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 )
 
 type FakeRegistry struct {

@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cf-bigip-ctlr/metrics"
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 )
 
 type FakeVarzReporter struct {

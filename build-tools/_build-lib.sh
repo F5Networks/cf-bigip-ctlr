@@ -24,7 +24,7 @@ set -e
 : ${BUILD_VARIANT:=release}
 : ${BUILD_VARIANT_FLAGS:=}
 
-PKGIMPORT="github.com/cf-bigip-ctlr"
+PKGIMPORT="github.com/F5Networks/cf-bigip-ctlr"
 
 
 # Defer calculating build dir until actualy in the build environment

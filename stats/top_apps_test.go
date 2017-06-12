@@ -3,7 +3,7 @@ package stats_test
 import (
 	"time"
 
-	. "github.com/cf-bigip-ctlr/stats"
+	. "github.com/F5Networks/cf-bigip-ctlr/stats"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -4,7 +4,7 @@ package fakes
 import (
 	"sync"
 
-	"github.com/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 )
 
 type FakeEndpointIterator struct {

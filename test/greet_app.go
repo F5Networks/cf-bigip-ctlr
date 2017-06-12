@@ -5,8 +5,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/cf-bigip-ctlr/route"
-	"github.com/cf-bigip-ctlr/test/common"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/test/common"
 
 	"github.com/nats-io/nats"
 )

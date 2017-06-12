@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cf-bigip-ctlr/common/health"
-	"github.com/cf-bigip-ctlr/common/schema"
+	"github.com/F5Networks/cf-bigip-ctlr/common/health"
+	"github.com/F5Networks/cf-bigip-ctlr/common/schema"
 
 	"code.cloudfoundry.org/lager"
 	. "github.com/onsi/ginkgo"
