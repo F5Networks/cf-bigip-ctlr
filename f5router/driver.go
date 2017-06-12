@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
@@ -42,6 +43,7 @@ type Driver struct {
 	bigIP     config.BigIPConfig
 	driverCmd string
 	logger    logger.Logger
+	stopping  uint32
 }
 
 // NewDriver create ifrit process instance
@@ -111,16 +113,27 @@ func (d *Driver) runBigIPDriver(
 	if exitError, ok := err.(*exec.ExitError); ok {
 		waitStatus = exitError.Sys().(syscall.WaitStatus)
 		if waitStatus.Signaled() {
-			d.logger.Fatal("f5router-driver-signaled-to-stop", zap.String("signal",
-				fmt.Sprintf("%d - %s", waitStatus.Signal(), waitStatus.Signal())))
+			if 1 == atomic.LoadUint32(&d.stopping) {
+				d.logger.Info("f5router-driver-signaled-to-stop", zap.String("signal",
+					fmt.Sprintf("%d - %s", waitStatus.Signal(), waitStatus.Signal())))
+			} else {
+				d.logger.Fatal("f5router-driver-unexpected-signal", zap.String("signal",
+					fmt.Sprintf("%d - %s", waitStatus.Signal(), waitStatus.Signal())))
+			}
 		} else {
-			d.logger.Fatal("f5router-driver-exited", zap.Int("exit-status", waitStatus.ExitStatus()))
+			d.logger.Fatal("f5router-driver-exited-unexpectedly",
+				zap.Int("exit-status", waitStatus.ExitStatus()),
+			)
 		}
 	} else if nil != err {
-		d.logger.Fatal("f5router-driver-exited", zap.Error(err))
+		d.logger.Fatal("f5router-driver-exited-unexpectedly",
+			zap.Error(err),
+		)
 	} else {
 		waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
-		d.logger.Warn("f5router-driver-exited-normally", zap.Int("exit-status", waitStatus.ExitStatus()))
+		d.logger.Info("f5router-driver-exited-normally",
+			zap.Int("exit-status", waitStatus.ExitStatus()),
+		)
 	}
 
 	close(done)
@@ -139,6 +152,7 @@ func (d *Driver) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	d.logger.Info("f5router-driver-started")
 
 	sig := <-signals
+	atomic.StoreUint32(&d.stopping, 1)
 
 	proc, err := os.FindProcess(pid)
 	if nil != err {
