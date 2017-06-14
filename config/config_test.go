@@ -355,22 +355,6 @@ enable_proxy: true
 			Expect(config.EnablePROXY).To(Equal(true))
 		})
 
-		It("sets the healthcheck User-Agent", func() {
-			var b = []byte("healthcheck_user_agent: ELB-HealthChecker/1.0")
-			err := config.Initialize(b)
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(config.HealthCheckUserAgent).To(Equal("ELB-HealthChecker/1.0"))
-		})
-
-		It("defaults the healthcheck User-Agent", func() {
-			var b = []byte(``)
-			err := config.Initialize(b)
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(config.HealthCheckUserAgent).To(Equal("HTTP-Monitor/1.1"))
-		})
-
 		It("sets Tracing.EnableZipkin", func() {
 			var b = []byte("tracing:\n  enable_zipkin: true")
 			err := config.Initialize(b)

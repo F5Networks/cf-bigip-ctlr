@@ -156,11 +156,10 @@ type Config struct {
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 
-	DrainWait            time.Duration `yaml:"drain_wait,omitempty"`
-	DrainTimeout         time.Duration `yaml:"drain_timeout,omitempty"`
-	SecureCookies        bool          `yaml:"secure_cookies"`
-	RouterGroupName      string        `yaml:"router_group"`
-	HealthCheckUserAgent string        `yaml:"healthcheck_user_agent,omitempty"`
+	DrainWait       time.Duration `yaml:"drain_wait,omitempty"`
+	DrainTimeout    time.Duration `yaml:"drain_timeout,omitempty"`
+	SecureCookies   bool          `yaml:"secure_cookies"`
+	RouterGroupName string        `yaml:"router_group"`
 
 	OAuth                      OAuthConfig      `yaml:"oauth"`
 	RoutingApi                 RoutingApiConfig `yaml:"routing_api"`
@@ -211,8 +210,7 @@ var defaultConfig = Config{
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
 
-	HealthCheckUserAgent: "HTTP-Monitor/1.1",
-	LoadBalance:          LOAD_BALANCE_RR,
+	LoadBalance: LOAD_BALANCE_RR,
 
 	DisableKeepAlives:   true,
 	MaxIdleConns:        100,

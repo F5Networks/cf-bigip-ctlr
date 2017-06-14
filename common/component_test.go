@@ -6,11 +6,12 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	. "github.com/F5Networks/cf-bigip-ctlr/common"
 	"github.com/F5Networks/cf-bigip-ctlr/common/health"
-	"github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/handlers"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/localip"
@@ -30,13 +31,19 @@ func (m *MarshalableValue) MarshalJSON() ([]byte, error) {
 
 var _ = Describe("Component", func() {
 	var (
-		component *VcapComponent
-		varz      *health.Varz
+		component   *VcapComponent
+		varz        *health.Varz
+		heartbeatOK int32
+		logger      *test_util.TestZapLogger
 	)
 
 	BeforeEach(func() {
 		port, err := localip.LocalPort()
 		Expect(err).ToNot(HaveOccurred())
+
+		atomic.StoreInt32(&heartbeatOK, 0)
+		logger = test_util.NewTestZapLogger("router-test")
+		hc := handlers.NewHealthcheck(&heartbeatOK, logger)
 
 		varz = &health.Varz{
 			GenericVarz: health.GenericVarz{
@@ -45,7 +52,14 @@ var _ = Describe("Component", func() {
 			},
 		}
 		component = &VcapComponent{
-			Varz: varz,
+			Varz:   varz,
+			Health: hc,
+		}
+	})
+
+	AfterEach(func() {
+		if nil != logger {
+			logger.Close()
 		}
 	})
 
@@ -118,27 +132,6 @@ var _ = Describe("Component", func() {
 		Expect(body).To(Equal(`{"key":"value"}` + "\n"))
 	})
 
-	It("updates the uptime statistic", func() {
-		stringMap := make(map[string]interface{})
-		path := "/varz"
-		component.Varz.Type = "Router"
-		startComponent(component)
-
-		time.Sleep(2 * time.Second)
-		req := buildGetRequest(component, path)
-		req.SetBasicAuth("username", "password")
-
-		code, header, body := doGetRequest(req)
-		Expect(code).To(Equal(200))
-		Expect(header.Get("Content-Type")).To(Equal("application/json"))
-
-		err := json.Unmarshal([]byte(body), &stringMap)
-		Expect(err).NotTo(HaveOccurred())
-
-		duration := stringMap["uptime"].(string)
-		Expect(duration).NotTo(Equal(`"uptime":"0d:0h:0m:0s"`))
-	})
-
 	It("returns 404 for non existent paths", func() {
 		serveComponent(component)
 
@@ -149,18 +142,40 @@ var _ = Describe("Component", func() {
 		Expect(code).To(Equal(404))
 	})
 
+	It("returns 200 for good health checks", func() {
+		component.Varz.Type = "Router"
+		startComponent(component)
+
+		time.Sleep(2 * time.Second)
+		atomic.StoreInt32(&heartbeatOK, 1)
+
+		req := buildGetRequest(component, "/health")
+
+		code, _, _ := doGetRequest(req)
+		Expect(code).To(Equal(200))
+	})
+
+	It("returns 503 for bad health checks", func() {
+		component.Varz.Type = "Router"
+		startComponent(component)
+
+		time.Sleep(2 * time.Second)
+
+		req := buildGetRequest(component, "/health")
+
+		code, _, _ := doGetRequest(req)
+		Expect(code).To(Equal(503))
+	})
+
 	Describe("Register", func() {
 		var mbusClient *nats.Conn
 		var natsRunner *test_util.NATSRunner
-		var logger logger.Logger
 
 		BeforeEach(func() {
 			natsPort := test_util.NextAvailPort()
 			natsRunner = test_util.NewNATSRunner(int(natsPort))
 			natsRunner.Start()
 			mbusClient = natsRunner.MessageBus
-
-			logger = test_util.NewTestZapLogger("test")
 		})
 
 		AfterEach(func() {

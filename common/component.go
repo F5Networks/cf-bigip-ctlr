@@ -84,9 +84,8 @@ func (p *ProcessStatus) StopUpdate() {
 var procStat *ProcessStatus
 
 type VcapComponent struct {
-	Config     interface{}     `json:"-"`
-	Varz       *health.Varz    `json:"-"`
-	Healthz    *health.Healthz `json:"-"`
+	Config     interface{}  `json:"-"`
+	Varz       *health.Varz `json:"-"`
 	Health     http.Handler
 	InfoRoutes map[string]json.Marshaler `json:"-"`
 	Logger     logger.Logger             `json:"-"`
@@ -212,24 +211,6 @@ func (c *VcapComponent) ListenAndServe() {
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		c.Health.ServeHTTP(w, req)
-	})
-
-	hs.HandleFunc("/healthz", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Connection", "close")
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-
-		fmt.Fprintf(w, c.Healthz.Value())
-	})
-
-	hs.HandleFunc("/varz", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Connection", "close")
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		enc := json.NewEncoder(w)
-		c.UpdateVarz()
-		enc.Encode(c.Varz)
 	})
 
 	for path, marshaler := range c.InfoRoutes {
