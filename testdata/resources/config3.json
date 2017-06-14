@@ -1,0 +1,346 @@
+{
+  "bigip": {
+    "url": "http://example.com",
+    "username": "admin",
+    "password": "pass",
+    "partitions": ["cf"]
+  },
+  "global": {
+    "log-level": "debug",
+    "verify-interval": 30
+  },
+  "policies": [{
+    "controls": ["forwarding"],
+    "legacy": true,
+    "name": "cf-routing-policy",
+    "partition": "cf",
+    "requires": ["http"],
+    "rules": [{
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/foo-e500900501f76ce8",
+        "request": true
+      }],
+      "conditions": [{
+        "equals": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["foo.cf.com"]
+      }],
+      "name": "foo-e500900501f76ce8",
+      "ordinal": 0
+    }, {
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/baz-beac6f8bec5a4446",
+        "request": true
+      }],
+      "conditions": [{
+        "equals": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["baz.cf.com"]
+      }, {
+        "equals": true,
+        "httpUri": true,
+        "pathSegment": true,
+        "name": "1",
+        "index": 1,
+        "request": true,
+        "values": ["segment1"]
+      }, {
+        "equals": true,
+        "httpUri": true,
+        "pathSegment": true,
+        "name": "2",
+        "index": 2,
+        "request": true,
+        "values": ["segment2"]
+      }, {
+        "equals": true,
+        "httpUri": true,
+        "pathSegment": true,
+        "name": "3",
+        "index": 3,
+        "request": true,
+        "values": ["segment3"]
+      }],
+      "name": "baz-beac6f8bec5a4446",
+      "ordinal": 1
+    }, {
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/baz-69cf12df3b85f455",
+        "request": true
+      }],
+      "conditions": [{
+        "equals": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["baz.cf.com"]
+      }, {
+        "equals": true,
+        "httpUri": true,
+        "pathSegment": true,
+        "name": "1",
+        "index": 1,
+        "request": true,
+        "values": ["segment1"]
+      }],
+      "name": "baz-69cf12df3b85f455",
+      "ordinal": 2
+    }, {
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/baz-9a96ddcfe07bb46e",
+        "request": true
+      }],
+      "conditions": [{
+        "equals": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["baz.cf.com"]
+      }],
+      "name": "baz-9a96ddcfe07bb46e",
+      "ordinal": 3
+    }, {
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/bar-d21aa8a505891ac9",
+        "request": true
+      }],
+      "conditions": [{
+        "equals": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["bar.cf.com"]
+      }],
+      "name": "bar-d21aa8a505891ac9",
+      "ordinal": 4
+    }, {
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/foo.cf.com",
+        "request": true
+      }],
+      "conditions": [{
+        "endsWith": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["foo.cf.com"]
+      }],
+      "name": "foo.cf.com",
+      "ordinal": 5
+    }, {
+      "actions": [{
+        "forward": true,
+        "name": "0",
+        "pool": "/cf/cf.com",
+        "request": true
+      }],
+      "conditions": [{
+        "endsWith": true,
+        "host": true,
+        "httpHost": true,
+        "name": "0",
+        "index": 0,
+        "request": true,
+        "values": ["cf.com"]
+      }],
+      "name": "cf.com",
+      "ordinal": 6
+    }],
+    "strategy": "/Common/first-match"
+  }],
+  "services": [{
+    "virtualServer": {
+      "backend": {
+        "serviceName": "*.cf.com",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.5.1:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "cf.com",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "*.foo.cf.com",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.6.1:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "foo.cf.com",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "bar.cf.com",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.1.1:80", "127.0.1.2:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "bar-d21aa8a505891ac9",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "baz.cf.com",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.2.1:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "baz-9a96ddcfe07bb46e",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "baz.cf.com/segment1",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.3.1:80", "127.0.3.2:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "baz-69cf12df3b85f455",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "baz.cf.com/segment1/segment2/segment3",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.4.1:80", "127.0.4.2:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "baz-beac6f8bec5a4446",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "foo.cf.com",
+        "servicePort": -1,
+        "poolMemberAddrs": ["127.0.0.1:80"],
+        "healthMonitors": ["/Common/potato"]
+      },
+      "frontend": {
+        "virtualServerName": "foo-e500900501f76ce8",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http"
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "routing-vip-http",
+        "servicePort": -1,
+        "poolMemberAddrs": []
+      },
+      "frontend": {
+        "virtualServerName": "routing-vip-http",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http",
+        "virtualAddress": {
+          "bindAddr": "127.0.0.1",
+          "port": 80
+        },
+        "policies": [{
+          "name": "cf-routing-policy",
+          "partition": "cf"
+        }],
+        "profiles": [{
+          "name": "http",
+          "partition": "Common"
+        }, {
+          "name": "fakeprofile",
+          "partition": "Common"
+        }]
+      }
+    }
+  }, {
+    "virtualServer": {
+      "backend": {
+        "serviceName": "routing-vip-https",
+        "servicePort": -1,
+        "poolMemberAddrs": []
+      },
+      "frontend": {
+        "virtualServerName": "routing-vip-https",
+        "partition": "cf",
+        "balance": "round-robin",
+        "mode": "http",
+        "virtualAddress": {
+          "bindAddr": "127.0.0.1",
+          "port": 443
+        },
+        "sslProfiles": {
+          "f5ProfileNames": ["/Common/clientssl"]
+        },
+        "policies": [{
+          "name": "cf-routing-policy",
+          "partition": "cf"
+        }],
+        "profiles": [{
+          "name": "http",
+          "partition": "Common"
+        }, {
+          "name": "fakeprofile",
+          "partition": "Common"
+        }]
+      }
+    }
+  }]
+}

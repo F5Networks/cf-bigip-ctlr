@@ -81,6 +81,9 @@ func (d *Driver) runBigIPDriver(
 
 	// the config driver python logging goes to stderr by default
 	cmdOut, err := cmd.StderrPipe()
+	if nil != err {
+		d.logger.Fatal("f5router-driver-pipe-failed", zap.Error(err))
+	}
 
 	err = cmd.Start()
 	if nil != err {

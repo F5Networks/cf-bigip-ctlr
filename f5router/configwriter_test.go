@@ -19,17 +19,276 @@ package f5router
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
+
+var _ = Describe("Configwriter", func() {
+	It("should be true", func() {
+		Expect(true).To(BeTrue())
+	})
+	Describe("running", func() {
+
+		var (
+			logger *test_util.TestZapLogger
+			cw     *ConfigWriter
+			err    error
+		)
+
+		BeforeEach(func() {
+			logger = test_util.NewTestZapLogger("router-test")
+			cw, err = NewConfigWriter(logger)
+
+			Expect(cw).NotTo(BeNil())
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			if nil != cw {
+				cw.Close()
+			}
+			if nil != logger {
+				logger.Close()
+			}
+		})
+
+		It("should locate the file", func() {
+			f := cw.GetOutputFilename()
+
+			dir := filepath.Dir(f)
+			_, err = os.Stat(dir)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should write a simple config", func() {
+			var d []byte
+			var e []byte
+			var n int
+			var expected []byte
+			var written []byte
+
+			f := cw.GetOutputFilename()
+
+			defer func() {
+				Expect(f).To(BeARegularFile())
+			}()
+
+			testData := simpleTest{
+				Test: testSection{
+					Field1: "test-field1",
+					Field2: 121232343,
+					Field3: &testSubSection{
+						SubField1: "test-sub-field1",
+						SubField2: 42,
+					},
+				},
+			}
+
+			testFile(f, false)
+
+			d, err = json.Marshal(testData)
+			Expect(err).NotTo(HaveOccurred())
+
+			n, err = cw.Write(d)
+			Expect(n).To(Equal(len(d)))
+			Expect(err).NotTo(HaveOccurred())
+
+			testFile(f, true)
+
+			expected, err = json.Marshal(testData)
+			Expect(err).NotTo(HaveOccurred())
+
+			written, err = ioutil.ReadFile(f)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(written).To(Equal(expected))
+
+			// test empty section and overwrite
+			empty := struct {
+				Section struct {
+					Field string `json:"field,omitempty"`
+				} `json:"simple-test"`
+			}{Section: struct {
+				Field string `json:"field,omitempty"`
+			}{
+				Field: "",
+			},
+			}
+
+			e, err = json.Marshal(empty)
+			Expect(err).NotTo(HaveOccurred())
+
+			n, err = cw.Write(e)
+			Expect(n).To(Equal(len(e)))
+			Expect(err).NotTo(HaveOccurred())
+
+			testFile(f, true)
+
+			expected, err = json.Marshal(empty)
+			Expect(err).NotTo(HaveOccurred())
+
+			written, err = ioutil.ReadFile(f)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(written).To(Equal(expected))
+
+			// add section back
+			n, err = cw.Write(d)
+			Expect(n).To(Equal(len(d)))
+			Expect(err).NotTo(HaveOccurred())
+
+			testFile(f, true)
+
+			expected, err = json.Marshal(testData)
+			Expect(err).NotTo(HaveOccurred())
+
+			written, err = ioutil.ReadFile(f)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(written).To(Equal(expected))
+		})
+
+		Context("fail cases", func() {
+			It("should error when encountering a bad FD", func() {
+				// go does not have an idea of a File interface, doing the best
+				// we can to try and create some negative behaviors
+				mockFile := newPseudoFile(failLock)
+				Expect(mockFile).NotTo(BeNil())
+				defer func() {
+					err = mockFile.RealFile.Close()
+					Expect(err).NotTo(HaveOccurred())
+
+					os.Remove(mockFile.RealFile.Name())
+				}()
+
+				var wrote int
+				Expect(func() {
+					wrote, err = cw._write(mockFile, []byte("hello"))
+				}).NotTo(Panic())
+				Expect(wrote).To(BeZero())
+				Expect(err).To(HaveOccurred())
+
+				expected := "bad file descriptor"
+				Expect(err).To(MatchError(expected))
+			})
+
+			It("should error on a failed truncate", func() {
+				// go does not have an idea of a File interface, doing the best
+				// we can to try and create some negative behaviors
+				mockFile := newPseudoFile(failTruncate)
+				Expect(mockFile).NotTo(BeNil())
+				defer func() {
+					err = mockFile.RealFile.Close()
+					Expect(err).NotTo(HaveOccurred())
+
+					os.Remove(mockFile.RealFile.Name())
+				}()
+
+				var wrote int
+				Expect(func() {
+					wrote, err = cw._write(mockFile, []byte("hello"))
+				}).NotTo(Panic())
+				Expect(wrote).To(BeZero())
+				Expect(err).To(HaveOccurred())
+
+				expected := "mock file truncate error"
+				Expect(err).To(MatchError(expected))
+			})
+
+			It("should error on a failed write", func() {
+				// go does not have an idea of a File interface, doing the best
+				// we can to try and create some negative behaviors
+				mockFile := newPseudoFile(failWrite)
+				Expect(mockFile).NotTo(BeNil())
+				defer func() {
+					err = mockFile.RealFile.Close()
+					Expect(err).NotTo(HaveOccurred())
+
+					os.Remove(mockFile.RealFile.Name())
+				}()
+
+				var wrote int
+				Expect(func() {
+					wrote, err = cw._write(mockFile, []byte("hello"))
+				}).NotTo(Panic())
+				Expect(wrote).To(BeZero())
+				Expect(err).To(HaveOccurred())
+
+				expected := "mock file write error"
+				Expect(err).To(MatchError(expected))
+			})
+
+			It("should error on a short write", func() {
+				// go does not have an idea of a File interface, doing the best
+				// we can to try and create some negative behaviors
+				mockFile := newPseudoFile(failShortWrite)
+				Expect(mockFile).NotTo(BeNil())
+				defer func() {
+					err = mockFile.RealFile.Close()
+					Expect(err).NotTo(HaveOccurred())
+
+					os.Remove(mockFile.RealFile.Name())
+				}()
+
+				var wrote int
+				Expect(func() {
+					wrote, err = cw._write(mockFile, []byte("hello"))
+				}).NotTo(Panic())
+				Expect(wrote).NotTo(BeZero())
+				Expect(err).To(HaveOccurred())
+
+				expected := "mock file short write"
+				Expect(err).To(MatchError(expected))
+			})
+
+			It("should error if config file doesn't exist", func() {
+				logger := test_util.NewTestZapLogger("router-test")
+				cw = &ConfigWriter{
+					configFile: "/this-file/really/probably/will/not/exist",
+					logger:     logger,
+				}
+
+				var wrote int
+				Expect(func() {
+					wrote, err = cw.Write([]byte("hello"))
+				}).NotTo(Panic())
+				Expect(wrote).To(BeZero())
+				Expect(err).To(HaveOccurred())
+
+				expected := "open /this-file/really/probably/will/not/exist: no such file or directory"
+				Expect(err).To(MatchError(expected))
+			})
+
+			It("should error when encountering a bad unlock", func() {
+				// go does not have an idea of a File interface, doing the best
+				// we can to try and create some negative behaviors
+				mockFile := newPseudoFile(failUnlock)
+				Expect(mockFile).NotTo(BeNil())
+				defer func() {
+					err = mockFile.RealFile.Close()
+					Expect(err).NotTo(HaveOccurred())
+
+					os.Remove(mockFile.RealFile.Name())
+				}()
+
+				var wrote int
+				Expect(func() {
+					wrote, err = cw._write(mockFile, []byte("hello"))
+				}).NotTo(Panic())
+				Expect(wrote).To(BeZero())
+				Expect(err).To(HaveOccurred())
+
+				expected := "bad file descriptor"
+				Expect(err).To(MatchError(expected))
+			})
+		})
+	})
+})
 
 const (
 	failLock = iota
@@ -45,10 +304,10 @@ type pseudoFile struct {
 	BadFd     uintptr
 }
 
-func newPseudoFile(t *testing.T, failure int) *pseudoFile {
+func newPseudoFile(failure int) *pseudoFile {
 	f, err := ioutil.TempFile("/tmp", "config-writer-unit-test")
-	require.NoError(t, err)
-	require.NotNil(t, f)
+	ExpectWithOffset(1, f).NotTo(BeNil())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	pf := &pseudoFile{
 		FailStyle: failure,
@@ -111,298 +370,10 @@ type simpleTest struct {
 	Test testSection `json:"simple-test"`
 }
 
-func testFile(t *testing.T, f string, shouldExist bool) {
-	_, err := os.Stat(f)
-
+func testFile(f string, shouldExist bool) {
 	if false == shouldExist {
-		assert.NotNil(t, err)
-		assert.True(t, os.IsNotExist(err))
+		ExpectWithOffset(1, f).NotTo(BeAnExistingFile(), "The file should not exist")
 	} else {
-		assert.Nil(t, err)
-		if nil != err {
-			assert.False(t, os.IsNotExist(err))
-		}
+		ExpectWithOffset(1, f).To(BeARegularFile(), "The file should exist")
 	}
-}
-
-func TestConfigWriterGetters(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	f := cw.GetOutputFilename()
-
-	dir := filepath.Dir(f)
-	_, err = os.Stat(dir)
-	assert.NoError(t, err)
-}
-
-func TestConfigWriterSimpleWrite(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	f := cw.GetOutputFilename()
-	fmt.Printf("%v\n", f)
-
-	defer func() {
-		_, err := os.Stat(f)
-		assert.False(t, os.IsExist(err))
-	}()
-
-	testData := simpleTest{
-		Test: testSection{
-			Field1: "test-field1",
-			Field2: 121232343,
-			Field3: &testSubSection{
-				SubField1: "test-sub-field1",
-				SubField2: 42,
-			},
-		},
-	}
-
-	testFile(t, f, false)
-
-	d, err := json.Marshal(testData)
-	assert.NoError(t, err)
-
-	n, err := cw.Write(d)
-	assert.Equal(t, len(d), n)
-	assert.NoError(t, err)
-
-	testFile(t, f, true)
-
-	expected, err := json.Marshal(testData)
-	assert.Nil(t, err)
-
-	written, err := ioutil.ReadFile(f)
-	assert.Nil(t, err)
-
-	assert.EqualValues(t, expected, written)
-
-	// test empty section and overwrite
-	empty := struct {
-		Section struct {
-			Field string `json:"field,omitempty"`
-		} `json:"simple-test"`
-	}{Section: struct {
-		Field string `json:"field,omitempty"`
-	}{
-		Field: "",
-	},
-	}
-
-	e, err := json.Marshal(empty)
-	assert.NoError(t, err)
-
-	n, err = cw.Write(e)
-	assert.Equal(t, len(e), n)
-	assert.NoError(t, err)
-
-	testFile(t, f, true)
-
-	expected, err = json.Marshal(empty)
-	assert.Nil(t, err)
-
-	written, err = ioutil.ReadFile(f)
-	assert.Nil(t, err)
-
-	assert.EqualValues(t, expected, written)
-
-	// add section back
-	n, err = cw.Write(d)
-	assert.Equal(t, len(d), n)
-	assert.NoError(t, err)
-
-	testFile(t, f, true)
-
-	expected, err = json.Marshal(testData)
-	assert.Nil(t, err)
-
-	written, err = ioutil.ReadFile(f)
-	assert.Nil(t, err)
-
-	assert.EqualValues(t, expected, written)
-}
-
-func TestConfigWriterWriteFailOpen(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw := &ConfigWriter{
-		configFile: "/this-file/really/probably/will/not/exist",
-		logger:     logger,
-	}
-
-	var wrote int
-	var err error
-	require.NotPanics(t, func() {
-		wrote, err = cw.Write([]byte("hello"))
-	})
-	assert.Zero(t, wrote)
-	assert.Error(t, err)
-
-	expected := "open /this-file/really/probably/will/not/exist: no such file or directory"
-	assert.Equal(t, expected, err.Error())
-}
-
-func TestConfigWriterFailLock(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	// go does not have an idea of a File interface, doing the best
-	// we can to try and create some negative behaviors
-	mockFile := newPseudoFile(t, failLock)
-	require.NotNil(t, mockFile)
-	defer func() {
-		err := mockFile.RealFile.Close()
-		assert.NoError(t, err)
-
-		os.Remove(mockFile.RealFile.Name())
-	}()
-
-	var wrote int
-	require.NotPanics(t, func() {
-		wrote, err = cw._write(mockFile, []byte("hello"))
-	})
-	assert.Zero(t, wrote)
-	assert.Error(t, err)
-
-	expected := "bad file descriptor"
-	assert.Equal(t, expected, err.Error())
-}
-
-func TestConfigWriterFailUnlock(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	// go does not have an idea of a File interface, doing the best
-	// we can to try and create some negative behaviors
-	mockFile := newPseudoFile(t, failUnlock)
-	require.NotNil(t, mockFile)
-	defer func() {
-		err := mockFile.RealFile.Close()
-		assert.NoError(t, err)
-
-		os.Remove(mockFile.RealFile.Name())
-	}()
-
-	var wrote int
-	require.NotPanics(t, func() {
-		wrote, err = cw._write(mockFile, []byte("hello"))
-	})
-	assert.Zero(t, wrote)
-	assert.Error(t, err)
-
-	expected := "bad file descriptor"
-	assert.Equal(t, expected, err.Error())
-}
-
-func TestConfigWriterFailTrunc(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	// go does not have an idea of a File interface, doing the best
-	// we can to try and create some negative behaviors
-	mockFile := newPseudoFile(t, failTruncate)
-	require.NotNil(t, mockFile)
-	defer func() {
-		err := mockFile.RealFile.Close()
-		assert.NoError(t, err)
-
-		os.Remove(mockFile.RealFile.Name())
-	}()
-
-	var wrote int
-	require.NotPanics(t, func() {
-		wrote, err = cw._write(mockFile, []byte("hello"))
-	})
-	assert.Zero(t, wrote)
-	assert.Error(t, err)
-
-	expected := "mock file truncate error"
-	assert.Equal(t, expected, err.Error())
-}
-
-func TestConfigWriterFailWrite(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	// go does not have an idea of a File interface, doing the best
-	// we can to try and create some negative behaviors
-	mockFile := newPseudoFile(t, failWrite)
-	require.NotNil(t, mockFile)
-	defer func() {
-		err := mockFile.RealFile.Close()
-		assert.NoError(t, err)
-
-		os.Remove(mockFile.RealFile.Name())
-	}()
-
-	var wrote int
-	require.NotPanics(t, func() {
-		wrote, err = cw._write(mockFile, []byte("hello"))
-	})
-	assert.Zero(t, wrote)
-	assert.Error(t, err)
-
-	expected := "mock file write error"
-	assert.Equal(t, expected, err.Error())
-}
-
-func TestConfigWriterFailShortWrite(t *testing.T) {
-	logger := test_util.NewTestZapLogger("router-test")
-	cw, err := NewConfigWriter(logger)
-	assert.Nil(t, err)
-	require.NotNil(t, cw)
-	defer func() {
-		cw.Close()
-	}()
-
-	// go does not have an idea of a File interface, doing the best
-	// we can to try and create some negative behaviors
-	mockFile := newPseudoFile(t, failShortWrite)
-	require.NotNil(t, mockFile)
-	defer func() {
-		err := mockFile.RealFile.Close()
-		assert.NoError(t, err)
-
-		os.Remove(mockFile.RealFile.Name())
-	}()
-
-	var wrote int
-	require.NotPanics(t, func() {
-		wrote, err = cw._write(mockFile, []byte("hello"))
-	})
-	assert.NotZero(t, wrote)
-	assert.Error(t, err)
-
-	expected := "mock file short write"
-	assert.Equal(t, expected, err.Error())
 }

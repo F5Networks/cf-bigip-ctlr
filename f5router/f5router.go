@@ -560,10 +560,7 @@ func (r *F5Router) processRouteRemove(ru routeUpdate) bool {
 			)
 		}
 		ret = true
-	} else {
-		r.logger.Debug("f5router-route-not-found", zap.String("uri", ru.Name))
 	}
-
 	return ret
 }
 
