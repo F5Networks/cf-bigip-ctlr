@@ -37,7 +37,7 @@ type BigIPConfig struct {
 	Pass           string          `yaml:"pass" json:"password"`
 	Partitions     []string        `yaml:"partition" json:"partitions"`
 	Balance        string          `yaml:"balance" json:"-"`
-	VerifyInterval int             `yaml:"verify-interval" json:"-"`
+	VerifyInterval int             `yaml:"verify_interval" json:"-"`
 	ExternalAddr   string          `yaml:"external_addr" json:"-"`
 	SSLProfiles    []string        `yaml:"ssl_profiles" json:"-"`
 	Policies       RoutingPolicies `yaml:"policies" json:"-"`
