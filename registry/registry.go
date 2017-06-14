@@ -184,9 +184,15 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 	pool := r.byURI.Find(uri)
 	if pool != nil {
 		endpointRemoved := pool.Remove(endpoint)
+		emptiedPool := pool.IsEmpty()
+
+		if emptiedPool {
+			r.byURI.Delete(uri)
+		}
+
 		if endpointRemoved {
 			if nil != r.listener {
-				if true == pool.IsEmpty() {
+				if emptiedPool {
 					r.listener.RouteUpdate(Remove, r.byURI, uri)
 				} else {
 					r.listener.RouteUpdate(Update, r.byURI, uri)
@@ -196,10 +202,6 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 			r.logger.Debug("endpoint-unregistered", zapData...)
 		} else {
 			r.logger.Debug("endpoint-not-unregistered", zapData...)
-		}
-
-		if pool.IsEmpty() {
-			r.byURI.Delete(uri)
 		}
 	}
 
