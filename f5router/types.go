@@ -21,7 +21,6 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 
 	"github.com/F5Networks/cf-bigip-ctlr/registry"
-	"github.com/F5Networks/cf-bigip-ctlr/registry/container"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
 
 	"k8s.io/client-go/util/workqueue"
@@ -105,7 +104,7 @@ type (
 	routeUpdate struct {
 		Name string
 		URI  route.Uri
-		T    *container.Trie
+		R    registry.Registry
 		Op   registry.Operation
 	}
 

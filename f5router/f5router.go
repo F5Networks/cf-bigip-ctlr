@@ -337,7 +337,7 @@ func (r *F5Router) process() bool {
 				services = append(services, r.routeVSHTTPS)
 			}
 
-			ru.T.EachNodeWithPool(func(t *container.Trie) {
+			ru.R.WalkNodesWithPool(func(t *container.Trie) {
 				var addrs []string
 				t.Pool.Each(func(e *route.Endpoint) {
 					addrs = append(addrs, e.CanonicalAddr())
@@ -544,7 +544,7 @@ func (r *F5Router) processRouteAdd(ru routeUpdate) bool {
 
 func (r *F5Router) processRouteRemove(ru routeUpdate) bool {
 	var ret bool
-	pool := ru.T.Find(ru.URI)
+	pool := ru.R.LookupWithoutWildcard(ru.URI)
 	if nil == pool || pool.IsEmpty() {
 		if true == strings.HasPrefix(ru.URI.String(), "*.") {
 			delete(r.wildcards, ru.URI)
@@ -567,7 +567,7 @@ func (r *F5Router) processRouteRemove(ru routeUpdate) bool {
 // RouteUpdate send update information to processor
 func (r *F5Router) RouteUpdate(
 	op registry.Operation,
-	t *container.Trie,
+	reg registry.Registry,
 	uri route.Uri,
 ) {
 	if 0 == len(uri) {
@@ -586,7 +586,7 @@ func (r *F5Router) RouteUpdate(
 	ru := routeUpdate{
 		Name: makePoolName(uri.String()),
 		URI:  uri,
-		T:    t,
+		R:    reg,
 		Op:   op,
 	}
 	r.queue.Add(ru)
