@@ -82,14 +82,12 @@ func NewController(
 		},
 	}
 
-	healthz := &health.Healthz{}
 	var heartbeatOK int32
 	health := handlers.NewHealthcheck(&heartbeatOK, logger)
 	component := &common.VcapComponent{
-		Config:  cfg,
-		Varz:    varz,
-		Healthz: healthz,
-		Health:  health,
+		Config: cfg,
+		Varz:   varz,
+		Health: health,
 		InfoRoutes: map[string]json.Marshaler{
 			"/routes": r,
 		},

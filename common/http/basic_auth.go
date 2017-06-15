@@ -34,7 +34,7 @@ func extractCredentials(req *http.Request) []string {
 }
 
 func authenticatedEndpoint(path string) bool {
-	return path != "/healthz" && path != "/health"
+	return path != "/health"
 
 }
 func (x *BasicAuth) ServeHTTP(w http.ResponseWriter, req *http.Request) {
