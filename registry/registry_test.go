@@ -9,6 +9,7 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 	"github.com/F5Networks/cf-bigip-ctlr/metrics/fakes"
 	. "github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/registry/container"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
@@ -22,7 +23,13 @@ var _ = Describe("RouteRegistry", func() {
 	var r *RouteRegistry
 	var reporter *fakes.FakeRouteRegistryReporter
 
-	var fooEndpoint, barEndpoint, bar2Endpoint *route.Endpoint
+	var (
+		fooEndpoint,
+		barEndpoint,
+		bar2Endpoint,
+		bazEndpoint,
+		quxEndpoint *route.Endpoint
+	)
 	var configObj *config.Config
 	var logger logger.Logger
 	var modTag models.ModificationTag
@@ -42,8 +49,7 @@ var _ = Describe("RouteRegistry", func() {
 		r = NewRouteRegistry(logger, configObj, nil, reporter, routerGroupGuid)
 		modTag = models.ModificationTag{}
 		fooEndpoint = route.NewEndpoint("12345", "192.168.1.1", 1234,
-			"id1", "0",
-			map[string]string{
+			"id1", "0", map[string]string{
 				"runtime":   "ruby18",
 				"framework": "sinatra",
 			}, -1, "", modTag)
@@ -59,6 +65,62 @@ var _ = Describe("RouteRegistry", func() {
 				"runtime":   "javascript",
 				"framework": "node",
 			}, -1, "", modTag)
+
+		bazEndpoint = route.NewEndpoint("15243", "192.168.1.4", 1234,
+			"id4", "0", map[string]string{
+				"runtime":   "go",
+				"framework": "go",
+			}, -1, "", modTag)
+
+		quxEndpoint = route.NewEndpoint("34251", "192.168.1.5", 1234,
+			"id5", "0", map[string]string{
+				"runtime":   "c++",
+				"framework": "c++",
+			}, -1, "", modTag)
+	})
+
+	Context("WalkNodesWithPool", func() {
+		BeforeEach(func() {
+			r.Register("foo", fooEndpoint)
+			r.Register("bar", barEndpoint)
+			r.Register("baz", bazEndpoint)
+			r.Register("qux", quxEndpoint)
+		})
+
+		It("walks every node with pool", func() {
+			var numPools int
+			var URIS []string
+			expectedURIS := []string{"foo", "bar", "baz", "qux"}
+
+			r.WalkNodesWithPool(func(t *container.Trie) {
+				numPools++
+				Expect(t.Pool.IsEmpty()).Should(BeFalse())
+				URIS = append(URIS, t.ToPath())
+			})
+
+			Expect(numPools).Should(Equal(4))
+			Expect(URIS).Should(HaveLen(4))
+			Expect(URIS).Should(ConsistOf(expectedURIS))
+		})
+
+		It("skips empty pools", func() {
+			var numPools int
+			var URIS []string
+			expectedURIS := []string{"bar", "baz"}
+
+			r.Unregister("foo", fooEndpoint)
+			r.Unregister("qux", quxEndpoint)
+
+			r.WalkNodesWithPool(func(t *container.Trie) {
+				numPools++
+				Expect(t.Pool.IsEmpty()).Should(BeFalse())
+				URIS = append(URIS, t.ToPath())
+			})
+
+			Expect(numPools).Should(Equal(2))
+			Expect(URIS).Should(HaveLen(2))
+			Expect(URIS).Should(ConsistOf(expectedURIS))
+		})
 	})
 
 	Context("Register", func() {
@@ -607,6 +669,102 @@ var _ = Describe("RouteRegistry", func() {
 		Context("when lookup fails to find any routes", func() {
 			It("returns nil", func() {
 				p := r.Lookup("non-existent")
+				Expect(p).To(BeNil())
+			})
+		})
+	})
+
+	Context("LookupWithoutWildcard", func() {
+		It("case insensitive lookup", func() {
+			m := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+
+			r.Register("foo", m)
+
+			p1 := r.LookupWithoutWildcard("foo")
+			p2 := r.LookupWithoutWildcard("FOO")
+			Expect(p1).To(Equal(p2))
+
+			iter := p1.Endpoints("", "")
+			Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+		})
+
+		It("selects one of the routes", func() {
+			m1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+			m2 := route.NewEndpoint("", "192.168.1.1", 1235, "", "", nil, -1, "", modTag)
+
+			r.Register("bar", m1)
+			r.Register("barr", m1)
+
+			r.Register("bar", m2)
+			r.Register("barr", m2)
+
+			Expect(r.NumUris()).To(Equal(2))
+			Expect(r.NumEndpoints()).To(Equal(2))
+
+			p := r.LookupWithoutWildcard("bar")
+			Expect(p).ToNot(BeNil())
+			e := p.Endpoints("", "").Next()
+			Expect(e).ToNot(BeNil())
+			Expect(e.CanonicalAddr()).To(MatchRegexp("192.168.1.1:123[4|5]"))
+		})
+
+		It("returns nil route if wildcard exists with no route", func() {
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", nil, -1, "", modTag)
+
+			r.Register("*.outer.wild.card", app1)
+			r.Register("*.wild.card", app2)
+
+			p := r.LookupWithoutWildcard("foo.wild.card")
+			Expect(p).To(BeNil())
+
+			p = r.LookupWithoutWildcard("foo.space.wild.card")
+			Expect(p).To(BeNil())
+		})
+
+		It("prefers full URIs to wildcard routes", func() {
+			app1 := route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+			app2 := route.NewEndpoint("", "192.168.1.2", 1234, "", "", nil, -1, "", modTag)
+
+			r.Register("not.wild.card", app1)
+			r.Register("*.wild.card", app2)
+
+			p := r.LookupWithoutWildcard("not.wild.card")
+			Expect(p).ToNot(BeNil())
+			e := p.Endpoints("", "").Next()
+			Expect(e).ToNot(BeNil())
+			Expect(e.CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+		})
+
+		Context("has context path", func() {
+
+			var m *route.Endpoint
+
+			BeforeEach(func() {
+				m = route.NewEndpoint("", "192.168.1.1", 1234, "", "", nil, -1, "", modTag)
+			})
+
+			It("using context path and query string", func() {
+				r.Register("dora.app.com/env", m)
+				p := r.LookupWithoutWildcard("dora.app.com/env?foo=bar")
+
+				Expect(p).ToNot(BeNil())
+				iter := p.Endpoints("", "")
+				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			})
+
+			It("using nested context path and query string", func() {
+				r.Register("dora.app.com/env/abc", m)
+				p := r.LookupWithoutWildcard("dora.app.com/env/abc?foo=bar&baz=bing")
+
+				Expect(p).ToNot(BeNil())
+				iter := p.Endpoints("", "")
+				Expect(iter.Next().CanonicalAddr()).To(Equal("192.168.1.1:1234"))
+			})
+		})
+		Context("when lookup fails to find any routes", func() {
+			It("returns nil", func() {
+				p := r.LookupWithoutWildcard("non-existent")
 				Expect(p).To(BeNil())
 			})
 		})

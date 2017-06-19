@@ -21,6 +21,8 @@ type Registry interface {
 	Unregister(uri route.Uri, endpoint *route.Endpoint)
 	Lookup(uri route.Uri) *route.Pool
 	LookupWithInstance(uri route.Uri, appID, appIndex string) *route.Pool
+	LookupWithoutWildcard(uri route.Uri) *route.Pool
+	WalkNodesWithPool(func(f *container.Trie))
 	StartPruningCycle()
 	StopPruningCycle()
 	NumUris() int
@@ -55,7 +57,7 @@ func (op Operation) String() string {
 
 // Listener optional listener for route registry updates
 type Listener interface {
-	RouteUpdate(op Operation, t *container.Trie, uri route.Uri)
+	RouteUpdate(op Operation, r Registry, uri route.Uri)
 }
 
 type PruneStatus int
@@ -127,7 +129,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 
 		if nil != r.listener {
-			r.listener.RouteUpdate(Add, r.byURI, routekey)
+			r.listener.RouteUpdate(Add, r, routekey)
 		}
 	} else {
 		if nil == pool.FindById(endpoint.CanonicalAddr()) {
@@ -137,7 +139,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	endpointAdded := pool.Put(endpoint)
 	if endpointAdded && updateRoute && nil != r.listener {
-		r.listener.RouteUpdate(Update, r.byURI, routekey)
+		r.listener.RouteUpdate(Update, r, routekey)
 	}
 
 	r.timeOfLastUpdate = t
@@ -193,9 +195,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 		if endpointRemoved {
 			if nil != r.listener {
 				if emptiedPool {
-					r.listener.RouteUpdate(Remove, r.byURI, uri)
+					r.listener.RouteUpdate(Remove, r, uri)
 				} else {
-					r.listener.RouteUpdate(Update, r.byURI, uri)
+					r.listener.RouteUpdate(Update, r, uri)
 				}
 			}
 
@@ -249,6 +251,25 @@ func (r *RouteRegistry) LookupWithInstance(
 		}
 	})
 	return surgicalPool
+}
+
+func (r *RouteRegistry) LookupWithoutWildcard(uri route.Uri) *route.Pool {
+	r.RLock()
+
+	uri = uri.RouteKey()
+	pool := r.byURI.Find(uri)
+
+	r.RUnlock()
+
+	return pool
+}
+
+func (r *RouteRegistry) WalkNodesWithPool(f func(*container.Trie)) {
+	r.RLock()
+
+	r.byURI.EachNodeWithPool(f)
+
+	r.RUnlock()
 }
 
 func (r *RouteRegistry) StartPruningCycle() {
@@ -341,9 +362,9 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		if len(endpoints) > 0 {
 			if nil != r.listener {
 				if nil == t.Pool {
-					r.listener.RouteUpdate(Remove, t, route.Uri(t.ToPath()))
+					r.listener.RouteUpdate(Remove, r, route.Uri(t.ToPath()))
 				} else {
-					r.listener.RouteUpdate(Update, t, route.Uri(t.ToPath()))
+					r.listener.RouteUpdate(Update, r, route.Uri(t.ToPath()))
 				}
 			}
 			addresses := []string{}

@@ -22,8 +22,8 @@ import (
 	"sync"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/metrics/fakes"
 	"github.com/F5Networks/cf-bigip-ctlr/registry"
-	"github.com/F5Networks/cf-bigip-ctlr/registry/container"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
@@ -223,6 +223,51 @@ var _ = Describe("F5Router", func() {
 		var err error
 		var logger *test_util.TestZapLogger
 		var c *config.Config
+		var r registry.Registry
+
+		var (
+			fooEndpoint,
+			barEndpoint,
+			bar2Endpoint,
+			bazEndpoint,
+			baz2Endpoint,
+			bazSegment1Endpoint,
+			baz2Segment1Endpoint,
+			bazSegment3Endpoint,
+			baz2Segment3Endpoint,
+			wildCfEndpoint,
+			wildFooEndpoint,
+			quxEndpoint *route.Endpoint
+		)
+
+		registerRoutes := func() {
+			// this weird pattern let's us test some concurrency while still
+			// keeping the pool internal lists sorted for easier matching
+			go func() {
+				r.Register("foo.cf.com", fooEndpoint)
+			}()
+			go func() {
+				r.Register("bar.cf.com", barEndpoint)
+				r.Register("bar.cf.com", bar2Endpoint)
+			}()
+			go func() {
+				r.Register("baz.cf.com", bazEndpoint)
+			}()
+			go func() {
+				r.Register("baz.cf.com/segment1", bazSegment1Endpoint)
+				r.Register("baz.cf.com/segment1", baz2Segment1Endpoint)
+			}()
+			go func() {
+				r.Register("baz.cf.com/segment1/segment2/segment3", bazSegment3Endpoint)
+				r.Register("baz.cf.com/segment1/segment2/segment3", baz2Segment3Endpoint)
+			}()
+			go func() {
+				r.Register("*.cf.com", wildCfEndpoint)
+			}()
+			go func() {
+				r.Register("*.foo.cf.com", wildFooEndpoint)
+			}()
+		}
 
 		BeforeEach(func() {
 			logger = test_util.NewTestZapLogger("router-test")
@@ -233,6 +278,27 @@ var _ = Describe("F5Router", func() {
 
 			Expect(router).NotTo(BeNil(), "%v", router)
 			Expect(err).NotTo(HaveOccurred())
+
+			fooEndpoint = makeEndpoint("127.0.0.1")
+			barEndpoint = makeEndpoint("127.0.1.1")
+			bar2Endpoint = makeEndpoint("127.0.1.2")
+			bazEndpoint = makeEndpoint("127.0.2.1")
+			baz2Endpoint = makeEndpoint("127.0.2.2")
+			bazSegment1Endpoint = makeEndpoint("127.0.3.1")
+			baz2Segment1Endpoint = makeEndpoint("127.0.3.2")
+			bazSegment3Endpoint = makeEndpoint("127.0.4.1")
+			baz2Segment3Endpoint = makeEndpoint("127.0.4.2")
+			wildCfEndpoint = makeEndpoint("127.0.5.1")
+			wildFooEndpoint = makeEndpoint("127.0.6.1")
+			quxEndpoint = makeEndpoint("127.0.7.1")
+
+			r = registry.NewRouteRegistry(
+				logger,
+				c,
+				router,
+				new(fakes.FakeRouteRegistryReporter),
+				"",
+			)
 		})
 
 		AfterEach(func() {
@@ -263,7 +329,6 @@ var _ = Describe("F5Router", func() {
 		})
 
 		It("should update routes", func() {
-			data := createTrie()
 			done := make(chan struct{})
 			os := make(chan os.Signal)
 			ready := make(chan struct{})
@@ -278,67 +343,42 @@ var _ = Describe("F5Router", func() {
 				}).NotTo(Panic())
 			}()
 
-			data.EachNodeWithPool(func(t *container.Trie) {
-				t.Pool.Each(func(e *route.Endpoint) {
-					go func(t *container.Trie, uri string) {
-						router.RouteUpdate(
-							registry.Add,
-							t,
-							route.Uri(uri),
-						)
-					}(data, t.ToPath())
-				})
-			})
+			registerRoutes()
 
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
 			update++
 
 			// make some changes and update the verification function
-			p := data.Find(route.Uri("bar.cf.com"))
-			Expect(p).NotTo(BeNil())
-			removed := p.Remove(makeEndpoint("127.0.1.1"))
-			Expect(removed).To(BeTrue())
+			r.Unregister("bar.cf.com", barEndpoint)
+			p := r.LookupWithoutWildcard("bar.cf.com")
+			Expect(p).ToNot(BeNil())
+			Expect(p.FindById(barEndpoint.CanonicalAddr())).To(BeNil())
 
-			p = data.Find(route.Uri("baz.cf.com/segment1"))
-			Expect(p).NotTo(BeNil())
-			removed = p.Remove(makeEndpoint("127.0.3.2"))
-			Expect(removed).To(BeTrue())
+			r.Unregister("baz.cf.com/segment1", baz2Segment1Endpoint)
+			p = r.LookupWithoutWildcard("baz.cf.com/segment1")
+			Expect(p).ToNot(BeNil())
+			Expect(p.FindById(baz2Segment1Endpoint.CanonicalAddr())).To(BeNil())
 
-			p = data.Find(route.Uri("baz.cf.com"))
-			Expect(p).NotTo(BeNil())
-			added := p.Put(makeEndpoint("127.0.2.2"))
-			Expect(added).To(BeTrue())
+			r.Register("baz.cf.com", baz2Endpoint)
+			p = r.LookupWithoutWildcard("baz.cf.com")
+			Expect(p).ToNot(BeNil())
+			Expect(p.FindById(baz2Endpoint.CanonicalAddr())).ToNot(BeNil())
 
-			removed = data.Delete(route.Uri("*.foo.cf.com"))
-			Expect(removed).To(BeTrue())
+			r.Unregister("*.foo.cf.com", wildFooEndpoint)
+			p = r.LookupWithoutWildcard("*.foo.cf.com")
+			Expect(p).To(BeNil())
 
-			removed = data.Delete(route.Uri("foo.cf.com"))
-			Expect(removed).To(BeTrue())
-
-			router.RouteUpdate(
-				registry.Remove,
-				data,
-				route.Uri("*.foo.cf.com"),
-			)
-
-			router.RouteUpdate(
-				registry.Remove,
-				data,
-				route.Uri("foo.cf.com"),
-			)
+			r.Unregister("foo.cf.com", fooEndpoint)
+			p = r.LookupWithoutWildcard("foo.cf.com")
+			Expect(p).To(BeNil())
 
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
 			update++
 
-			p = route.NewPool(1, "qux.cf.com")
-			p.Put(makeEndpoint("127.0.7.1"))
-			data.Insert(route.Uri("qux.cf.com"), p)
-
-			router.RouteUpdate(
-				registry.Add,
-				data,
-				route.Uri("qux.cf.com"),
-			)
+			r.Register("qux.cf.com", quxEndpoint)
+			p = r.LookupWithoutWildcard("qux.cf.com")
+			Expect(p).ToNot(BeNil())
+			Expect(p.FindById(quxEndpoint.CanonicalAddr())).ToNot(BeNil())
 
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
 
@@ -347,7 +387,6 @@ var _ = Describe("F5Router", func() {
 		})
 
 		It("should handle ssl and health monitors", func() {
-			data := createTrie()
 			done := make(chan struct{})
 			os := make(chan os.Signal)
 			ready := make(chan struct{})
@@ -357,6 +396,13 @@ var _ = Describe("F5Router", func() {
 			c.BigIP.Profiles = []string{"Common/http", "/Common/fakeprofile"}
 
 			router, err = NewF5Router(logger, c, mw)
+			r = registry.NewRouteRegistry(
+				logger,
+				c,
+				router,
+				new(fakes.FakeRouteRegistryReporter),
+				"",
+			)
 
 			go func() {
 				defer GinkgoRecover()
@@ -367,24 +413,14 @@ var _ = Describe("F5Router", func() {
 				}).NotTo(Panic())
 			}()
 			Eventually(ready).Should(BeClosed())
-			data.EachNodeWithPool(func(t *container.Trie) {
-				t.Pool.Each(func(e *route.Endpoint) {
-					go func(t *container.Trie, uri string) {
-						router.RouteUpdate(
-							registry.Add,
-							t,
-							route.Uri(uri),
-						)
-					}(data, t.ToPath())
-				})
-			})
+
+			registerRoutes()
 
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[3]))
 		})
 
 		Context("fail cases", func() {
 			It("should error when not passing a URI for route update", func() {
-				data := createTrie()
 				done := make(chan struct{})
 				os := make(chan os.Signal)
 				ready := make(chan struct{})
@@ -398,11 +434,7 @@ var _ = Describe("F5Router", func() {
 					}).NotTo(Panic())
 				}()
 
-				router.RouteUpdate(
-					registry.Remove,
-					data,
-					route.Uri(""),
-				)
+				r.Register("", fooEndpoint)
 
 				Eventually(logger).Should(Say("f5router-skipping-update"))
 			})
@@ -464,15 +496,6 @@ func makeConfig() *config.Config {
 	return c
 }
 
-func makeEndpoints(addrs ...string) []*route.Endpoint {
-	var r []*route.Endpoint
-	for _, addr := range addrs {
-		r = append(r, makeEndpoint(addr))
-	}
-
-	return r
-}
-
 func makeEndpoint(addr string) *route.Endpoint {
 	r := route.NewEndpoint("1",
 		addr,
@@ -488,56 +511,4 @@ func makeEndpoint(addr string) *route.Endpoint {
 		},
 	)
 	return r
-}
-
-func createTrie() *container.Trie {
-	data := container.NewTrie()
-
-	routes := []testRoutes{
-		{
-			Key:         "foo.cf.com",
-			Addrs:       makeEndpoints("127.0.0.1"),
-			ContextPath: "/",
-		},
-		{
-			Key:         "bar.cf.com",
-			Addrs:       makeEndpoints("127.0.1.1", "127.0.1.2"),
-			ContextPath: "/",
-		},
-		{
-			Key:         "baz.cf.com",
-			Addrs:       makeEndpoints("127.0.2.1"),
-			ContextPath: "/",
-		},
-		{
-			Key:         "baz.cf.com/segment1",
-			Addrs:       makeEndpoints("127.0.3.1", "127.0.3.2"),
-			ContextPath: "/segment1",
-		},
-		{
-			Key:         "baz.cf.com/segment1/segment2/segment3",
-			Addrs:       makeEndpoints("127.0.4.1", "127.0.4.2"),
-			ContextPath: "/segment1/segment2/segment3",
-		},
-		{
-			Key:         "*.cf.com",
-			Addrs:       makeEndpoints("127.0.5.1"),
-			ContextPath: "/",
-		},
-		{
-			Key:         "*.foo.cf.com",
-			Addrs:       makeEndpoints("127.0.6.1"),
-			ContextPath: "/",
-		},
-	}
-
-	for i := range routes {
-		pool := route.NewPool(1, routes[i].ContextPath)
-		for j := range routes[i].Addrs {
-			pool.Put(routes[i].Addrs[j])
-		}
-		data.Insert(routes[i].Key, pool)
-	}
-
-	return data
 }
