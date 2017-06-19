@@ -59,23 +59,6 @@ func (r rules) Len() int           { return len(r) }
 func (r rules) Less(i, j int) bool { return r[i].FullURI < r[j].FullURI }
 func (r rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 
-func (slice routeConfigs) Len() int {
-	return len(slice)
-}
-
-func (slice routeConfigs) Less(i, j int) bool {
-	return slice[i].Item.Backend.ServiceName <
-		slice[j].Item.Backend.ServiceName ||
-		(slice[i].Item.Backend.ServiceName ==
-			slice[j].Item.Backend.ServiceName &&
-			slice[i].Item.Backend.ServicePort <
-				slice[j].Item.Backend.ServicePort)
-}
-
-func (slice routeConfigs) Swap(i, j int) {
-	slice[i], slice[j] = slice[j], slice[i]
-}
-
 func makePoolName(uri string) string {
 	var name string
 	if strings.HasPrefix(uri, "*.") {
@@ -183,7 +166,7 @@ func (r *F5Router) validateConfig() error {
 func (r *F5Router) makeVirtual(
 	name string,
 	t vsType,
-) *routeConfig {
+) *virtual {
 	var port int32
 	var sslProfiles []*nameRef
 
@@ -194,30 +177,20 @@ func (r *F5Router) makeVirtual(
 		sslProfiles = r.generateNameList(r.c.BigIP.SSLProfiles)
 	}
 
-	vs := &routeConfig{
-		Item: routeItem{
-			Backend: backend{
-				ServiceName:     name,
-				ServicePort:     -1,         // unused
-				PoolMemberAddrs: []string{}, // unused
-			},
-			Frontend: frontend{
-				Name: name,
-				//FIXME need to handle multiple partitions
-				Partition: r.c.BigIP.Partitions[0],
-				Balance:   r.c.BigIP.Balance,
-				Mode:      "http",
-				VirtualAddress: &virtualAddress{
-					BindAddr: r.c.BigIP.ExternalAddr,
-					Port:     port,
-				},
-			},
+	vs := &virtual{
+		VirtualServerName: name,
+		//FIXME need to handle multiple partitions
+		Partition: r.c.BigIP.Partitions[0],
+		Mode:      "http",
+		VirtualAddress: &virtualAddress{
+			BindAddr: r.c.BigIP.ExternalAddr,
+			Port:     port,
 		},
 	}
 	plcs := r.generatePolicyList()
 	prfls := append(r.generateNameList(r.c.BigIP.Profiles), sslProfiles...)
-	vs.Item.Frontend.Policies = plcs
-	vs.Item.Frontend.Profiles = prfls
+	vs.Policies = plcs
+	vs.Profiles = prfls
 	return vs
 }
 
@@ -283,6 +256,56 @@ func (r *F5Router) generatePolicyList() []*nameRef {
 	return n
 }
 
+func (r *F5Router) createPolicies(rs *resources, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	rs.Policies = policies{
+		r.makeRoutePolicy(CFRoutingPolicyName),
+	}
+}
+
+func (r *F5Router) createVirtuals(rs *resources, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	rs.Virtuals = append(rs.Virtuals, r.routeVSHTTP)
+	if nil != r.routeVSHTTPS {
+		rs.Virtuals = append(rs.Virtuals, r.routeVSHTTPS)
+	}
+}
+
+func (r *F5Router) createPools(rs *resources, ru routeUpdate, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	ru.R.WalkNodesWithPool(func(t *container.Trie) {
+		var addrs []string
+		t.Pool.Each(func(e *route.Endpoint) {
+			addrs = append(addrs, e.CanonicalAddr())
+		})
+		uri := t.ToPath()
+		p := r.makePool(makePoolName(uri), uri, addrs...)
+		rs.Pools = append(rs.Pools, p)
+	})
+}
+
+func (r *F5Router) createResources(ru routeUpdate) *resources {
+	rs := &resources{}
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go r.createPolicies(rs, &wg)
+
+	wg.Add(1)
+	go r.createVirtuals(rs, &wg)
+
+	wg.Add(1)
+	go r.createPools(rs, ru, &wg)
+
+	wg.Wait()
+
+	return rs
+}
+
 func (r *F5Router) process() bool {
 	item, quit := r.queue.Get()
 	if quit {
@@ -322,32 +345,15 @@ func (r *F5Router) process() bool {
 			r.drainUpdate = false
 
 			sections := make(map[string]interface{})
+
 			sections["global"] = globalConfig{
 				LogLevel:       r.c.Logging.Level,
 				VerifyInterval: r.c.BigIP.VerifyInterval,
 			}
+
 			sections["bigip"] = r.c.BigIP
 
-			sections["policies"] = policies{r.makeRoutePolicy(CFRoutingPolicyName)}
-
-			services := routeConfigs{}
-			services = append(services, r.routeVSHTTP)
-			if nil != r.routeVSHTTPS {
-				services = append(services, r.routeVSHTTPS)
-			}
-
-			ru.R.WalkNodesWithPool(func(t *container.Trie) {
-				var addrs []string
-				t.Pool.Each(func(e *route.Endpoint) {
-					addrs = append(addrs, e.CanonicalAddr())
-				})
-				uri := t.ToPath()
-				p := r.makePool(makePoolName(uri), uri, addrs...)
-				services = append(services, p)
-			})
-			sort.Sort(services)
-
-			sections["services"] = services
+			sections["resources"] = r.createResources(ru)
 
 			r.logger.Debug("f5router-drain", zap.Object("writing", sections))
 
@@ -360,10 +366,6 @@ func (r *F5Router) process() bool {
 					r.logger.Warn("f5router-config-write-error", zap.Error(err))
 				} else if len(output) != n {
 					r.logger.Warn("f5router-config-short-write", zap.Error(err))
-				} else {
-					r.logger.Debug("f5router-wrote-config",
-						zap.Int("number-services", len(services)),
-					)
 				}
 			}
 		} else {
@@ -381,24 +383,17 @@ func (r *F5Router) makePool(
 	name string,
 	uri string,
 	addrs ...string,
-) *routeConfig {
+) *pool {
 	prefixHealthMonitors := fixupNames(r.c.BigIP.HealthMonitors)
-	return &routeConfig{
-		Item: routeItem{
-			Backend: backend{
-				ServiceName:     uri,
-				ServicePort:     -1, // unused
-				PoolMemberAddrs: addrs,
-				HealthMonitors:  prefixHealthMonitors,
-			},
-			Frontend: frontend{
-				Name: name,
-				//FIXME need to handle multiple partitions
-				Partition: r.c.BigIP.Partitions[0],
-				Balance:   r.c.BigIP.Balance,
-				Mode:      "http",
-			},
-		},
+	return &pool{
+		Name: name,
+		//FIXME need to handle multiple partitions
+		Partition:       r.c.BigIP.Partitions[0],
+		Balance:         r.c.BigIP.LoadBalancingMode,
+		ServiceName:     uri,
+		ServicePort:     -1, // unused
+		PoolMemberAddrs: addrs,
+		MonitorNames:    prefixHealthMonitors,
 	}
 }
 

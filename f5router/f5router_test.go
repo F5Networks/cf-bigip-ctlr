@@ -36,81 +36,6 @@ import (
 
 var _ = Describe("F5Router", func() {
 	Describe("sorting", func() {
-		Context("route config", func() {
-			It("should sort correctly", func() {
-				routeconfigs := routeConfigs{}
-
-				expectedList := make(routeConfigs, 10)
-
-				rc := routeConfig{}
-				rc.Item.Backend.ServiceName = "bar"
-				rc.Item.Backend.ServicePort = 80
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[1] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "foo"
-				rc.Item.Backend.ServicePort = 2
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[5] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "foo"
-				rc.Item.Backend.ServicePort = 8080
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[7] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "baz"
-				rc.Item.Backend.ServicePort = 1
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[2] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "foo"
-				rc.Item.Backend.ServicePort = 80
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[6] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "foo"
-				rc.Item.Backend.ServicePort = 9090
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[9] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "baz"
-				rc.Item.Backend.ServicePort = 1000
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[3] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "foo"
-				rc.Item.Backend.ServicePort = 8080
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[8] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "foo"
-				rc.Item.Backend.ServicePort = 1
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[4] = &rc
-
-				rc = routeConfig{}
-				rc.Item.Backend.ServiceName = "bar"
-				rc.Item.Backend.ServicePort = 1
-				routeconfigs = append(routeconfigs, &rc)
-				expectedList[0] = &rc
-
-				sort.Sort(routeconfigs)
-
-				for i := range expectedList {
-					Expect(routeconfigs[i]).To(Equal(expectedList[i]),
-						"Sorted list elements should be equal")
-				}
-			})
-		})
-
 		Context("rules", func() {
 			It("should sort correctly", func() {
 				l7 := rules{}
@@ -346,7 +271,7 @@ var _ = Describe("F5Router", func() {
 
 			registerRoutes()
 			// config0
-			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
+			matchConfig(mw, expectedConfigs[update])
 			update++
 
 			// make some changes and update the verification function
@@ -373,7 +298,7 @@ var _ = Describe("F5Router", func() {
 			p = r.LookupWithoutWildcard("foo.cf.com")
 			Expect(p).To(BeNil())
 			// config1
-			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
+			matchConfig(mw, expectedConfigs[update])
 			update++
 
 			r.Register("qux.cf.com", quxEndpoint)
@@ -381,7 +306,7 @@ var _ = Describe("F5Router", func() {
 			Expect(p).ToNot(BeNil())
 			Expect(p.FindById(quxEndpoint.CanonicalAddr())).ToNot(BeNil())
 			// config2
-			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
+			matchConfig(mw, expectedConfigs[update])
 
 			os <- MockSignal(123)
 			Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
@@ -418,7 +343,7 @@ var _ = Describe("F5Router", func() {
 
 			registerRoutes()
 
-			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[3]))
+			matchConfig(mw, expectedConfigs[3])
 		})
 
 		Context("fail cases", func() {
@@ -468,7 +393,7 @@ var _ = Describe("F5Router", func() {
 				Eventually(ready).Should(BeClosed())
 
 				Eventually(logger).Should(Say("f5router-skipping-name"))
-				p, _ := json.Marshal(router.routeVSHTTP.Item.Frontend.Policies)
+				p, _ := json.Marshal(router.routeVSHTTP.Policies)
 				cp := `[{"name":"anotherpolicy","partition":"cf"},{"name":"cf-routing-policy","partition":"cf"}]`
 				Eventually(p).Should(MatchJSON(cp))
 			})
@@ -477,6 +402,12 @@ var _ = Describe("F5Router", func() {
 
 	})
 })
+
+type configMatcher struct {
+	Global    globalConfig       `json:"global"`
+	BigIP     config.BigIPConfig `json:"bigip"`
+	Resources resources          `json:"resources"`
+}
 
 type testRoutes struct {
 	Key         route.Uri
@@ -501,13 +432,13 @@ func (mw *MockWriter) Write(input []byte) (n int, err error) {
 	return len(input), nil
 }
 
-func (mw *MockWriter) Input() []byte {
+func (mw *MockWriter) getInput() *configMatcher {
 	mw.Lock()
 	defer mw.Unlock()
-	dest := make([]byte, len(mw.input))
-	l := copy(dest, mw.input)
-	Expect(len(mw.input)).To(Equal(l))
-	return dest
+	var m configMatcher
+	err := json.Unmarshal(mw.input, &m)
+	Expect(err).To(BeNil())
+	return &m
 }
 
 type MockSignal int
@@ -546,4 +477,29 @@ func makeEndpoint(addr string) *route.Endpoint {
 		},
 	)
 	return r
+}
+
+func matchConfig(mw *MockWriter, expected []byte) {
+	var matcher configMatcher
+	err := json.Unmarshal(expected, &matcher)
+	ExpectWithOffset(1, err).To(BeNil())
+
+	EventuallyWithOffset(1, func() globalConfig {
+		return mw.getInput().Global
+	}).Should(Equal(matcher.Global))
+	EventuallyWithOffset(1, func() config.BigIPConfig {
+		return mw.getInput().BigIP
+	}).Should(Equal(matcher.BigIP))
+	EventuallyWithOffset(1, func() []*virtual {
+		return mw.getInput().Resources.Virtuals
+	}).Should(ConsistOf(matcher.Resources.Virtuals))
+	EventuallyWithOffset(1, func() []*pool {
+		return mw.getInput().Resources.Pools
+	}).Should(ConsistOf(matcher.Resources.Pools))
+	EventuallyWithOffset(1, func() []*monitor {
+		return mw.getInput().Resources.Monitors
+	}).Should(ConsistOf(matcher.Resources.Monitors))
+	EventuallyWithOffset(1, func() []*policy {
+		return mw.getInput().Resources.Policies
+	}).Should(ConsistOf(matcher.Resources.Policies))
 }

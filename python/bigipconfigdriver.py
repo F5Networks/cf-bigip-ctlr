@@ -261,8 +261,8 @@ def create_config_kubernetes(bigip, config):
     f5 = {'ltm': {}, 'network': {}}
     if 'openshift-sdn' in config:
         f5['network'] = create_network_config_kubernetes(config)
-    if 'services' in config:
-        f5['ltm'] = create_ltm_config_kubernetes(bigip, config)
+    if 'resources' in config and 'virtualServers' in config['resources']:
+        f5['ltm'] = create_ltm_config_kubernetes(bigip, config['resources'])
 
     return f5
 
@@ -280,6 +280,16 @@ def create_network_config_kubernetes(config):
     return f5_network
 
 
+def append_ssl_profile(profiles, profName):
+    profile = (profName.split('/'))
+    if len(profile) != 2:
+        log.error("Could not parse partition and name "
+                  "from SSL profile: %s", profName)
+    else:
+        profiles.append({'partition': profile[0],
+                         'name': profile[1]})
+
+
 def create_ltm_config_kubernetes(bigip, config):
     """Create a BIG-IP LTM configuration from the Kubernetes configuration.
 
@@ -287,51 +297,52 @@ def create_ltm_config_kubernetes(bigip, config):
         config: Kubernetes BigIP config which contains a svc list
     """
     configuration = {}
-    configuration['policies'] = config.get('policies', [])
+    configuration['l7Policies'] = config.get('l7Policies', [])
+    configuration['monitors'] = config.get('monitors', [])
+    configuration['pools'] = []
 
+    f5_pools = config.get('pools', [])
     f5_services = {}
 
     # partitions this script is responsible for:
     partitions = frozenset(bigip.get_partitions())
 
-    svcs = config['services']
+    svcs = config['virtualServers']
     for svc in svcs:
-        f5_service = {}
-
-        backend = svc['virtualServer']['backend']
-        frontend = svc['virtualServer']['frontend']
-        health_monitors = backend.get('healthMonitors', [])
-        policies = frontend.get('policies', [])
-        profiles = frontend.get('profiles', [])
-
+        vs_partition = svc['partition']
         # Only handle application if it's partition is one that this script
         # is responsible for
-        if not has_partition(partitions, frontend['partition']):
+        if not has_partition(partitions, vs_partition):
             continue
+
+        f5_service = {}
+        vs_name = svc['name']
+        f5_service['balance'] = svc.get('balance', '')
+
+        policies = svc.get('policies', [])
+        profiles = svc.get('profiles', [])
+
+        pool = {}
 
         # No address for this port
-        if (('virtualAddress' not in frontend or
-                'bindAddr' not in frontend['virtualAddress']) and
-                'iapp' not in frontend):
-            log.debug("Creating pool only for %s",
-                      frontend['virtualServerName'])
-        elif ('iapp' not in frontend and 'bindAddr' not in
-                frontend['virtualAddress']):
+        if (('virtualAddress' not in svc or
+                'bindAddr' not in svc['virtualAddress']) and
+                'iapp' not in svc):
+            log.debug("Creating pool only for %s", vs_name)
+        elif ('iapp' not in svc and 'bindAddr' not in
+                svc['virtualAddress']):
             continue
 
-        frontend_name = frontend['virtualServerName']
+        f5_service['name'] = vs_name
+        f5_service['partition'] = vs_partition
 
-        f5_service['name'] = frontend_name
-
-        f5_service['partition'] = frontend['partition']
-
-        if 'iapp' in frontend:
-            f5_service['iapp'] = {'template': frontend['iapp'],
+        if 'iapp' in svc:
+            f5_service['iapp'] = {'template': svc['iapp'],
                                   'poolMemberTable':
-                                  frontend['iappPoolMemberTable'],
-                                  'variables': frontend['iappVariables'],
-                                  'options': frontend['iappOptions']}
-            f5_service['iapp']['tables'] = frontend.get('iappTables', {})
+                                  svc['iappPoolMemberTable'],
+                                  'variables': svc['iappVariables'],
+                                  'options': svc['iappOptions']}
+            f5_service['iapp']['tables'] = svc.get('iappTables', {})
         else:
             f5_service['virtual'] = {}
             f5_service['pool'] = {}
@@ -340,86 +351,81 @@ def create_ltm_config_kubernetes(bigip, config):
             # Add default profiles if no profiles have been passed through
             profile_http = {'partition': 'Common', 'name': 'http'}
             profile_tcp = {'partition': 'Common', 'name': 'tcp'}
-            if str(frontend['mode']).lower() == 'http' and len(profiles) == 0:
+            if str(svc['mode']).lower() == 'http' and len(profiles) == 0:
                 profiles.append(profile_http)
-            elif (get_protocol(frontend['mode']) == 'tcp' and
+            elif (get_protocol(svc['mode']) == 'tcp' and
                     len(profiles) == 0):
                 profiles.append(profile_tcp)
 
-            # Parse the SSL profiles into partition and name
-            if 'sslProfiles' in frontend:
-                for profile in frontend['sslProfiles']['f5ProfileNames']:
-                    pf = profile.lstrip('/').split('/')
-                    if len(pf) != 2:
-                        log.error("Could not parse partition and name from "
-                                  "SSL profile: %s",
-                                  profile)
-                    else:
-                        pf_dict = {'partition': pf[0], 'name': pf[1]}
-                        if pf_dict not in profiles:
-                            profiles.append(pf_dict)
+            # Parse the SSL profile into partition and name
+            if 'sslProfiles' in svc:
+                # The sslProfiles item can be empty or have either
+                # 'f5ProfileName' or 'f5ProfileNames', not both.
+                if 'f5ProfileName' in svc['sslProfiles']:
+                    append_ssl_profile(
+                        profiles, svc['sslProfiles']['f5ProfileName'])
+                elif 'f5ProfileNames' in svc['sslProfiles']:
+                    for profName in svc['sslProfiles']['f5ProfileNames']:
+                        append_ssl_profile(profiles, profName)
 
-            if ('virtualAddress' in frontend and
-                    'bindAddr' in frontend['virtualAddress']):
+            if ('virtualAddress' in svc and
+                    'bindAddr' in svc['virtualAddress']):
                 f5_service['virtual_address'] = \
-                    frontend['virtualAddress']['bindAddr']
+                    svc['virtualAddress']['bindAddr']
 
                 f5_service['virtual'].update({
                     'enabled': True,
                     'disabled': False,
-                    'ipProtocol': get_protocol(frontend['mode']),
+                    'ipProtocol': get_protocol(svc['mode']),
                     'destination':
-                    "/%s/%s:%d" % (frontend['partition'],
-                                   frontend['virtualAddress']['bindAddr'],
-                                   frontend['virtualAddress']['port']),
-                    'pool': "/%s/%s" % (frontend['partition'], frontend_name),
+                    "/%s/%s:%d" % (vs_partition,
+                                   svc['virtualAddress']['bindAddr'],
+                                   svc['virtualAddress']['port']),
+                    'pool': "%s" % (svc['pool']),
                     'sourceAddressTranslation': {'type': 'automap'},
                     'profiles': profiles,
                     'policies': policies
                 })
+        f5_services.update({vs_name: f5_service})
+    configuration['virtualServers'] = f5_services
 
-            monitors = None
-            # Health Monitors
-            for index, health in enumerate(health_monitors):
-                log.debug("Healthcheck for service %s: %s",
-                          backend['serviceName'], health)
-                if type(health) == dict:
-                    if index == 0:
-                        health['name'] = frontend_name
-                    else:
-                        health['name'] = frontend_name + '_' + str(index)
-                        monitors = monitors + ' and '
-                    f5_service['health'].append(health)
+    # FIXME(garyr): CCCL presently expects pools slightly differently than
+    # we get from the controller, so convert to the expected format here.
+    for pool in f5_pools:
+        new_pool = {}
+        members = {}
+        pname = pool['name']
+        new_pool['name'] = pname
+        monitors = None
+        if 'monitor' in pool and pool['monitor']:
+            monitors = ' and '.join(pool['monitor'])
+        new_pool['monitor'] = monitors
 
-                    # monitors is a string of health-monitor names
-                    # delimited by ' and '
-                    monitor = "/%s/%s" % (frontend['partition'],
-                                          f5_service['health'][index]['name'])
-
-                    monitors = (monitors + monitor) if monitors is not None \
-                        else monitor
-                else:
-                    if monitors is not None:
-                        monitors = monitors + ' and '
-                    monitors = (monitors + health) if monitors is not None \
-                        else health
-
-            f5_service['pool'].update({
-                'monitor': monitors,
-                'loadBalancingMode': frontend['balance']
-            })
-
-        f5_service['nodes'] = {}
-        if backend['poolMemberAddrs']:
-            for node in backend['poolMemberAddrs']:
-                f5_service['nodes'].update({node: {
+        balance = None
+        vname = pname.rsplit('_', 1)[0]
+        if pname in f5_services:
+            if 'balance' in f5_services[pname]:
+                balance = f5_services[pname]['balance']
+        elif vname in f5_services:
+            if 'balance' in f5_services[vname]:
+                balance = f5_services[vname]['balance']
+        elif 'balance' in pool:
+            balance = pool['balance']
+        new_pool['loadBalancingMode'] = balance
+        new_pool['partition'] = pool['partition']
+        if 'poolMemberAddrs' in pool:
+            for member in pool['poolMemberAddrs']:
+                members.update({member: {
                     'state': 'user-up',
                     'session': 'user-enabled'
                 }})
-
-        f5_services.update({frontend_name: f5_service})
-
-    configuration['services'] = f5_services
+        else:
+            log.warning(
+                'Pool "{}" has service "{}", which is empty - '
+                'configuring 0 pool members.'.format(
+                    pname, pool['serviceName']))
+        new_pool['members'] = members
+        configuration['pools'].append(new_pool)
 
     return configuration
 
@@ -486,6 +492,8 @@ class ConfigHandler():
                     start_time = time.time()
 
                     config = _parse_config(self._config_file)
+                    if 'resources' not in config:
+                        continue
                     verify_interval, _ = _handle_global_config(config)
                     _handle_openshift_sdn_config(config)
                     self.set_interval_timer(verify_interval)
@@ -510,11 +518,14 @@ class ConfigHandler():
                             test_data = {}
                             app_count = 0
                             backend_count = 0
-                            for service in config['services']:
+                            for service in config['virtualServers']:
                                 app_count += 1
-                                vs_bkend = service['virtualServer']['backend']
-                                backends = len(vs_bkend['poolMemberAddrs'])
-                                test_data[vs_bkend['serviceName']] = backends
+                                backends = 0
+                                for pool in config['pools']:
+                                    if pool['name'] == service['name']:
+                                        backends = len(pool['poolMemberAddrs'])
+                                        break
+                                test_data[service['name']] = backends
                                 backend_count += backends
                             test_data['Total_Services'] = app_count
                             test_data['Total_Backends'] = backend_count
@@ -768,10 +779,11 @@ def _handle_bigip_config(config):
         raise ConfigError('Configuration file missing "bigip" section')
     bigip = config['bigip']
     if 'username' not in bigip:
-        raise ConfigError("bigip config: {}".format(config))
+        raise ConfigError('Configuration file missing '
+                          '"bigip:username" section')
     if 'password' not in bigip:
         raise ConfigError('Configuration file missing '
-                          '"bigip:pass" section')
+                          '"bigip:password" section')
     if 'url' not in bigip:
         raise ConfigError('Configuration file missing "bigip:url" section')
     if ('partitions' not in bigip) or (len(bigip['partitions']) == 0):
