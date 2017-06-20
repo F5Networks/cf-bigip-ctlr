@@ -332,9 +332,6 @@
           "bindAddr": "127.0.0.1",
           "port": 443
         },
-        "sslProfiles": {
-          "f5ProfileNames": ["/Common/clientssl"]
-        },
         "policies": [{
           "name": "fakepolicy",
           "partition": "Common"
@@ -350,6 +347,9 @@
           "partition": "Common"
         }, {
           "name": "fakeprofile",
+          "partition": "Common"
+        }, {
+          "name": "clientssl",
           "partition": "Common"
         }]
       }

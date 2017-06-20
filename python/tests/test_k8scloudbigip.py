@@ -423,9 +423,9 @@ class KubernetesTest(BigIPTest):
                                   'sourceAddressTranslation':
                                   {'type': 'automap'},
                                   'profiles': [{'partition': 'Common',
-                                                'name': 'clientssl'},
+                                                'name': 'http'},
                                                {'partition': 'Common',
-                                                'name': 'http'}]}
+                                                'name': 'clientssl'}]}
         virtual = self.create_mock_virtual('default_configmap',
                                            **virtual_data_unchanged)
 

@@ -300,6 +300,10 @@
         "policies": [{
           "name": "cf-routing-policy",
           "partition": "cf"
+        }],
+        "profiles": [{
+          "name": "http",
+          "partition": "Common"
         }]
       }
     }

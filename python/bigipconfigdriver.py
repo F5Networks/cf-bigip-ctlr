@@ -337,6 +337,15 @@ def create_ltm_config_kubernetes(bigip, config):
             f5_service['pool'] = {}
             f5_service['health'] = []
 
+            # Add default profiles if no profiles have been passed through
+            profile_http = {'partition': 'Common', 'name': 'http'}
+            profile_tcp = {'partition': 'Common', 'name': 'tcp'}
+            if str(frontend['mode']).lower() == 'http' and len(profiles) == 0:
+                profiles.append(profile_http)
+            elif (get_protocol(frontend['mode']) == 'tcp' and
+                    len(profiles) == 0):
+                profiles.append(profile_tcp)
+
             # Parse the SSL profiles into partition and name
             if 'sslProfiles' in frontend:
                 for profile in frontend['sslProfiles']['f5ProfileNames']:
@@ -349,16 +358,6 @@ def create_ltm_config_kubernetes(bigip, config):
                         pf_dict = {'partition': pf[0], 'name': pf[1]}
                         if pf_dict not in profiles:
                             profiles.append(pf_dict)
-
-            # Add appropriate profiles
-            profile_http = {'partition': 'Common', 'name': 'http'}
-            profile_tcp = {'partition': 'Common', 'name': 'tcp'}
-            if str(frontend['mode']).lower() == 'http':
-                if profile_http not in profiles:
-                    profiles.append(profile_http)
-            elif get_protocol(frontend['mode']) == 'tcp':
-                if profile_tcp not in profiles:
-                    profiles.append(profile_tcp)
 
             if ('virtualAddress' in frontend and
                     'bindAddr' in frontend['virtualAddress']):
