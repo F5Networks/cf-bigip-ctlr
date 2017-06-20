@@ -275,12 +275,11 @@ func (r *F5Router) generateNameList(names []string) []*nameRef {
 
 func (r *F5Router) generatePolicyList() []*nameRef {
 	var n []*nameRef
-	n = append(n, r.generateNameList(r.c.BigIP.Policies.PreRouting)...)
+	n = append(n, r.generateNameList(r.c.BigIP.Policies)...)
 	n = append(n, &nameRef{
 		Name:      CFRoutingPolicyName,
 		Partition: r.c.BigIP.Partitions[0], // FIXME handle multiple partitions
 	})
-	n = append(n, r.generateNameList(r.c.BigIP.Policies.PostRouting)...)
 	return n
 }
 

@@ -25,25 +25,20 @@ type StatusConfig struct {
 	Pass string `yaml:"pass"`
 }
 
-type RoutingPolicies struct {
-	PreRouting  []string `yaml:"prerouting" json:"-"`
-	PostRouting []string `yaml:"postrouting" json:"-"`
-}
-
 // BigIPConfig configuration parameters for bigip integration
 type BigIPConfig struct {
-	URL            string          `yaml:"url" json:"url"`
-	User           string          `yaml:"user" json:"username"`
-	Pass           string          `yaml:"pass" json:"password"`
-	Partitions     []string        `yaml:"partition" json:"partitions"`
-	Balance        string          `yaml:"balance" json:"-"`
-	VerifyInterval int             `yaml:"verify_interval" json:"-"`
-	ExternalAddr   string          `yaml:"external_addr" json:"-"`
-	SSLProfiles    []string        `yaml:"ssl_profiles" json:"-"`
-	Policies       RoutingPolicies `yaml:"policies" json:"-"`
-	Profiles       []string        `yaml:"profiles" json:"-"`
-	HealthMonitors []string        `yaml:"health_monitors" json:"-"`
-	DriverCmd      string          `yaml:"driver_path" json:"-"`
+	URL            string   `yaml:"url" json:"url"`
+	User           string   `yaml:"user" json:"username"`
+	Pass           string   `yaml:"pass" json:"password"`
+	Partitions     []string `yaml:"partition" json:"partitions"`
+	Balance        string   `yaml:"balance" json:"-"`
+	VerifyInterval int      `yaml:"verify_interval" json:"-"`
+	ExternalAddr   string   `yaml:"external_addr" json:"-"`
+	SSLProfiles    []string `yaml:"ssl_profiles" json:"-"`
+	Policies       []string `yaml:"policies" json:"-"`
+	Profiles       []string `yaml:"profiles" json:"-"`
+	HealthMonitors []string `yaml:"health_monitors" json:"-"`
+	DriverCmd      string   `yaml:"driver_path" json:"-"`
 }
 
 var defaultBigIPConfig = BigIPConfig{
@@ -55,7 +50,7 @@ var defaultBigIPConfig = BigIPConfig{
 	VerifyInterval: 30,
 	ExternalAddr:   "",
 	SSLProfiles:    []string{},
-	Policies:       RoutingPolicies{},
+	Policies:       []string{},
 	Profiles:       []string{},
 	DriverCmd:      "",
 }

@@ -17,6 +17,7 @@
 package f5router
 
 import (
+	"encoding/json"
 	"os"
 	"sort"
 	"sync"
@@ -386,7 +387,7 @@ var _ = Describe("F5Router", func() {
 			Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
 		})
 
-		It("should handle ssl and health monitors", func() {
+		It("should handle policies, profiles and health monitors", func() {
 			done := make(chan struct{})
 			os := make(chan os.Signal)
 			ready := make(chan struct{})
@@ -394,6 +395,7 @@ var _ = Describe("F5Router", func() {
 			c.BigIP.HealthMonitors = []string{"Common/potato"}
 			c.BigIP.SSLProfiles = []string{"Common/clientssl"}
 			c.BigIP.Profiles = []string{"Common/http", "/Common/fakeprofile"}
+			c.BigIP.Policies = []string{"Common/fakepolicy", "/cf/anotherpolicy"}
 
 			router, err = NewF5Router(logger, c, mw)
 			r = registry.NewRouteRegistry(
@@ -438,6 +440,39 @@ var _ = Describe("F5Router", func() {
 
 				Eventually(logger).Should(Say("f5router-skipping-update"))
 			})
+
+			It("should error on invalid policy format", func() {
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				c.BigIP.Policies = []string{"fakepolicy", "/cf/anotherpolicy"}
+
+				router, err = NewF5Router(logger, c, mw)
+				r = registry.NewRouteRegistry(
+					logger,
+					c,
+					router,
+					new(fakes.FakeRouteRegistryReporter),
+					"",
+				)
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+				Eventually(ready).Should(BeClosed())
+
+				Eventually(logger).Should(Say("f5router-skipping-name"))
+				p, _ := json.Marshal(router.routeVSHTTP.Item.Frontend.Policies)
+				cp := `[{"name":"anotherpolicy","partition":"cf"},{"name":"cf-routing-policy","partition":"cf"}]`
+				Eventually(p).Should(MatchJSON(cp))
+			})
+
 		})
 
 	})

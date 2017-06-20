@@ -15,10 +15,8 @@ applications:
                            - /Common/clientssl
                            - /Common/serverssl
                         policies:
-                          prerouting:
-                            - /Common/header-insert
-                          postrouting:
-                            - /Common/redirect
+                          - /Common/header-insert
+                          - /Common/redirect
                         profiles:
                           - /Common/http
                         health_monitors:
