@@ -173,6 +173,10 @@ func (r *F5Router) validateConfig() error {
 		r.c.BigIP.HealthMonitors = []string{"/Common/tcp_half_open"}
 	}
 
+	if 0 == len(r.c.BigIP.Profiles) {
+		r.c.BigIP.Profiles = []string{"/Common/http"}
+	}
+
 	return nil
 }
 
@@ -181,16 +185,13 @@ func (r *F5Router) makeVirtual(
 	t vsType,
 ) *routeConfig {
 	var port int32
-	var ssl *sslProfiles
+	var sslProfiles []*nameRef
 
 	if t == HTTP {
 		port = 80
 	} else if t == HTTPS {
 		port = 443
-		prefixSSL := fixupNames(r.c.BigIP.SSLProfiles)
-		ssl = &sslProfiles{
-			F5ProfileNames: prefixSSL,
-		}
+		sslProfiles = r.generateNameList(r.c.BigIP.SSLProfiles)
 	}
 
 	vs := &routeConfig{
@@ -210,12 +211,11 @@ func (r *F5Router) makeVirtual(
 					BindAddr: r.c.BigIP.ExternalAddr,
 					Port:     port,
 				},
-				SSLProfiles: ssl,
 			},
 		},
 	}
 	plcs := r.generatePolicyList()
-	prfls := r.generateNameList(r.c.BigIP.Profiles)
+	prfls := append(r.generateNameList(r.c.BigIP.Profiles), sslProfiles...)
 	vs.Item.Frontend.Policies = plcs
 	vs.Item.Frontend.Profiles = prfls
 	return vs

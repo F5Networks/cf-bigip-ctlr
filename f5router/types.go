@@ -32,11 +32,6 @@ type (
 		VerifyInterval int    `json:"verify-interval"`
 	}
 
-	// frontend ssl profile
-	sslProfiles struct {
-		F5ProfileNames []string `json:"f5ProfileNames,omitempty"`
-	}
-
 	// frontend bindaddr and port
 	virtualAddress struct {
 		BindAddr string `json:"bindAddr,omitempty"`
@@ -67,7 +62,6 @@ type (
 		Balance        string          `json:"balance,omitempty"`
 		Mode           string          `json:"mode,omitempty"`
 		VirtualAddress *virtualAddress `json:"virtualAddress,omitempty"`
-		SSLProfiles    *sslProfiles    `json:"sslProfiles,omitempty"`
 		Policies       []*nameRef      `json:"policies,omitempty"`
 		Profiles       []*nameRef      `json:"profiles,omitempty"`
 	}
