@@ -432,7 +432,7 @@ func (r *F5Router) makeRouteRule(ru routeUpdate) (*rule, error) {
 			Name:     "0",
 			Index:    0,
 			Request:  true,
-			Values:   []string{strings.TrimPrefix(u.Host, "*.")},
+			Values:   []string{strings.TrimPrefix(u.Host, "*")},
 		})
 	} else {
 		c = append(c, &condition{

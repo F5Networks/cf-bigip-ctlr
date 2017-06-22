@@ -133,7 +133,7 @@
         "name": "0",
         "index": 0,
         "request": true,
-        "values": ["cf.com"]
+        "values": [".cf.com"]
       }],
       "name": "cf.com",
       "ordinal": 4

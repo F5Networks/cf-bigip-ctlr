@@ -345,7 +345,7 @@ var _ = Describe("F5Router", func() {
 			}()
 
 			registerRoutes()
-
+			// config0
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
 			update++
 
@@ -372,7 +372,7 @@ var _ = Describe("F5Router", func() {
 			r.Unregister("foo.cf.com", fooEndpoint)
 			p = r.LookupWithoutWildcard("foo.cf.com")
 			Expect(p).To(BeNil())
-
+			// config1
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
 			update++
 
@@ -380,7 +380,7 @@ var _ = Describe("F5Router", func() {
 			p = r.LookupWithoutWildcard("qux.cf.com")
 			Expect(p).ToNot(BeNil())
 			Expect(p.FindById(quxEndpoint.CanonicalAddr())).ToNot(BeNil())
-
+			// config2
 			Eventually(mw.Input).Should(MatchJSON(expectedConfigs[update]))
 
 			os <- MockSignal(123)
