@@ -21,7 +21,7 @@ import unittest
 from mock import Mock, patch
 from f5_cccl.common import ipv4_to_mac
 from f5.bigip import BigIP
-from f5_cccl.testcommon import BigIPTest
+from f5_cccl.testcommon import BigIPTest, MockIapp
 ctlr = __import__('bigipconfigdriver')
 
 
@@ -114,14 +114,10 @@ class KubernetesTest(BigIPTest):
         self.assertEqual(self.bigip.member_create.call_count, 2)
 
         self.assertEquals(2, len(self.test_monitor))
-        expected_name0 = 'default_configmap'
-        self.assertEquals(expected_name0, self.test_monitor[0]['name'])
-        expected_name1 = 'default_configmap_1'
-        self.assertEquals(expected_name1, self.test_monitor[1]['name'])
-        self.assertEquals(self.test_partition,
-                          self.test_monitor[0]['partition'])
-        self.assertEquals(self.test_partition,
-                          self.test_monitor[1]['partition'])
+        expected_names = ['default_configmap', 'default_configmap_1']
+        for mon in self.test_monitor:
+            self.assertTrue(mon['name'] in expected_names)
+            self.assertEqual(self.test_partition, mon['partition'])
 
     def test_invalid_svcs(self,
                           cloud_state='tests/kubernetes_invalid_svcs.json',
@@ -158,18 +154,14 @@ class KubernetesTest(BigIPTest):
         self.assertEquals(2, len(self.test_virtual))
         self.assertEquals(2, len(self.test_pool))
 
-        expected_name0 = 'invalid_sslProfile0_configmap'
-        expected_name1 = 'invalid_sslProfile1_configmap'
-        self.assertEquals(expected_name0, self.test_virtual[1]['name'])
-        self.assertEquals(expected_name0, self.test_pool[1]['name'])
-        self.assertEquals(self.test_partition,
-                          self.test_virtual[1]['partition'])
-        self.assertEquals(self.test_partition, self.test_pool[1]['partition'])
-        self.assertEquals(expected_name1, self.test_virtual[0]['name'])
-        self.assertEquals(expected_name1, self.test_pool[0]['name'])
-        self.assertEquals(self.test_partition,
-                          self.test_virtual[0]['partition'])
-        self.assertEquals(self.test_partition, self.test_pool[0]['partition'])
+        expected_names = ['invalid_sslProfile0_configmap',
+                          'invalid_sslProfile1_configmap']
+        for v in self.test_virtual:
+            self.assertTrue(v['name'] in expected_names)
+            self.assertEquals(self.test_partition, v['partition'])
+        for p in self.test_pool:
+            self.assertTrue(p['name'] in expected_names)
+            self.assertEquals(self.test_partition, p['partition'])
 
     def test_svc_scaled_down(
             self,
@@ -307,12 +299,21 @@ class KubernetesTest(BigIPTest):
         self.bigip.sys.application.services.get_collection = \
             Mock(side_effect=self.mock_iapp_update_services_get_collection)
         self.bigip.sys.application.services.service.load = \
-            Mock(side_effect=self.mock_iapp_service_load)
+            Mock(side_effect=self.mock_iapp_update_service_load)
         self.bigip.iapp_update = self.bigip.iapp_update_orig
         self.bigip.cleanup_nodes = Mock()
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_config_kubernetes(self.bigip, self.cloud_data)
+
+        iapp_def = self.bigip.iapp_build_definition(
+            cfg['ltm']['virtualServers']['default_configmap'],
+            cfg['ltm']['pools'][0])
+        self.test_iapp = MockIapp(name='default_configmap',
+                                  partition=self.test_partition,
+                                  variables=iapp_def['variables'],
+                                  tables=iapp_def['tables'])
+
         self.bigip.regenerate_config_f5(cfg)
 
         # Verify BIG-IP configuration
@@ -403,6 +404,8 @@ class KubernetesTest(BigIPTest):
         self.bigip.get_virtual = Mock(side_effect=self.mock_get_virtual)
         self.bigip.get_virtual_profiles = Mock(
             side_effect=self.mock_get_virtual_profiles)
+        self.bigip.get_virtual_policies = Mock(
+            side_effect=self.mock_get_virtual_policies)
         self.bigip.get_member = Mock(side_effect=self.mock_get_member)
         self.bigip.get_virtual_address = Mock(
             side_effect=self.mock_get_virtual_address)
@@ -410,7 +413,10 @@ class KubernetesTest(BigIPTest):
         # Create a mock Pool
         pool_data_unchanged = {'monitor': '/k8s/default_configmap and '
                                           '/k8s/default_configmap_1',
-                               'balance': 'round-robin'}
+                               'balance': 'round-robin',
+                               'partition': 'k8s',
+                               'members': ['172.16.0.5:30008',
+                                           '172.16.0.6:30008']}
         pool = self.create_mock_pool('default_configmap',
                                      **pool_data_unchanged)
 
@@ -425,7 +431,10 @@ class KubernetesTest(BigIPTest):
                                   'profiles': [{'partition': 'Common',
                                                 'name': 'http'},
                                                {'partition': 'Common',
-                                                'name': 'clientssl'}]}
+                                                'name': 'clientssl'},
+                                               {'partition': 'Common',
+                                                'name': 'clientssl-secure'}],
+                                  'policies': []}
         virtual = self.create_mock_virtual('default_configmap',
                                            **virtual_data_unchanged)
 
@@ -466,12 +475,29 @@ class KubernetesTest(BigIPTest):
             'pool': '/Common/default_configmap',
             'sourceAddressTranslation': {'type': 'snat'},
             'profiles': [{'partition': 'Common', 'name': 'clientssl'},
+                         {'partition': 'Common', 'name': 'clientssl-secure'},
                          {'partition': 'Common', 'name': 'tcp'}]
         }
         for key in virtual_data_changed:
             data = virtual_data_unchanged.copy()
             # Change one thing
             data[key] = virtual_data_changed[key]
+            virtual = self.create_mock_virtual('default_configmap',
+                                               **data)
+            cfg = ctlr.create_config_kubernetes(self.bigip, self.cloud_data)
+            self.bigip.regenerate_config_f5(cfg)
+            self.assertTrue(virtual.modify.called)
+
+        # Make sure virtual server modify is called for policy name changes.
+        policies = [
+            {'partition': 'Common', 'name': 'policy1'},
+            {'partition': 'Common', 'name': 'policy2'},
+            {}
+            ]
+        for pol in policies:
+            data = virtual_data_unchanged.copy()
+            # Change one thing
+            data['policies'] = pol
             virtual = self.create_mock_virtual('default_configmap',
                                                **data)
             cfg = ctlr.create_config_kubernetes(self.bigip, self.cloud_data)
@@ -539,12 +565,16 @@ class KubernetesTest(BigIPTest):
         self.assertEqual(self.bigip.ltm.monitor.https.http.create.call_count,
                          1)
 
-        expected_name = 'default_configmap'
-        self.assertEqual(expected_name, self.test_pool[0]['name'])
-        self.assertEqual(expected_name, self.test_monitor[0]['name'])
+        expected_pool_name = 'default_configmap'
+        expected_names = ['default_configmap', 'default_configmap_1']
+        self.assertEqual(1, len(self.test_pool))
+        self.assertEqual(0, len(self.test_virtual))
+        self.assertEqual(2, len(self.test_monitor))
+        self.assertEqual(expected_pool_name, self.test_pool[0]['name'])
         self.assertEqual(self.test_partition, self.test_pool[0]['partition'])
-        self.assertEqual(self.test_partition,
-                         self.test_monitor[0]['partition'])
+        for mon in self.test_monitor:
+            self.assertTrue(mon['name'] in expected_names)
+            self.assertEqual(self.test_partition, mon['partition'])
 
     def test_pool_only_to_virtual_server(
             self,
@@ -573,7 +603,7 @@ class KubernetesTest(BigIPTest):
                          1)
 
         # Reconfigure BIG-IP by adding virtual server to existing pool
-        self.cloud_data['services'][0]['virtualServer']['frontend'].update(
+        self.cloud_data['resources']['virtualServers'][0].update(
             {
                 unicode('virtualAddress'):
                 {
@@ -610,15 +640,18 @@ class KubernetesTest(BigIPTest):
         self.assertEqual(self.bigip.ltm.monitor.https.http.create.call_count,
                          1)
 
-        expected_name = 'default_configmap'
-        self.assertEqual(expected_name, self.test_pool[0]['name'])
-        self.assertEqual(expected_name, self.test_monitor[0]['name'])
-        self.assertEqual(expected_name, self.test_virtual[0]['name'])
+        expected_virtual_name = 'default_configmap'
+        expected_pool_name = 'default_configmap'
+        expected_names = ['default_configmap', 'default_configmap_1']
+        self.assertEqual(1, len(self.test_pool))
+        self.assertEqual(1, len(self.test_virtual))
+        self.assertEqual(2, len(self.test_monitor))
+        self.assertEqual(expected_pool_name, self.test_pool[0]['name'])
+        self.assertEqual(expected_virtual_name, self.test_virtual[0]['name'])
         self.assertEqual(self.test_partition, self.test_pool[0]['partition'])
-        self.assertEqual(self.test_partition,
-                         self.test_monitor[0]['partition'])
-        self.assertEqual(self.test_partition,
-                         self.test_virtual[0]['partition'])
+        for mon in self.test_monitor:
+            self.assertTrue(mon['name'] in expected_names)
+            self.assertEqual(self.test_partition, mon['partition'])
 
     def test_virtual_server_to_pool_only(
             self,
@@ -648,7 +681,7 @@ class KubernetesTest(BigIPTest):
                          1)
 
         # Reconfigure BIG-IP by adding virtual server to existing pool
-        self.cloud_data['services'][0]['virtualServer']['frontend'].pop(
+        self.cloud_data['resources']['virtualServers'][0].pop(
             unicode('virtualAddress'))
         cfg = ctlr.create_config_kubernetes(self.bigip, self.cloud_data)
         self.bigip.regenerate_config_f5(cfg)
@@ -677,13 +710,16 @@ class KubernetesTest(BigIPTest):
         self.assertEqual(self.bigip.ltm.monitor.https.http.create.call_count,
                          1)
 
-        expected_name = 'default_configmap'
-        self.assertEqual(expected_name, self.test_pool[0]['name'])
-        self.assertEqual(expected_name, self.test_monitor[0]['name'])
-        self.assertEqual(self.test_partition, self.test_pool[0]['partition'])
-        self.assertEqual(self.test_partition,
-                         self.test_monitor[0]['partition'])
+        self.assertEqual(1, len(self.test_pool))
         self.assertEqual(0, len(self.test_virtual))
+        self.assertEqual(2, len(self.test_monitor))
+        expected_names = ['default_configmap', 'default_configmap_1']
+        expected_pool_name = 'default_configmap'
+        self.assertEqual(expected_pool_name, self.test_pool[0]['name'])
+        self.assertEqual(self.test_partition, self.test_pool[0]['partition'])
+        for mon in self.test_monitor:
+            self.assertTrue(mon['name'] in expected_names)
+            self.assertEqual(self.test_partition, mon['partition'])
 
     def test_updates_pool_only(
             self,

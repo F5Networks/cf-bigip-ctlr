@@ -44,62 +44,46 @@ type (
 		Partition string `json:"partition"`
 	}
 
-	// virtual server backend backend
-	backend struct {
-		ServiceName     string   `json:"serviceName"`
-		ServicePort     int32    `json:"servicePort"`
-		PoolMemberAddrs []string `json:"poolMemberAddrs"`
-		HealthMonitors  []string `json:"healthMonitors,omitempty"`
+	resources struct {
+		Virtuals []*virtual `json:"virtualServers,omitempty"`
+		Pools    []*pool    `json:"pools,omitempty"`
+		Monitors []*monitor `json:"monitors,omitempty"`
+		Policies []*policy  `json:"l7Policies,omitempty"`
 	}
 
 	// virtual server frontend
-	frontend struct {
-		Name string `json:"virtualServerName"`
+	virtual struct {
+		VirtualServerName string `json:"name"`
+		PoolName          string `json:"pool"`
 		// Mutual parameter, partition
 		Partition string `json:"partition"`
 
 		// VirtualServer parameters
-		Balance        string          `json:"balance,omitempty"`
 		Mode           string          `json:"mode,omitempty"`
 		VirtualAddress *virtualAddress `json:"virtualAddress,omitempty"`
 		Policies       []*nameRef      `json:"policies,omitempty"`
 		Profiles       []*nameRef      `json:"profiles,omitempty"`
 	}
 
-	routeItem struct {
-		Backend  backend  `json:"backend"`
-		Frontend frontend `json:"frontend"`
-		Policies policies `json:"policies,omitempty"`
+	// pool backend
+	pool struct {
+		Name            string   `json:"name"`
+		Partition       string   `json:"partition"`
+		ServiceName     string   `json:"serviceName"`
+		ServicePort     int32    `json:"servicePort"`
+		Balance         string   `json:"balance"`
+		PoolMemberAddrs []string `json:"poolMemberAddrs"`
+		MonitorNames    []string `json:"monitor"`
 	}
 
-	// RouteConfig main virtual server configuration
-	routeConfig struct {
-		Item routeItem `json:"virtualServer"`
-	}
-
-	routeMap     map[route.Uri]*routeConfig
-	ruleMap      map[route.Uri]*rule
-	routeConfigs []*routeConfig
-
-	// F5Router controller of BigIP configuration objects
-	F5Router struct {
-		c            *config.Config
-		logger       logger.Logger
-		r            ruleMap
-		wildcards    ruleMap
-		queue        workqueue.RateLimitingInterface
-		writer       Writer
-		routeVSHTTP  *routeConfig
-		routeVSHTTPS *routeConfig
-		drainUpdate  bool
-	}
-
-	vsType      int
-	routeUpdate struct {
-		Name string
-		URI  route.Uri
-		R    registry.Registry
-		Op   registry.Operation
+	// backend health monitor
+	monitor struct {
+		Name      string `json:"name"`
+		Partition string `json:"partition"`
+		Interval  int    `json:"interval,omitempty"`
+		Protocol  string `json:"protocol"`
+		Send      string `json:"send,omitempty"`
+		Timeout   int    `json:"timeout,omitempty"`
 	}
 
 	action struct {
@@ -143,4 +127,27 @@ type (
 
 	policies []*policy
 	rules    []*rule
+	routeMap map[route.Uri]*pool
+	ruleMap  map[route.Uri]*rule
+
+	// F5Router controller of BigIP configuration objects
+	F5Router struct {
+		c            *config.Config
+		logger       logger.Logger
+		r            ruleMap
+		wildcards    ruleMap
+		queue        workqueue.RateLimitingInterface
+		writer       Writer
+		routeVSHTTP  *virtual
+		routeVSHTTPS *virtual
+		drainUpdate  bool
+	}
+
+	vsType      int
+	routeUpdate struct {
+		Name string
+		URI  route.Uri
+		R    registry.Registry
+		Op   registry.Operation
+	}
 )

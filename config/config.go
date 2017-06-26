@@ -27,32 +27,32 @@ type StatusConfig struct {
 
 // BigIPConfig configuration parameters for bigip integration
 type BigIPConfig struct {
-	URL            string   `yaml:"url" json:"url"`
-	User           string   `yaml:"user" json:"username"`
-	Pass           string   `yaml:"pass" json:"password"`
-	Partitions     []string `yaml:"partition" json:"partitions"`
-	Balance        string   `yaml:"balance" json:"-"`
-	VerifyInterval int      `yaml:"verify_interval" json:"-"`
-	ExternalAddr   string   `yaml:"external_addr" json:"-"`
-	SSLProfiles    []string `yaml:"ssl_profiles" json:"-"`
-	Policies       []string `yaml:"policies" json:"-"`
-	Profiles       []string `yaml:"profiles" json:"-"`
-	HealthMonitors []string `yaml:"health_monitors" json:"-"`
-	DriverCmd      string   `yaml:"driver_path" json:"-"`
+	URL               string   `yaml:"url" json:"url"`
+	User              string   `yaml:"user" json:"username"`
+	Pass              string   `yaml:"pass" json:"password"`
+	Partitions        []string `yaml:"partition" json:"partitions"`
+	LoadBalancingMode string   `yaml:"load_balancing_mode" json:"-"`
+	VerifyInterval    int      `yaml:"verify_interval" json:"-"`
+	ExternalAddr      string   `yaml:"external_addr" json:"-"`
+	SSLProfiles       []string `yaml:"ssl_profiles" json:"-"`
+	Policies          []string `yaml:"policies" json:"-"`
+	Profiles          []string `yaml:"profiles" json:"-"`
+	HealthMonitors    []string `yaml:"health_monitors" json:"-"`
+	DriverCmd         string   `yaml:"driver_path" json:"-"`
 }
 
 var defaultBigIPConfig = BigIPConfig{
-	URL:            "",
-	User:           "",
-	Pass:           "",
-	Partitions:     []string{},
-	Balance:        "round-robin",
-	VerifyInterval: 30,
-	ExternalAddr:   "",
-	SSLProfiles:    []string{},
-	Policies:       []string{},
-	Profiles:       []string{},
-	DriverCmd:      "",
+	URL:               "",
+	User:              "",
+	Pass:              "",
+	Partitions:        []string{},
+	LoadBalancingMode: "round-robin",
+	VerifyInterval:    30,
+	ExternalAddr:      "",
+	SSLProfiles:       []string{},
+	Policies:          []string{},
+	Profiles:          []string{},
+	DriverCmd:         "",
 }
 
 var defaultStatusConfig = StatusConfig{
