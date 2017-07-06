@@ -1,43 +1,46 @@
 applications:
-  - name: cf-bigip-ctlr
+  - name: ctlr
+    disk_quota: 256M
+    memory: 256M
+    health-check-type: http
+    health-check-http-endpoint: /health
+    routes:
+      - route: ctlr.apps.pcf.local
+      - route: ctlr.apps.bigip.pcf.local
     env:
       BIGIP_CTLR_CFG: |
                       bigip:
-                        url: https://10.190.24.32
+                        url: https://10.100.200.3
                         user: admin
                         pass: admin
                         partition:
-                          - k8s
+                          - cf
                         balance: round-robin
-                        verify_interval: 30
-                        external_addr: 172.16.3.90
-                        ssl_profiles:
-                           - /Common/clientssl
-                           - /Common/serverssl
+                        verify_interval: 1000000
+                        external_addr: 10.100.100.101
                         policies:
-                          - /Common/header-insert
-                          - /Common/redirect
+                          - /Common/bigip-traffic
+                          - /Common/forwarded-proto
                         profiles:
-                          - /Common/http
+                          - /Common/forwarded-for
                         health_monitors:
                           - /Common/tcp_half_open
 
                       status:
-                        port: 8087
                         user: admin
                         pass: admin
                       nats:
-                        - host: local.pcfdev.io
+                        - host: 10.100.100.25
                           port: 4222
                           user: nats
-                          pass: "nats"
+                          pass: "ft_AnnyzEgIerAoyUlVAiJ05Cfcp2V7h"
 
                       logging:
                         file: /tmp/cf-bigip.ctlr.log
                         syslog: vcap.cf-bigip-ctlr
-                        level: debug
+                        level: info
                         loggregator_enabled: false
-                        metron_address:
+                        metron_address: "localhost:3457"
 
                       go_max_procs: -1
                       prune_stale_droplets_interval: 30s
@@ -45,15 +48,15 @@ applications:
                       suspend_pruning_if_nats_unavailable: false
 
                       oauth:
-                        token_endpoint: uaa.local.pcfdev.io
+                        token_endpoint: uaa.system.pcf.local
                         client_name: "gorouter"
-                        client_secret: gorouter-secret
+                        client_secret: BBuI9_PpnJ25VtAMzaszHWmLmRxjOxo_
                         port: 443
                         skip_ssl_validation: true
                         ca_certs:
 
                       routing_api:
-                        uri: http://api.local.pcfdev.io
+                        uri: http://api.system.pcf.local
                         port: 80
                         auth_disabled: false
 

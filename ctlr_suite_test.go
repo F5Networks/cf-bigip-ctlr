@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	gorouterPath string
-	oauthServer  *ghttp.Server
+	ctlrPath    string
+	oauthServer *ghttp.Server
 )
 
-func TestGorouter(t *testing.T) {
+func TestCtlr(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "CF BigIP Controller Suite")
 }
@@ -41,7 +41,7 @@ var _ = BeforeSuite(func() {
 	}
 
 	Expect(err).ToNot(HaveOccurred())
-	gorouterPath = path
+	ctlrPath = path
 	SetDefaultEventuallyTimeout(15 * time.Second)
 	SetDefaultEventuallyPollingInterval(100 * time.Millisecond)
 	SetDefaultConsistentlyDuration(1 * time.Second)

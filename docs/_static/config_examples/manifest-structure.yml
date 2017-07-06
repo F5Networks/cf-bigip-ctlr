@@ -1,0 +1,57 @@
+applications:
+  - name: cf-bigip-ctlr
+    env:
+      BIGIP_CTLR_CFG: |
+                      bigip:
+                        url: string
+                        user: string
+                        pass: string
+                        partition: list(string)
+                        balance: round-robin
+                        verify_interval: number
+                        external_addr: string
+                        ssl_profiles: list(string)
+                        policies: list(string)
+                        profiles: list(string)
+                        health_monitors: list(string)
+
+                      status:
+                        port: number
+                        user: string
+                        pass: string
+                      nats:
+                        - host: string
+                          port: number
+                          user: string
+                          pass: string
+
+                      logging:
+                        file: string
+                        syslog: string
+                        level: string
+                        loggregator_enabled: boolean
+                        metron_address: string
+
+                      go_max_procs: number
+                      prune_stale_droplets_interval: number
+                      droplet_stale_threshold: number
+                      suspend_pruning_if_nats_unavailable: boolean
+
+                      oauth:
+                        token_endpoint: string
+                        client_name: string
+                        client_secret: string
+                        port: number
+                        skip_ssl_validation: boolean
+                        ca_certs: string
+
+                      routing_api:
+                        uri: string
+                        port: number
+                        auth_disabled: boolean
+
+                      start_response_delay_interval: number
+
+                      token_fetcher_max_retries: number
+                      token_fetcher_retry_interval: number
+                      token_fetcher_expiration_buffer_time: number

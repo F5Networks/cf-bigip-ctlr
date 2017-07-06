@@ -94,6 +94,8 @@ rst_epilog = '''
 .. |attributions| raw:: html
 
     <a href="http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/%(url_version)s/_static/ATTRIBUTIONS.html">Attributions</a>
+.. |cfctlr| replace:: :code:`cf-bigip-ctlr`
+.. |cfctlr-long| replace:: F5 Cloud Foundry BIG-IP Controller
 ''' % {
     'url_version': version
 }
