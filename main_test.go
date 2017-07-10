@@ -41,11 +41,11 @@ const defaultPruneThreshold = 2
 var _ = Describe("Router Integration", func() {
 
 	var (
-		tmpdir          string
-		natsPort        uint16
-		natsRunner      *test_util.NATSRunner
-		gorouterSession *Session
-		oauthServerURL  string
+		tmpdir         string
+		natsPort       uint16
+		natsRunner     *test_util.NATSRunner
+		ctlrSession    *Session
+		oauthServerURL string
 	)
 
 	writeConfig := func(config *config.Config, cfgFile string) {
@@ -105,14 +105,14 @@ var _ = Describe("Router Integration", func() {
 		return cfg
 	}
 
-	startGorouterSession := func(cfgFile string) *Session {
-		gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-		session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+	startCtlrSession := func(cfgFile string) *Session {
+		ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+		session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 		Expect(err).ToNot(HaveOccurred())
 		var eventsSessionLogs []byte
 		Eventually(func() string {
 			logAdd, err := ioutil.ReadAll(session.Out)
-			Expect(err).ToNot(HaveOccurred(), "Gorouter session closed")
+			Expect(err).ToNot(HaveOccurred(), "ctlr session closed")
 			eventsSessionLogs = append(eventsSessionLogs, logAdd...)
 			return string(eventsSessionLogs)
 		}, 70*time.Second).Should(SatisfyAll(
@@ -121,19 +121,19 @@ var _ = Describe("Router Integration", func() {
 			ContainSubstring(`f5router-started`),
 			ContainSubstring(`f5router-driver-started`),
 		))
-		gorouterSession = session
+		ctlrSession = session
 		return session
 	}
 
-	stopGorouter := func(gorouterSession *Session) {
-		err := gorouterSession.Command.Process.Signal(syscall.SIGTERM)
+	stopCtlr := func(ctlrSession *Session) {
+		err := ctlrSession.Command.Process.Signal(syscall.SIGTERM)
 		Expect(err).ToNot(HaveOccurred())
-		Eventually(gorouterSession, 5).Should(Exit(0))
+		Eventually(ctlrSession, 5).Should(Exit(0))
 	}
 
 	BeforeEach(func() {
 		var err error
-		tmpdir, err = ioutil.TempDir("", "gorouter")
+		tmpdir, err = ioutil.TempDir("", "ctlr")
 		Expect(err).ToNot(HaveOccurred())
 
 		natsPort = test_util.NextAvailPort()
@@ -149,8 +149,8 @@ var _ = Describe("Router Integration", func() {
 
 		os.RemoveAll(tmpdir)
 
-		if gorouterSession != nil && gorouterSession.ExitCode() == -1 {
-			stopGorouter(gorouterSession)
+		if ctlrSession != nil && ctlrSession.ExitCode() == -1 {
+			stopCtlr(ctlrSession)
 		}
 	})
 
@@ -163,9 +163,9 @@ var _ = Describe("Router Integration", func() {
 			config.Logging.MetronAddress = ""
 			writeConfig(config, cfgFile)
 
-			gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-			gorouterSession, _ = Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
-			Eventually(gorouterSession, 5*time.Second).Should(Exit(1))
+			ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+			ctlrSession, _ = Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
+			Eventually(ctlrSession, 5*time.Second).Should(Exit(1))
 		})
 	})
 
@@ -174,9 +174,9 @@ var _ = Describe("Router Integration", func() {
 		cfgFile := filepath.Join(tmpdir, "config.yml")
 		createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
-		gorouterSession = startGorouterSession(cfgFile)
+		ctlrSession = startCtlrSession(cfgFile)
 
-		Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("Component Controller registered successfully"))
+		Eventually(ctlrSession.Out.Contents).Should(ContainSubstring("Component Controller registered successfully"))
 	})
 
 	It("has Nats connectivity", func() {
@@ -188,7 +188,7 @@ var _ = Describe("Router Integration", func() {
 		cfgFile := filepath.Join(tmpdir, "config.yml")
 		config := createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 
-		gorouterSession = startGorouterSession(cfgFile)
+		ctlrSession = startCtlrSession(cfgFile)
 
 		mbusClient, err := newMessageBus(config)
 		Expect(err).ToNot(HaveOccurred())
@@ -266,7 +266,7 @@ var _ = Describe("Router Integration", func() {
 			config := createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
 			config.NatsClientPingInterval = 1 * time.Second
 			writeConfig(config, cfgFile)
-			gorouterSession = startGorouterSession(cfgFile)
+			ctlrSession = startCtlrSession(cfgFile)
 
 			mbusClient, err := newMessageBus(config)
 			Expect(err).ToNot(HaveOccurred())
@@ -294,12 +294,12 @@ var _ = Describe("Router Integration", func() {
 
 			natsRunner.Stop()
 
-			Eventually(gorouterSession).Should(Say("nats-connection-disconnected"))
-			Eventually(gorouterSession, time.Second*25).Should(Say("nats-connection-still-disconnected"))
+			Eventually(ctlrSession).Should(Say("nats-connection-disconnected"))
+			Eventually(ctlrSession, time.Second*25).Should(Say("nats-connection-still-disconnected"))
 			natsRunner.Start()
-			Eventually(gorouterSession, time.Second*5).Should(Say("nats-connection-reconnected"))
-			Consistently(gorouterSession, time.Second*25).ShouldNot(Say("nats-connection-still-disconnected"))
-			Consistently(gorouterSession.ExitCode, 150*time.Second).ShouldNot(Equal(1))
+			Eventually(ctlrSession, time.Second*5).Should(Say("nats-connection-reconnected"))
+			Consistently(ctlrSession, time.Second*25).ShouldNot(Say("nats-connection-still-disconnected"))
+			Consistently(ctlrSession.ExitCode, 150*time.Second).ShouldNot(Equal(1))
 		})
 	})
 
@@ -331,7 +331,7 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		JustBeforeEach(func() {
-			gorouterSession = startGorouterSession(cfgFile)
+			ctlrSession = startCtlrSession(cfgFile)
 		})
 
 		It("fails over to second nats server before pruning", func() {
@@ -453,8 +453,8 @@ var _ = Describe("Router Integration", func() {
 				writeConfig(cfg, cfgFile)
 
 				// The process should not have any error.
-				session := startGorouterSession(cfgFile)
-				stopGorouter(session)
+				session := startCtlrSession(cfgFile)
+				stopCtlr(session)
 			})
 		})
 	})
@@ -475,9 +475,9 @@ var _ = Describe("Router Integration", func() {
 		})
 
 		It("doesn't start the route fetcher", func() {
-			session := startGorouterSession(cfgFile)
+			session := startCtlrSession(cfgFile)
 			Eventually(session).ShouldNot(Say("setting-up-routing-api"))
-			stopGorouter(session)
+			stopCtlr(session)
 		})
 
 	})
@@ -557,9 +557,9 @@ var _ = Describe("Router Integration", func() {
 				writeConfig(config, cfgFile)
 
 				// note, this will start with routing api, but will not be able to connect
-				session := startGorouterSession(cfgFile)
-				defer stopGorouter(session)
-				Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("using-noop-token-fetcher"))
+				session := startCtlrSession(cfgFile)
+				defer stopCtlr(session)
+				Eventually(ctlrSession.Out.Contents).Should(ContainSubstring("using-noop-token-fetcher"))
 			})
 		})
 
@@ -584,16 +584,16 @@ var _ = Describe("Router Integration", func() {
 				It("fetches a token from uaa", func() {
 					writeConfig(config, cfgFile)
 
-					session := startGorouterSession(cfgFile)
-					defer stopGorouter(session)
-					Eventually(gorouterSession.Out.Contents).Should(ContainSubstring("started-fetching-token"))
+					session := startCtlrSession(cfgFile)
+					defer stopCtlr(session)
+					Eventually(ctlrSession.Out.Contents).Should(ContainSubstring("started-fetching-token"))
 				})
 				It("does not exit", func() {
 					config.RouterGroupName = "router_group_name"
 					writeConfig(config, cfgFile)
 
-					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+					session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					defer session.Terminate()
 					Consistently(session, 5*time.Second).ShouldNot(Exit(1))
@@ -602,8 +602,8 @@ var _ = Describe("Router Integration", func() {
 					It("logs the router group name and the guid", func() {
 						config.RouterGroupName = "router_group_name"
 						writeConfig(config, cfgFile)
-						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+						ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+						session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 						Expect(err).ToNot(HaveOccurred())
 						expectedLog := `retrieved-router-group","source":"cf-bigip-ctlr.stdout","data":{"router-group":"router_group_name","router-group-guid":"abc123"}`
 						Eventually(session).Should(Say(expectedLog))
@@ -613,8 +613,8 @@ var _ = Describe("Router Integration", func() {
 							config.RouterGroupName = "invalid_router_group"
 							writeConfig(config, cfgFile)
 
-							gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-							session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+							ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+							session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 							Expect(err).ToNot(HaveOccurred())
 							defer session.Terminate()
 							Eventually(session, 30*time.Second).Should(Say("router group not found"))
@@ -635,8 +635,8 @@ var _ = Describe("Router Integration", func() {
 							config.RouterGroupName = "router_group_name"
 							writeConfig(config, cfgFile)
 
-							gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-							session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+							ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+							session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 							Expect(err).ToNot(HaveOccurred())
 							defer session.Terminate()
 							Eventually(session, 30*time.Second).Should(Say("expected-router-group-type-http"))
@@ -647,8 +647,8 @@ var _ = Describe("Router Integration", func() {
 				Context("when a router group is not provided", func() {
 					It("logs the router group name and guid as '-'", func() {
 						writeConfig(config, cfgFile)
-						gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-						session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+						ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+						session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 						Expect(err).ToNot(HaveOccurred())
 						expectedLog := `retrieved-router-group","source":"cf-bigip-ctlr.stdout","data":{"router-group":"-","router-group-guid":"-"}`
 						Eventually(session).Should(Say(expectedLog))
@@ -657,11 +657,11 @@ var _ = Describe("Router Integration", func() {
 			})
 
 			Context("when the uaa is not available", func() {
-				It("gorouter exits with non-zero code", func() {
+				It("ctlr exits with non-zero code", func() {
 					writeConfig(config, cfgFile)
 
-					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+					session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					defer session.Terminate()
 					Eventually(session, 30*time.Second).Should(Say("unable-to-fetch-token"))
@@ -673,12 +673,12 @@ var _ = Describe("Router Integration", func() {
 				BeforeEach(func() {
 					config.OAuth.TokenEndpoint, config.OAuth.Port = hostnameAndPort(oauthServerURL)
 				})
-				It("gorouter exits with non-zero code", func() {
+				It("ctlr exits with non-zero code", func() {
 					routingApiServer.Close()
 					writeConfig(config, cfgFile)
 
-					gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-					session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+					ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+					session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 					Expect(err).ToNot(HaveOccurred())
 					defer session.Terminate()
 					Eventually(session, 30*time.Second).Should(Say("routing-api-connection-failed"))
@@ -692,8 +692,8 @@ var _ = Describe("Router Integration", func() {
 				config.OAuth.Port = -1
 				writeConfig(config, cfgFile)
 
-				gorouterCmd := exec.Command(gorouterPath, "-c", cfgFile)
-				session, err := Start(gorouterCmd, GinkgoWriter, GinkgoWriter)
+				ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+				session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
 				Expect(err).ToNot(HaveOccurred())
 				defer session.Terminate()
 				Eventually(session, 30*time.Second).Should(Say("tls-not-enabled"))
