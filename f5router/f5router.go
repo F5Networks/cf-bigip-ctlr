@@ -59,15 +59,15 @@ func (r rules) Len() int           { return len(r) }
 func (r rules) Less(i, j int) bool { return r[i].FullURI < r[j].FullURI }
 func (r rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 
-func makePoolName(uri string) string {
+func makeObjectName(uri string) string {
 	var name string
 	if strings.HasPrefix(uri, "*.") {
-		name = strings.TrimPrefix(uri, "*.")
+		name = "cf-" + strings.TrimPrefix(uri, "*.")
 	} else {
 		sum := sha256.Sum256([]byte(uri))
 		index := strings.Index(uri, ".")
 
-		name = fmt.Sprintf("%s-%x", uri[:index], sum[:8])
+		name = fmt.Sprintf("cf-%s-%x", uri[:index], sum[:8])
 	}
 	return name
 }
@@ -282,7 +282,7 @@ func (r *F5Router) createPools(rs *resources, ru routeUpdate, wg *sync.WaitGroup
 			addrs = append(addrs, e.CanonicalAddr())
 		})
 		uri := t.ToPath()
-		p := r.makePool(makePoolName(uri), uri, addrs...)
+		p := r.makePool(makeObjectName(uri), uri, addrs...)
 		rs.Pools = append(rs.Pools, p)
 	})
 }
@@ -578,7 +578,7 @@ func (r *F5Router) RouteUpdate(
 	)
 
 	ru := routeUpdate{
-		Name: makePoolName(uri.String()),
+		Name: makeObjectName(uri.String()),
 		URI:  uri,
 		R:    reg,
 		Op:   op,
