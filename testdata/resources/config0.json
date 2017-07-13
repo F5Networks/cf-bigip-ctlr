@@ -3,369 +3,254 @@
     "url": "http://example.com",
     "username": "admin",
     "password": "pass",
-    "partitions": [
-      "cf"
-    ]
+    "partitions": ["cf"]
   },
   "global": {
     "log-level": "debug",
     "verify-interval": 30
   },
   "resources": {
-    "virtualServers": [
-      {
-        "name": "routing-vip-http",
-        "pool": "",
-        "partition": "cf",
-        "mode": "http",
-        "virtualAddress": {
-          "bindAddr": "127.0.0.1",
-          "port": 80
-        },
-        "policies": [
-          {
-            "name": "cf-routing-policy",
-            "partition": "cf"
-          }
-        ],
-        "profiles": [
-          {
-            "name": "http",
-            "partition": "Common"
-          }
-        ]
-      }
-    ],
-    "pools": [
-      {
-        "name": "foo-e500900501f76ce8",
-        "partition": "cf",
-        "serviceName": "foo.cf.com",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.0.1:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
+    "virtualServers": [{
+      "name": "routing-vip-http",
+      "pool": "",
+      "partition": "cf",
+      "mode": "http",
+      "virtualAddress": {
+        "bindAddr": "127.0.0.1",
+        "port": 80
       },
-      {
-        "name": "baz-9a96ddcfe07bb46e",
-        "partition": "cf",
-        "serviceName": "baz.cf.com",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.2.1:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
-      },
-      {
-        "name": "baz-69cf12df3b85f455",
-        "partition": "cf",
-        "serviceName": "baz.cf.com/segment1",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.3.1:80",
-          "127.0.3.2:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
-      },
-      {
-        "name": "baz-beac6f8bec5a4446",
-        "partition": "cf",
-        "serviceName": "baz.cf.com/segment1/segment2/segment3",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.4.1:80",
-          "127.0.4.2:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
-      },
-      {
-        "name": "bar-d21aa8a505891ac9",
-        "partition": "cf",
-        "serviceName": "bar.cf.com",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.1.1:80",
-          "127.0.1.2:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
-      },
-      {
-        "name": "cf.com",
-        "partition": "cf",
-        "serviceName": "*.cf.com",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.5.1:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
-      },
-      {
-        "name": "foo.cf.com",
-        "partition": "cf",
-        "serviceName": "*.foo.cf.com",
-        "servicePort": -1,
-        "balance": "round-robin",
-        "poolMemberAddrs": [
-          "127.0.6.1:80"
-        ],
-        "monitor": [
-          "/Common/tcp_half_open"
-        ]
-      }
-    ],
-    "l7Policies": [
-      {
-        "controls": [
-          "forwarding"
-        ],
-        "legacy": true,
+      "policies": [{
         "name": "cf-routing-policy",
-        "partition": "cf",
-        "requires": [
-          "http"
-        ],
-        "rules": [
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/foo-e500900501f76ce8",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "equals": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  "foo.cf.com"
-                ]
-              }
-            ],
-            "name": "foo-e500900501f76ce8",
-            "ordinal": 0
-          },
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/baz-beac6f8bec5a4446",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "equals": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  "baz.cf.com"
-                ]
-              },
-              {
-                "equals": true,
-                "httpUri": true,
-                "pathSegment": true,
-                "name": "1",
-                "index": 1,
-                "request": true,
-                "values": [
-                  "segment1"
-                ]
-              },
-              {
-                "equals": true,
-                "httpUri": true,
-                "pathSegment": true,
-                "name": "2",
-                "index": 2,
-                "request": true,
-                "values": [
-                  "segment2"
-                ]
-              },
-              {
-                "equals": true,
-                "httpUri": true,
-                "pathSegment": true,
-                "name": "3",
-                "index": 3,
-                "request": true,
-                "values": [
-                  "segment3"
-                ]
-              }
-            ],
-            "name": "baz-beac6f8bec5a4446",
-            "ordinal": 1
-          },
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/baz-69cf12df3b85f455",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "equals": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  "baz.cf.com"
-                ]
-              },
-              {
-                "equals": true,
-                "httpUri": true,
-                "pathSegment": true,
-                "name": "1",
-                "index": 1,
-                "request": true,
-                "values": [
-                  "segment1"
-                ]
-              }
-            ],
-            "name": "baz-69cf12df3b85f455",
-            "ordinal": 2
-          },
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/baz-9a96ddcfe07bb46e",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "equals": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  "baz.cf.com"
-                ]
-              }
-            ],
-            "name": "baz-9a96ddcfe07bb46e",
-            "ordinal": 3
-          },
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/bar-d21aa8a505891ac9",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "equals": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  "bar.cf.com"
-                ]
-              }
-            ],
-            "name": "bar-d21aa8a505891ac9",
-            "ordinal": 4
-          },
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/foo.cf.com",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "endsWith": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  ".foo.cf.com"
-                ]
-              }
-            ],
-            "name": "foo.cf.com",
-            "ordinal": 5
-          },
-          {
-            "actions": [
-              {
-                "forward": true,
-                "name": "0",
-                "pool": "/cf/cf.com",
-                "request": true
-              }
-            ],
-            "conditions": [
-              {
-                "endsWith": true,
-                "host": true,
-                "httpHost": true,
-                "name": "0",
-                "index": 0,
-                "request": true,
-                "values": [
-                  ".cf.com"
-                ]
-              }
-            ],
-            "name": "cf.com",
-            "ordinal": 6
-          }
-        ],
-        "strategy": "/Common/first-match"
-      }
-    ]
+        "partition": "cf"
+      }],
+      "profiles": [{
+        "name": "http",
+        "partition": "Common"
+      }]
+    }],
+    "pools": [{
+      "name": "cf-foo-e500900501f76ce8",
+      "partition": "cf",
+      "serviceName": "foo.cf.com",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.0.1:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }, {
+      "name": "cf-baz-9a96ddcfe07bb46e",
+      "partition": "cf",
+      "serviceName": "baz.cf.com",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.2.1:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }, {
+      "name": "cf-baz-69cf12df3b85f455",
+      "partition": "cf",
+      "serviceName": "baz.cf.com/segment1",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.3.1:80", "127.0.3.2:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }, {
+      "name": "cf-baz-beac6f8bec5a4446",
+      "partition": "cf",
+      "serviceName": "baz.cf.com/segment1/segment2/segment3",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.4.1:80", "127.0.4.2:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }, {
+      "name": "cf-bar-d21aa8a505891ac9",
+      "partition": "cf",
+      "serviceName": "bar.cf.com",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.1.1:80", "127.0.1.2:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }, {
+      "name": "cf-cf.com",
+      "partition": "cf",
+      "serviceName": "*.cf.com",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.5.1:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }, {
+      "name": "cf-foo.cf.com",
+      "partition": "cf",
+      "serviceName": "*.foo.cf.com",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["127.0.6.1:80"],
+      "monitor": ["/Common/tcp_half_open"]
+    }],
+    "l7Policies": [{
+      "controls": ["forwarding"],
+      "legacy": true,
+      "name": "cf-routing-policy",
+      "partition": "cf",
+      "requires": ["http"],
+      "rules": [{
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-foo-e500900501f76ce8",
+          "request": true
+        }],
+        "conditions": [{
+          "equals": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": ["foo.cf.com"]
+        }],
+        "name": "cf-foo-e500900501f76ce8",
+        "ordinal": 0
+      }, {
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-baz-beac6f8bec5a4446",
+          "request": true
+        }],
+        "conditions": [{
+          "equals": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": ["baz.cf.com"]
+        }, {
+          "equals": true,
+          "httpUri": true,
+          "pathSegment": true,
+          "name": "1",
+          "index": 1,
+          "request": true,
+          "values": ["segment1"]
+        }, {
+          "equals": true,
+          "httpUri": true,
+          "pathSegment": true,
+          "name": "2",
+          "index": 2,
+          "request": true,
+          "values": ["segment2"]
+        }, {
+          "equals": true,
+          "httpUri": true,
+          "pathSegment": true,
+          "name": "3",
+          "index": 3,
+          "request": true,
+          "values": ["segment3"]
+        }],
+        "name": "cf-baz-beac6f8bec5a4446",
+        "ordinal": 1
+      }, {
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-baz-69cf12df3b85f455",
+          "request": true
+        }],
+        "conditions": [{
+          "equals": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": ["baz.cf.com"]
+        }, {
+          "equals": true,
+          "httpUri": true,
+          "pathSegment": true,
+          "name": "1",
+          "index": 1,
+          "request": true,
+          "values": ["segment1"]
+        }],
+        "name": "cf-baz-69cf12df3b85f455",
+        "ordinal": 2
+      }, {
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-baz-9a96ddcfe07bb46e",
+          "request": true
+        }],
+        "conditions": [{
+          "equals": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": ["baz.cf.com"]
+        }],
+        "name": "cf-baz-9a96ddcfe07bb46e",
+        "ordinal": 3
+      }, {
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-bar-d21aa8a505891ac9",
+          "request": true
+        }],
+        "conditions": [{
+          "equals": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": ["bar.cf.com"]
+        }],
+        "name": "cf-bar-d21aa8a505891ac9",
+        "ordinal": 4
+      }, {
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-foo.cf.com",
+          "request": true
+        }],
+        "conditions": [{
+          "endsWith": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": [".foo.cf.com"]
+        }],
+        "name": "cf-foo.cf.com",
+        "ordinal": 5
+      }, {
+        "actions": [{
+          "forward": true,
+          "name": "0",
+          "pool": "/cf/cf-cf.com",
+          "request": true
+        }],
+        "conditions": [{
+          "endsWith": true,
+          "host": true,
+          "httpHost": true,
+          "name": "0",
+          "index": 0,
+          "request": true,
+          "values": [".cf.com"]
+        }],
+        "name": "cf-cf.com",
+        "ordinal": 6
+      }],
+      "strategy": "/Common/first-match"
+    }]
   }
 }
