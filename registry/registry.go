@@ -57,7 +57,7 @@ func (op Operation) String() string {
 
 // Listener optional listener for route registry updates
 type Listener interface {
-	RouteUpdate(op Operation, r Registry, uri route.Uri)
+	RouteUpdate(op Operation, r Registry, uri route.Uri, appID string)
 }
 
 type PruneStatus int
@@ -129,7 +129,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
 
 		if nil != r.listener {
-			r.listener.RouteUpdate(Add, r, routekey)
+			r.listener.RouteUpdate(Add, r, routekey, endpoint.ApplicationId)
 		}
 	} else {
 		if nil == pool.FindById(endpoint.CanonicalAddr()) {
@@ -139,7 +139,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	endpointAdded := pool.Put(endpoint)
 	if endpointAdded && updateRoute && nil != r.listener {
-		r.listener.RouteUpdate(Update, r, routekey)
+		r.listener.RouteUpdate(Update, r, routekey, endpoint.ApplicationId)
 	}
 
 	r.timeOfLastUpdate = t
@@ -195,9 +195,9 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 		if endpointRemoved {
 			if nil != r.listener {
 				if emptiedPool {
-					r.listener.RouteUpdate(Remove, r, uri)
+					r.listener.RouteUpdate(Remove, r, uri, endpoint.ApplicationId)
 				} else {
-					r.listener.RouteUpdate(Update, r, uri)
+					r.listener.RouteUpdate(Update, r, uri, endpoint.ApplicationId)
 				}
 			}
 
@@ -282,9 +282,9 @@ func (r *RouteRegistry) StartPruningCycle() {
 			for {
 				select {
 				case <-r.ticker.C:
-					r.logger.Info("start-pruning-routes")
+					r.logger.Debug("start-pruning-routes")
 					r.pruneStaleDroplets()
-					r.logger.Info("finished-pruning-routes")
+					r.logger.Debug("finished-pruning-routes")
 					msSinceLastUpdate := uint64(time.Since(r.TimeOfLastUpdate()) / time.Millisecond)
 					r.reporter.CaptureRouteStats(r.NumUris(), msSinceLastUpdate)
 				}
@@ -362,9 +362,9 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		if len(endpoints) > 0 {
 			if nil != r.listener {
 				if nil == t.Pool {
-					r.listener.RouteUpdate(Remove, r, route.Uri(t.ToPath()))
+					r.listener.RouteUpdate(Remove, r, route.Uri(t.ToPath()), "")
 				} else {
-					r.listener.RouteUpdate(Update, r, route.Uri(t.ToPath()))
+					r.listener.RouteUpdate(Update, r, route.Uri(t.ToPath()), "")
 				}
 			}
 			addresses := []string{}

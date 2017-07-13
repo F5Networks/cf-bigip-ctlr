@@ -74,6 +74,7 @@ type (
 		Balance         string   `json:"balance"`
 		PoolMemberAddrs []string `json:"poolMemberAddrs"`
 		MonitorNames    []string `json:"monitor"`
+		Description     string   `json:"description"`
 	}
 
 	// backend health monitor
@@ -107,11 +108,12 @@ type (
 	}
 
 	rule struct {
-		FullURI    string       `json:"-"`
-		Actions    []*action    `json:"actions"`
-		Conditions []*condition `json:"conditions"`
-		Name       string       `json:"name"`
-		Ordinal    int          `json:"ordinal"`
+		FullURI     string       `json:"-"`
+		Actions     []*action    `json:"actions"`
+		Conditions  []*condition `json:"conditions"`
+		Name        string       `json:"name"`
+		Ordinal     int          `json:"ordinal"`
+		Description string       `json:"description"`
 	}
 
 	policy struct {
@@ -145,9 +147,10 @@ type (
 
 	vsType      int
 	routeUpdate struct {
-		Name string
-		URI  route.Uri
-		R    registry.Registry
-		Op   registry.Operation
+		Name  string
+		URI   route.Uri
+		R     registry.Registry
+		Op    registry.Operation
+		AppID string
 	}
 )

@@ -413,17 +413,21 @@ def create_ltm_config_kubernetes(bigip, config):
             balance = pool['balance']
         new_pool['loadBalancingMode'] = balance
         new_pool['partition'] = pool['partition']
-        if 'poolMemberAddrs' in pool:
+        if 'poolMemberAddrs' in pool and pool['poolMemberAddrs'] is not None:
             for member in pool['poolMemberAddrs']:
                 members.update({member: {
                     'state': 'user-up',
                     'session': 'user-enabled'
                 }})
         else:
-            log.warning(
+            log.info(
                 'Pool "{}" has service "{}", which is empty - '
                 'configuring 0 pool members.'.format(
                     pname, pool['serviceName']))
+
+        if 'description' in pool:
+            new_pool['description'] = pool['description']
+
         new_pool['members'] = members
         configuration['pools'].append(new_pool)
 

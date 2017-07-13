@@ -84,6 +84,17 @@ func fixupNames(names []string) []string {
 	return fixed
 }
 
+// Make the description that gets applied to the pool and rule to translate
+// from the hashed name to the associated uri and app GUID in CF
+func makeDescription(uri string, appID string) string {
+	s := "route: " + uri
+	if appID == "" {
+		return s
+	}
+	s += " - App GUID: " + appID
+	return s
+}
+
 // NewF5Router create the F5Router route controller
 func NewF5Router(
 	logger logger.Logger,
@@ -278,11 +289,15 @@ func (r *F5Router) createPools(rs *resources, ru routeUpdate, wg *sync.WaitGroup
 
 	ru.R.WalkNodesWithPool(func(t *container.Trie) {
 		var addrs []string
+		var appID string
 		t.Pool.Each(func(e *route.Endpoint) {
 			addrs = append(addrs, e.CanonicalAddr())
+			// This will set appID for each endpoint under the node but will always
+			// be the same, ApplicationId is only available on the endpoint
+			appID = e.ApplicationId
 		})
 		uri := t.ToPath()
-		p := r.makePool(makeObjectName(uri), uri, addrs...)
+		p := r.makePool(makeObjectName(uri), uri, appID, addrs...)
 		rs.Pools = append(rs.Pools, p)
 	})
 }
@@ -382,6 +397,7 @@ func (r *F5Router) process() bool {
 func (r *F5Router) makePool(
 	name string,
 	uri string,
+	appID string,
 	addrs ...string,
 ) *pool {
 	prefixHealthMonitors := fixupNames(r.c.BigIP.HealthMonitors)
@@ -394,6 +410,7 @@ func (r *F5Router) makePool(
 		ServicePort:     -1, // unused
 		PoolMemberAddrs: addrs,
 		MonitorNames:    prefixHealthMonitors,
+		Description:     makeDescription(uri, appID),
 	}
 }
 
@@ -458,14 +475,25 @@ func (r *F5Router) makeRouteRule(ru routeUpdate) (*rule, error) {
 		}
 	}
 
+	uriString := ru.URI.String()
+
 	rl := rule{
-		FullURI:    ru.URI.String(),
-		Actions:    []*action{&a},
-		Conditions: c,
-		Name:       ru.Name,
+		FullURI:     uriString,
+		Actions:     []*action{&a},
+		Conditions:  c,
+		Name:        ru.Name,
+		Description: makeDescription(uriString, ru.AppID),
 	}
 
+	r.logger.Info(
+		"f5router-created-BIG-IP-object",
+		zap.String("rule-name", ru.Name),
+		zap.String("pool-name", ru.Name),
+		zap.String("cf-route", uriString),
+	)
+
 	r.logger.Debug("f5router-rule-create", zap.Object("rule", rl))
+
 	return &rl, nil
 }
 
@@ -563,6 +591,7 @@ func (r *F5Router) RouteUpdate(
 	op registry.Operation,
 	reg registry.Registry,
 	uri route.Uri,
+	appID string,
 ) {
 	if 0 == len(uri) {
 		r.logger.Warn("f5router-skipping-update",
@@ -578,10 +607,11 @@ func (r *F5Router) RouteUpdate(
 	)
 
 	ru := routeUpdate{
-		Name: makeObjectName(uri.String()),
-		URI:  uri,
-		R:    reg,
-		Op:   op,
+		Name:  makeObjectName(uri.String()),
+		URI:   uri,
+		R:     reg,
+		Op:    op,
+		AppID: appID,
 	}
 	r.queue.Add(ru)
 }
