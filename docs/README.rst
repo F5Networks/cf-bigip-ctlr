@@ -26,7 +26,7 @@ Features
 Guides
 ------
 
-See the `F5 Cloud Foundry Container Connector user documentation </containers/v1/cloudfoundry>`_.
+See the `F5 Cloud Foundry Container Connector user documentation </containers/v1/cloudfoundry/index.html>`_.
 
 Overview
 --------
