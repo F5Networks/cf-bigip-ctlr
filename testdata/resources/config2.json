@@ -29,13 +29,14 @@
       }]
     }],
     "pools": [{
-      "name": "cf-cf.com",
+      "name": "cf-qux-ac504dcd7f58634d",
       "partition": "cf",
-      "serviceName": "*.cf.com",
+      "serviceName": "qux.cf.com",
       "servicePort": -1,
       "balance": "round-robin",
-      "poolMemberAddrs": ["127.0.5.1:80"],
-      "monitor": ["/Common/tcp_half_open"]
+      "poolMemberAddrs": ["127.0.7.1:80"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route: qux.cf.com - App GUID: 1"
     }, {
       "name": "cf-bar-d21aa8a505891ac9",
       "partition": "cf",
@@ -43,7 +44,8 @@
       "servicePort": -1,
       "balance": "round-robin",
       "poolMemberAddrs": ["127.0.1.2:80"],
-      "monitor": ["/Common/tcp_half_open"]
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route: bar.cf.com - App GUID: 1"
     }, {
       "name": "cf-baz-9a96ddcfe07bb46e",
       "partition": "cf",
@@ -51,7 +53,8 @@
       "servicePort": -1,
       "balance": "round-robin",
       "poolMemberAddrs": ["127.0.2.1:80", "127.0.2.2:80"],
-      "monitor": ["/Common/tcp_half_open"]
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route: baz.cf.com - App GUID: 1"
     }, {
       "name": "cf-baz-69cf12df3b85f455",
       "partition": "cf",
@@ -59,7 +62,8 @@
       "servicePort": -1,
       "balance": "round-robin",
       "poolMemberAddrs": ["127.0.3.1:80"],
-      "monitor": ["/Common/tcp_half_open"]
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route: baz.cf.com/segment1 - App GUID: 1"
     }, {
       "name": "cf-baz-beac6f8bec5a4446",
       "partition": "cf",
@@ -67,15 +71,17 @@
       "servicePort": -1,
       "balance": "round-robin",
       "poolMemberAddrs": ["127.0.4.1:80", "127.0.4.2:80"],
-      "monitor": ["/Common/tcp_half_open"]
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route: baz.cf.com/segment1/segment2/segment3 - App GUID: 1"
     }, {
-      "name": "cf-qux-ac504dcd7f58634d",
+      "name": "cf-cf.com",
       "partition": "cf",
-      "serviceName": "qux.cf.com",
+      "serviceName": "*.cf.com",
       "servicePort": -1,
       "balance": "round-robin",
-      "poolMemberAddrs": ["127.0.7.1:80"],
-      "monitor": ["/Common/tcp_half_open"]
+      "poolMemberAddrs": ["127.0.5.1:80"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route: *.cf.com - App GUID: 1"
     }],
     "l7Policies": [{
       "controls": ["forwarding"],
@@ -100,7 +106,8 @@
           "values": ["qux.cf.com"]
         }],
         "name": "cf-qux-ac504dcd7f58634d",
-        "ordinal": 0
+        "ordinal": 0,
+        "description": "route: qux.cf.com - App GUID: 1"
       }, {
         "actions": [{
           "forward": true,
@@ -142,7 +149,8 @@
           "values": ["segment3"]
         }],
         "name": "cf-baz-beac6f8bec5a4446",
-        "ordinal": 1
+        "ordinal": 1,
+        "description": "route: baz.cf.com/segment1/segment2/segment3 - App GUID: 1"
       }, {
         "actions": [{
           "forward": true,
@@ -168,7 +176,8 @@
           "values": ["segment1"]
         }],
         "name": "cf-baz-69cf12df3b85f455",
-        "ordinal": 2
+        "ordinal": 2,
+        "description": "route: baz.cf.com/segment1 - App GUID: 1"
       }, {
         "actions": [{
           "forward": true,
@@ -186,7 +195,8 @@
           "values": ["baz.cf.com"]
         }],
         "name": "cf-baz-9a96ddcfe07bb46e",
-        "ordinal": 3
+        "ordinal": 3,
+        "description": "route: baz.cf.com - App GUID: 1"
       }, {
         "actions": [{
           "forward": true,
@@ -204,7 +214,8 @@
           "values": ["bar.cf.com"]
         }],
         "name": "cf-bar-d21aa8a505891ac9",
-        "ordinal": 4
+        "ordinal": 4,
+        "description": "route: bar.cf.com - App GUID: 1"
       }, {
         "actions": [{
           "forward": true,
@@ -222,7 +233,8 @@
           "values": [".cf.com"]
         }],
         "name": "cf-cf.com",
-        "ordinal": 5
+        "ordinal": 5,
+        "description": "route: *.cf.com - App GUID: 1"
       }],
       "strategy": "/Common/first-match"
     }]
