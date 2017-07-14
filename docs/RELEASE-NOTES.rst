@@ -4,8 +4,8 @@ Release Notes for Cloud Foundry BIG-IP Controller
 v1.0.0-beta.1
 -------------
 
-Capabilities
-````````````
+Added Functionality
+```````````````````
 
 - User can specify their own custom policy, profile or health monitor to associate with the objects created on the BIG-IP
 - Manages the following LTM resources for the BIG-IP partition
