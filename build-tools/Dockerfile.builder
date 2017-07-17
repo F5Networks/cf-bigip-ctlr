@@ -49,6 +49,7 @@ RUN apk add --no-cache \
 		git \
 		make \
 		musl-dev \
+		rsync \
 		su-exec && \
 	pip install setuptools flake8 && \
 	pip install -r /tmp/cf-build-requirements.txt && \
