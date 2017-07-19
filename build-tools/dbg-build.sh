@@ -13,6 +13,4 @@ BUILD_VARIANT_FLAGS="-race"
 
 go_install $(all_pkgs)
 
-for pkg in $(all_pkgs); do
-  test_pkg_profile "$pkg"
-done
+ginkgo_test_with_profile
