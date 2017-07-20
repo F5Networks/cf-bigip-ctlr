@@ -1,5 +1,5 @@
-F5 Cloud Foundry BIG-IP Controller
-==================================
+F5 BIG-IP Controller for Cloud Foundry
+======================================
 
 .. toctree::
     :hidden:
@@ -26,7 +26,7 @@ Features
 Guides
 ------
 
-See the `F5 Cloud Foundry Container Connector user documentation </containers/v1/cloudfoundry/index.html>`_.
+See the `F5 Container Connector for Cloud Foundry user documentation </containers/v1/cloudfoundry/index.html>`_.
 
 Overview
 --------
