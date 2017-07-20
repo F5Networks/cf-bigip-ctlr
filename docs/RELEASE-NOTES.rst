@@ -1,5 +1,5 @@
-Release Notes for Cloud Foundry BIG-IP Controller
-=================================================
+Release Notes for BIG-IP Controller for Cloud Foundry
+=====================================================
 
 v1.0.0-beta.1
 -------------
