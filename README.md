@@ -1,5 +1,5 @@
-F5 Cloud Foundry BIG-IP Controller
-==================================
+F5 BIG-IP Controller for Cloud Foundry
+======================================
 
 The F5 BIG-IP Controller for [Cloud Foundry](http://cloudfoundry.org) makes the F5 BIG-IP
 [Local Traffic Manager](<https://f5.com/products/big-ip/local-traffic-manager-ltm)
@@ -9,10 +9,10 @@ Documentation
 -------------
 
 For instructions on how to use this component, use the
-[F5 Cloud Foundry BIG-IP Controller docs](http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/latest/).
+[F5 BIG-IP Controller for Cloud Foundry docs](http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/latest/).
 
 For guides on this and other solutions for Cloud Foundry, see the
-[F5 Cloud Foundry Solution Guides](http://clouddocs.f5.com/containers/latest/cloudfoundry).
+[F5 Solution Guides for Cloud Foundry](http://clouddocs.f5.com/containers/latest/cloudfoundry).
 
 Running
 -------

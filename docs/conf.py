@@ -69,7 +69,7 @@ source_encoding = 'utf-8-sig'
 master_doc = 'index'
 
 # General information about the project.
-project = u'F5 Cloud Foundry BIG-IP Controller'
+project = u'F5 BIG-IP Controller for Cloud Foundry'
 copyright = u'2017 F5 Networks Inc'
 author = u'F5 Networks'
 
@@ -95,7 +95,7 @@ rst_epilog = '''
 
     <a href="http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/%(url_version)s/_static/ATTRIBUTIONS.html">Attributions</a>
 .. |cfctlr| replace:: :code:`cf-bigip-ctlr`
-.. |cfctlr-long| replace:: F5 Cloud Foundry BIG-IP Controller
+.. |cfctlr-long| replace:: F5 BIG-IP Controller for Cloud Foundry
 ''' % {
     'url_version': version
 }
@@ -194,7 +194,7 @@ html_title = "{} {}".format(project, version)
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 #
-#html_short_title = u'F5 Cloud Foundry BIG-IP Controller'
+#html_short_title = u'F5 BIG-IP Controller for Cloud Foundry'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -319,7 +319,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'F5 Cloud Foundry BIG-IP Controller.tex',
-     u'F5 Cloud Foundry BIG-IP Controller - Documentation',
+     u'F5 BIG-IP Controller for Cloud Foundry - Documentation',
      'F5 Networks', 'manual'),
 ]
 
@@ -369,8 +369,8 @@ latex_toplevel_sectioning = 'section'
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'F5 Cloud Foundry BIG-IP Controller',
-     u'F5 Cloud Foundry BIG-IP Controller - Documentation',
+    (master_doc, 'F5 BIG-IP Controller for Cloud Foundry',
+     u'F5 BIG-IP Controller for Cloud Foundry - Documentation',
      [author], 1)
 ]
 
@@ -385,9 +385,9 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'F5 Cloud Foundry BIG-IP Controller',
-     u'F5 Cloud Foundry BIG-IP Controller Documentation',
-     author, 'F5 Cloud Foundry BIG-IP Controller', 'manual'),
+    (master_doc, 'F5 BIG-IP Controller for Cloud Foundry',
+     u'F5 BIG-IP Controller for Cloud Foundry Documentation',
+     author, 'F5 BIG-IP Controller for Cloud Foundry', 'manual'),
 ]
 
 # Documents to append as an appendix to all manuals.
