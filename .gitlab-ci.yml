@@ -78,14 +78,14 @@ dockerize:
 
 
 Publish docs to internet:
-   # Publish ONLY 1.0-stable to the internet.
+   # Publish branch to the internet.
    image: docker-registry.pdbld.f5net.com/tools/containthedocs:master
    stage: deploy
    tags:
     - docker
    only:
-    - 1.0-stable@velcro/cf-bigip-ctlr
+    - 1.0.0-beta.1@velcro/cf-bigip-ctlr
    dependencies:
      - prod build
    script:
-     - publish-product-docs-to-prod connectors/cf-bigip-ctlr v1.0
+       - publish-product-docs-to-prod connectors/cf-bigip-ctlr v1.0-beta
