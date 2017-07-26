@@ -13,8 +13,34 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const LOAD_BALANCE_RR string = "round-robin"
-const LOAD_BALANCE_LC string = "least-connection"
+// RoutingMode of controller
+type RoutingMode int
+
+const (
+	// TCP only routing mode
+	TCP RoutingMode = iota
+	// HTTP only routing mode
+	HTTP
+	// all for TCP and HTTP
+	all
+)
+
+func (rm RoutingMode) String() string {
+	switch rm {
+	case TCP:
+		return "tcp"
+	case HTTP:
+		return "http"
+	case all:
+		return "all"
+	}
+	return "Unknown"
+}
+
+const (
+	LOAD_BALANCE_RR string = "round-robin"
+	LOAD_BALANCE_LC string = "least-connection"
+)
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 
@@ -150,6 +176,8 @@ type Config struct {
 	StartResponseDelayInterval      time.Duration `yaml:"start_response_delay_interval"`
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
+	RouteMode                       string        `yaml:"route_mode"`
+	RoutingMode                     RoutingMode
 
 	DrainWait       time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout    time.Duration `yaml:"drain_timeout,omitempty"`
@@ -204,6 +232,7 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
+	RouteMode: HTTP.String(),
 
 	LoadBalance: LOAD_BALANCE_RR,
 
@@ -275,6 +304,28 @@ func (c *Config) Process() {
 
 	if c.RouterGroupName != "" && !c.RoutingApiEnabled() {
 		errMsg := fmt.Sprintf("Routing API must be enabled to assign Router Group")
+		panic(errMsg)
+	}
+
+	switch c.RouteMode {
+	case "http":
+		c.RoutingMode = HTTP
+	case "tcp":
+		c.RoutingMode = TCP
+	case "all":
+		c.RoutingMode = all
+	default:
+		errMsg := fmt.Sprintf("Invalid Router Mode set %s. Allowed values are 'tcp', 'http', and 'all'.", c.RouteMode)
+		panic(errMsg)
+	}
+
+	if (c.RoutingMode == all) && !c.RoutingApiEnabled() {
+		c.RoutingMode = HTTP
+		fmt.Print("Route mode changed from 'all' to 'HTTP', Routing API is disabled")
+	}
+
+	if (c.RoutingMode == TCP) && !c.RoutingApiEnabled() {
+		errMsg := fmt.Sprintf("Routing API must be enable for TCP only route mode")
 		panic(errMsg)
 	}
 }

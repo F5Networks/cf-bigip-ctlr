@@ -1,4 +1,4 @@
-package route_fetcher_test
+package routefetcher_test
 
 import (
 	"errors"
@@ -9,7 +9,7 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 	testRegistry "github.com/F5Networks/cf-bigip-ctlr/registry/fakes"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
-	. "github.com/F5Networks/cf-bigip-ctlr/route_fetcher"
+	. "github.com/F5Networks/cf-bigip-ctlr/routefetcher"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/clock/fakeclock"
@@ -39,6 +39,7 @@ var _ = Describe("RouteFetcher", func() {
 		uaaClient   *testUaaClient.FakeClient
 		registry    *testRegistry.FakeRegistry
 		fetcher     *RouteFetcher
+		routeClient RouteClient
 		logger      logger.Logger
 		client      *fake_routing_api.FakeClient
 		eventSource *fake_routing_api.FakeEventSource
@@ -86,7 +87,8 @@ var _ = Describe("RouteFetcher", func() {
 		}
 
 		clock = fakeclock.NewFakeClock(time.Now())
-		fetcher = NewRouteFetcher(logger, uaaClient, registry, cfg, client, retryInterval, clock)
+		routeClient = NewHTTPFetcher(logger, uaaClient, client, registry)
+		fetcher = NewRouteFetcher(logger, uaaClient, cfg, client, retryInterval, clock, routeClient)
 
 	})
 
@@ -134,7 +136,7 @@ var _ = Describe("RouteFetcher", func() {
 		It("updates the route registry", func() {
 			client.RoutesReturns(response, nil)
 
-			err := fetcher.FetchRoutes()
+			err := routeClient.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(registry.RegisterCallCount()).To(Equal(3))
@@ -159,7 +161,7 @@ var _ = Describe("RouteFetcher", func() {
 		It("uses cache when fetching token from UAA", func() {
 			client.RoutesReturns(response, nil)
 
-			err := fetcher.FetchRoutes()
+			err := routeClient.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
 			Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
@@ -180,7 +182,7 @@ var _ = Describe("RouteFetcher", func() {
 
 			It("uses cache when fetching token from UAA", func() {
 				client = &fake_routing_api.FakeClient{}
-				err := fetcher.FetchRoutes()
+				err := routeClient.FetchRoutes()
 				Expect(err).ToNot(HaveOccurred())
 				Expect(uaaClient.FetchTokenCallCount()).To(Equal(2))
 				Expect(uaaClient.FetchTokenArgsForCall(0)).To(Equal(false))
@@ -195,13 +197,13 @@ var _ = Describe("RouteFetcher", func() {
 
 			client.RoutesReturns(response, nil)
 
-			err := fetcher.FetchRoutes()
+			err := routeClient.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(registry.RegisterCallCount()).To(Equal(3))
 
 			client.RoutesReturns(secondResponse, nil)
 
-			err = fetcher.FetchRoutes()
+			err = routeClient.FetchRoutes()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(registry.RegisterCallCount()).To(Equal(4))
 			Expect(registry.UnregisterCallCount()).To(Equal(2))
@@ -234,7 +236,7 @@ var _ = Describe("RouteFetcher", func() {
 				It("returns an error", func() {
 					client.RoutesReturns(nil, errors.New("Oops!"))
 
-					err := fetcher.FetchRoutes()
+					err := routeClient.FetchRoutes()
 					Expect(err).To(HaveOccurred())
 					Expect(err.Error()).To(Equal("Oops!"))
 					Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
@@ -246,7 +248,7 @@ var _ = Describe("RouteFetcher", func() {
 				It("returns an error", func() {
 					client.RoutesReturns(nil, errors.New("unauthorized"))
 
-					err := fetcher.FetchRoutes()
+					err := routeClient.FetchRoutes()
 					Expect(uaaClient.FetchTokenCallCount()).To(Equal(2))
 					Expect(uaaClient.FetchTokenArgsForCall(0)).To(BeFalse())
 					Expect(uaaClient.FetchTokenArgsForCall(1)).To(BeTrue())
@@ -264,7 +266,7 @@ var _ = Describe("RouteFetcher", func() {
 
 			It("returns an error", func() {
 				currentTokenFetchErrors := sender.GetCounter(TokenFetchErrors)
-				err := fetcher.FetchRoutes()
+				err := routeClient.FetchRoutes()
 				Expect(err).To(HaveOccurred())
 				Expect(uaaClient.FetchTokenCallCount()).To(Equal(1))
 				Expect(registry.RegisterCallCount()).To(Equal(0))
@@ -446,7 +448,7 @@ var _ = Describe("RouteFetcher", func() {
 					Route:  eventRoute,
 				}
 
-				fetcher.HandleEvent(event)
+				routeClient.HandleEvent(event)
 				Expect(registry.RegisterCallCount()).To(Equal(1))
 				uri, endpoint := registry.RegisterArgsForCall(0)
 				Expect(uri).To(Equal(route.Uri(eventRoute.Route)))
@@ -481,7 +483,7 @@ var _ = Describe("RouteFetcher", func() {
 					Route:  eventRoute,
 				}
 
-				fetcher.HandleEvent(event)
+				routeClient.HandleEvent(event)
 				Expect(registry.UnregisterCallCount()).To(Equal(1))
 				uri, endpoint := registry.UnregisterArgsForCall(0)
 				Expect(uri).To(Equal(route.Uri(eventRoute.Route)))

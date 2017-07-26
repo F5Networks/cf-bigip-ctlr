@@ -144,6 +144,8 @@ Configuration Parameters
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | suspend_prune_if_nats_unavailable        | boolean | Optional | false          | If NATS becomes unaviable should pruning suspend                                |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+| route_mode                               | string  | Optional | http           | Route types you want to watch, provide a single value                           | http, tcp, all |
++------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | start_response_delay_interval            | integer | Optional | 5              | In seconds, wait time to achieve steady state from routing message bus          |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_max_retries                | integer | Optional | 3              | Number of retries to fetch auth token                                           |                |
