@@ -71,14 +71,19 @@ Configuration Parameters
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | user                                | string  | Required | n/a            | BIG-IP iControl REST username                                                   |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | partition                           | array   | Required | n/a            | The BIG-IP parition in whichto configure objects.                               |                |
+|    | pass                                | string  | Required | n/a            | BIG-IP iControl REST password                                                   |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | balance                             | string  | Optional | round-robin    | Set the load balancing mode                                                     | Any supported  |
-|    |                                     |         |          |                |                                                                                 | BIG-IP mode    |
+|    | partition                           | array   | Required | n/a            | The BIG-IP partition in which to configure objects.                             |                |
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+|    | balance                             | string  | Optional | round-robin    | Set the load balancing mode                                                     | Any BIG-IP     |
+|    |                                     |         |          |                |                                                                                 | supported      |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | verify_interval                     | integer | Optional | 30             | In seconds, interval at which to verify the BIG-IP configuration                |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | external_addr                       | string  | Required | n/a            | Virtual address from the BIG-IP, this is the cloud ingress address              |                |
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+|    | ssl_profiles                        | array   | Optional | n/a            | List of pre-configured BIG-IP SSL policies to attach to the HTTPS routing       |                |
+|    |                                     |         |          |                | virtual server                                                                  |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | policies                            | array   | Optional | n/a            | Additional pre-configured BIG-IP policies to attach to routing virtual servers  |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
@@ -87,13 +92,13 @@ Configuration Parameters
 |    | health_monitors                     | array   | Optional | n/a            | Health monitors attached to each configured routing pool                        |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | status                                   | object  | Optional | n/a            | Basic authorization credentials for debug and health information                |                |
-+------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | user                                | string  | Optional | n/a            | Status username                                                                 |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | pass                                | string  | Optional | n/a            | Status password                                                                 |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | nats                                     | array   | Required | n/a            | NATS message bus                                                                |                |
-+------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | host                                | string  | Required | n/a            | NATS host                                                                       |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | port                                | integer | Required | n/a            | NATS port                                                                       |                |
@@ -103,7 +108,7 @@ Configuration Parameters
 |    | pass                                | string  | Required | n/a            | NATS password                                                                   |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | logging                                  | object  | Optional | n/a            | Logging configuration                                                           |                |
-+------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | file                                | string  | Optional | n/a            | Logging file name                                                               |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | syslog                              | string  | Optional | n/a            | Syslog ID                                                                       |                |
@@ -115,7 +120,7 @@ Configuration Parameters
 |    | metron_address                      | string  | Optional | localhost:3457 | Metron address                                                                  |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | oauth                                    | object  | Optional | n/a            | UAA token server configuration                                                  |                |
-+------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | token_endpoint                      | string  | Optional | n/a            | UAA token server                                                                |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | client_name                         | string  | Optional | n/a            | UAA username                                                                    |                |
@@ -129,7 +134,7 @@ Configuration Parameters
 |    | ca_certs                            | string  | Optional | n/a            | CA cert bundle                                                                  |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | routing_api                              | object  | Optional | n/a            | Routing API configuratoin                                                       |                |
-+------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | uri                                 | string  | Optional | n/a            | Routing API endpoint                                                            |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | port                                | integer | Optional | n/a            | Routing API listen port                                                         |                |
@@ -142,7 +147,7 @@ Configuration Parameters
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | droplet_stale_threshold                  | integer | Optional | 120            | In seconds, threshold to consider route stale                                   |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-| suspend_prune_if_nats_unavailable        | boolean | Optional | false          | If NATS becomes unaviable should pruning suspend                                |                |
+| suspend_prune_if_nats_unavailable        | boolean | Optional | false          | If NATS becomes unavailable should pruning suspend                              |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | start_response_delay_interval            | integer | Optional | 5              | In seconds, wait time to achieve steady state from routing message bus          |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
@@ -152,6 +157,19 @@ Configuration Parameters
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_expiration_buffer_time     | integer | Optional | 30             | In seconds, time to re-fetch auth token                                         |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+
+The F5 BIG-IP Controller for Cloud Foundry manages the BIG-IP virtual servers used for policy routing. It will always create an HTTP  virtual server (virtual address port 80) for routing into `Cloud Foundry`_. If one or more SSL profiles exist in the configuration (the ``ssl_profiles`` parameter) the controller creates an additional HTTPS virtual server (virtual address port 443).
+
+You can attach multiple certificate/key pairs to the HTTPS virtual server using ``ssl_profile``. The BIG-IP device uses `TLS Server Name Indication`_ (SNI) to choose the correct certificate to present to the client; SNI allows the `Cloud Foundry`_ instance to support multiple hostnames (foo.mypcf.com and bar.mypcf.com). Some of these cert/key pairs can be wildcard (\*.mypcf.com).
+
+```
+.. important::
+
+   Do not confuse the ``profiles`` configuration parameter with the ``ssl_profiles`` parameter.
+
+   - The ``profiles`` configuration parameter attaches other pre-existing BIG-IP profiles to each of the managed routing virtual servers (for example, TCP acceleration or the ``X-Forwarded-For`` header).
+   - The ``ssl_profiles`` configuration parameter tells the Controller to create an HTTPS virtual server and attach the specified BIG-IP SSL profiles to it.
+```
 
 .. _cfctrl-config-examples:
 
@@ -166,6 +184,7 @@ API Endpoints
 -------------
 
 :code:`/health`: The controller health endpoint. The controller returns :code:`200 OK` to indicate health; any other response is unhealthy.
+
 :code:`/routes`: The routes endpoint returns the entire routing table as JSON. Each route has an associated array of host:port entries.
 
 .. important::
@@ -174,3 +193,4 @@ API Endpoints
 
 .. _Cloud Foundry: http://cloudfoundry.org/
 .. _Gorouter: https://github.com/cloudfoundry/gorouter
+.. _TLS Server Name Indication: https://tools.ietf.org/html/rfc6066#section-3
