@@ -30,6 +30,7 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/handlers"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 	"github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
 	"github.com/F5Networks/cf-bigip-ctlr/varz"
 
 	"github.com/nats-io/nats"
@@ -38,12 +39,13 @@ import (
 
 // Controller varz / common component server for cf-bigip-ctlr
 type Controller struct {
-	config      *config.Config
-	component   *common.VcapComponent
-	mbusClient  *nats.Conn
-	registry    *registry.RouteRegistry
-	heartbeatOK *int32
-	logger      logger.Logger
+	config       *config.Config
+	component    *common.VcapComponent
+	mbusClient   *nats.Conn
+	registry     *registry.RouteRegistry
+	routingTable *routingtable.RoutingTable
+	heartbeatOK  *int32
+	logger       logger.Logger
 }
 
 // NewController create new controller instance
@@ -52,6 +54,7 @@ func NewController(
 	cfg *config.Config,
 	mbusClient *nats.Conn,
 	r *registry.RouteRegistry,
+	routingTable *routingtable.RoutingTable,
 	v varz.Varz,
 ) (*Controller, error) {
 	var host string
@@ -72,7 +75,6 @@ func NewController(
 	host = fmt.Sprintf("%s:%d", cfg.Status.Host, port)
 
 	varz := &health.Varz{
-		UniqueVarz: v,
 		GenericVarz: health.GenericVarz{
 			Type:        "Controller",
 			Index:       cfg.Index,
@@ -80,6 +82,10 @@ func NewController(
 			Credentials: []string{cfg.Status.User, cfg.Status.Pass},
 			LogCounts:   nil,
 		},
+	}
+
+	if cfg.RoutingMode != config.TCP {
+		varz.UniqueVarz = v
 	}
 
 	var heartbeatOK int32
@@ -99,18 +105,25 @@ func NewController(
 	}
 
 	return &Controller{
-		config:      cfg,
-		component:   component,
-		mbusClient:  mbusClient,
-		registry:    r,
-		heartbeatOK: &heartbeatOK,
-		logger:      logger,
+		config:       cfg,
+		component:    component,
+		mbusClient:   mbusClient,
+		registry:     r,
+		routingTable: routingTable,
+		heartbeatOK:  &heartbeatOK,
+		logger:       logger,
 	}, nil
 }
 
 // Run start the cf-bigip-ctlr component server
 func (c *Controller) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
-	c.registry.StartPruningCycle()
+	if c.config.RoutingMode != config.TCP {
+		c.registry.StartPruningCycle()
+	}
+
+	if c.config.RoutingMode != config.HTTP {
+		c.routingTable.StartPruningCycle()
+	}
 
 	c.component.Register(c.mbusClient)
 
@@ -149,7 +162,14 @@ func (c *Controller) Stop() {
 
 	c.logger.Info("controller-stop-called")
 
-	c.registry.StopPruningCycle()
+	if c.config.RoutingMode != config.TCP {
+		c.registry.StopPruningCycle()
+	}
+
+	if c.config.RoutingMode != config.HTTP {
+		c.routingTable.StopPruningCycle()
+	}
+
 	c.component.Stop()
 	c.logger.Info(
 		"controller-stopped",

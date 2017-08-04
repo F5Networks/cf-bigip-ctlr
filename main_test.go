@@ -64,6 +64,7 @@ var _ = Describe("Router Integration", func() {
 		cfg.EndpointTimeout = 5 * time.Second
 		cfg.DrainTimeout = 1 * time.Second
 		cfg.DrainWait = time.Duration(drainWait) * time.Second
+		cfg.RouteMode = "all"
 	}
 
 	createConfig := func(

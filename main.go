@@ -19,7 +19,8 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/mbus"
 	"github.com/F5Networks/cf-bigip-ctlr/metrics"
 	rregistry "github.com/F5Networks/cf-bigip-ctlr/registry"
-	"github.com/F5Networks/cf-bigip-ctlr/route_fetcher"
+	"github.com/F5Networks/cf-bigip-ctlr/routefetcher"
+	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
 	rvarz "github.com/F5Networks/cf-bigip-ctlr/varz"
 
 	"code.cloudfoundry.org/clock"
@@ -113,6 +114,10 @@ func main() {
 	}
 
 	writer, err := f5router.NewConfigWriter(logger.Session("f5writer"))
+	if nil != err {
+		logger.Fatal("writer-failed-initialization", zap.Error(err))
+	}
+
 	defer func() {
 		writer.Close()
 	}()
@@ -140,20 +145,43 @@ func main() {
 	driver := f5router.NewDriver(
 		writer.GetOutputFilename(),
 		dp,
-		logger,
+		logger.Session("python-driver"),
 	)
 
-	registry := rregistry.NewRouteRegistry(
-		logger.Session("registry"),
-		c,
-		f5Router,
-		metricsReporter,
-		routerGroupGUID,
-	)
-	if c.SuspendPruningIfNatsUnavailable {
-		registry.SuspendPruning(func() bool {
-			return !(natsClient.Status() == nats.CONNECTED)
-		})
+	var members grouper.Members
+
+	// registry is for http routing routes - if not in tcp only mode
+	// create the registry, subsribe to the routing api and listen to nats
+	var registry *rregistry.RouteRegistry
+	if c.RoutingMode != config.TCP {
+		registry = rregistry.NewRouteRegistry(
+			logger.Session("registry"),
+			c,
+			f5Router,
+			metricsReporter,
+			routerGroupGUID,
+		)
+		if c.SuspendPruningIfNatsUnavailable {
+			registry.SuspendPruning(func() bool {
+				return !(natsClient.Status() == nats.CONNECTED)
+			})
+		}
+		if c.RoutingApiEnabled() {
+			httpFetcher := setupRouteFetcher(logger.Session("http-route-fetcher"), c, registry, routingAPIClient)
+			members = append(members, grouper.Member{Name: "http-route-fetcher", Runner: httpFetcher})
+		}
+		// Subscribe to the nats client
+		subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan, routerGroupGUID)
+		members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
+	}
+
+	// routingTable is for tcp routing routes - if not in http only mode
+	// setup the connection to the routing api
+	var routingTable *routingtable.RoutingTable
+	if c.RoutingMode != config.HTTP {
+		routingTable = routingtable.NewRoutingTable(logger.Session("tcp-routing-table"), c)
+		tcpFetcher := setupTCPRouteFetcher(logger.Session("tcp-route-fetcher"), c, routingTable, routingAPIClient)
+		members = append(members, grouper.Member{Name: "tcp-route-fetcher", Runner: tcpFetcher})
 	}
 
 	varz := rvarz.NewVarz(registry)
@@ -162,22 +190,13 @@ func main() {
 		c,
 		natsClient,
 		registry,
+		routingTable,
 		varz,
 	)
 	if nil != err {
 		logger.Fatal("failed-starting-controller", zap.Error(err))
 	}
 
-	members := grouper.Members{}
-
-	if c.RoutingApiEnabled() {
-		routeFetcher := setupRouteFetcher(logger.Session("route-fetcher"), c, registry, routingAPIClient)
-		members = append(members, grouper.Member{Name: "router-fetcher", Runner: routeFetcher})
-	}
-
-	subscriber := createSubscriber(logger, c, natsClient, registry, startMsgChan, routerGroupGUID)
-
-	members = append(members, grouper.Member{Name: "subscriber", Runner: subscriber})
 	// controller handles StartResponseDelayInterval - start it before configuration ops
 	members = append(members, grouper.Member{Name: "controller", Runner: controller})
 	members = append(members, grouper.Member{Name: "f5router", Runner: f5Router})
@@ -269,7 +288,7 @@ func setupRouteFetcher(
 	c *config.Config,
 	registry rregistry.Registry,
 	routingAPIClient routing_api.Client,
-) *route_fetcher.RouteFetcher {
+) *routefetcher.RouteFetcher {
 	clock := clock.NewClock()
 
 	uaaClient := newUaaClient(logger, clock, c)
@@ -279,14 +298,51 @@ func setupRouteFetcher(
 		logger.Fatal("unable-to-fetch-token", zap.Error(err))
 	}
 
-	routeFetcher := route_fetcher.NewRouteFetcher(
+	httpClient := routefetcher.NewHTTPFetcher(logger, uaaClient, routingAPIClient, registry)
+
+	routeFetcher := routefetcher.NewRouteFetcher(
 		logger,
 		uaaClient,
-		registry,
 		c,
 		routingAPIClient,
 		1,
 		clock,
+		httpClient,
+	)
+	return routeFetcher
+}
+
+func setupTCPRouteFetcher(
+	logger cfLogger.Logger,
+	c *config.Config,
+	routingTable *routingtable.RoutingTable,
+	routingAPIClient routing_api.Client,
+) *routefetcher.RouteFetcher {
+	clock := clock.NewClock()
+
+	uaaClient := newUaaClient(logger, clock, c)
+
+	_, err := uaaClient.FetchToken(true)
+	if err != nil {
+		logger.Fatal("unable-to-fetch-token", zap.Error(err))
+	}
+
+	tcpClient := routefetcher.NewTCPFetcher(
+		logger,
+		routingTable,
+		routingAPIClient,
+		uaaClient,
+		c.DropletStaleThreshold,
+	)
+
+	routeFetcher := routefetcher.NewRouteFetcher(
+		logger,
+		uaaClient,
+		c,
+		routingAPIClient,
+		1,
+		clock,
+		tcpClient,
 	)
 	return routeFetcher
 }
