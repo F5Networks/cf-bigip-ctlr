@@ -74,16 +74,16 @@ func (httpFetcher *HTTPFetcher) HandleEvent(event interface{}) {
 }
 
 func (httpFetcher *HTTPFetcher) FetchRoutes() error {
-	httpFetcher.logger.Debug("syncer-fetch-routes-started")
+	httpFetcher.logger.Debug("HTTP-syncer-fetch-routes-started")
 
-	defer httpFetcher.logger.Debug("syncer-fetch-routes-completed")
+	defer httpFetcher.logger.Debug("HTTP-syncer-fetch-routes-completed")
 
 	routes, err := httpFetcher.fetchRoutesWithTokenRefresh()
 	if err != nil {
 		return err
 	}
 
-	httpFetcher.logger.Debug("syncer-refreshing-endpoints", zap.Int("number-of-routes", len(routes)))
+	httpFetcher.logger.Debug("HTTP-syncer-refreshing-endpoints", zap.Int("number-of-routes", len(routes)))
 	httpFetcher.refreshEndpoints(routes)
 	return nil
 }
@@ -93,17 +93,17 @@ func (httpFetcher *HTTPFetcher) fetchRoutesWithTokenRefresh() ([]models.Route, e
 	var err error
 	var routes []models.Route
 	for count := 0; count < 2; count++ {
-		httpFetcher.logger.Debug("syncer-fetching-token")
+		httpFetcher.logger.Debug("HTTP-syncer-fetching-token")
 		token, tokenErr := httpFetcher.UaaClient.FetchToken(forceUpdate)
 		if tokenErr != nil {
 			metrics.IncrementCounter(TokenFetchErrors)
 			return []models.Route{}, tokenErr
 		}
 		httpFetcher.client.SetToken(token.AccessToken)
-		httpFetcher.logger.Debug("syncer-fetching-routes")
+		httpFetcher.logger.Debug("HTTP-syncer-fetching-routes")
 		routes, err = httpFetcher.client.Routes()
 		if err != nil {
-			if err.Error() == "unauthorized" {
+			if err.Error() == unauthorized {
 				forceUpdate = true
 			} else {
 				return []models.Route{}, err

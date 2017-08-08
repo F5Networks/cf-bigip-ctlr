@@ -12,13 +12,13 @@ import (
 	"github.com/uber-go/zap"
 )
 
-// RouteTable interface used for testing
+// RouteTable interacts with RoutingTable
 //go:generate counterfeiter -o fakes/fake_routingtable.go . RouteTable
 type RouteTable interface {
-	PruneEntries(defaultTTL time.Duration)
 	UpsertBackendServerKey(key RoutingKey, info BackendServerInfo) bool
 	DeleteBackendServerKey(key RoutingKey, info BackendServerInfo) bool
-	CompareEntries(newTable *RoutingTable) bool
+	NumberOfRoutes() int
+	NumberOfBackends(key RoutingKey) int
 }
 
 // RoutingKey is the route port
@@ -47,15 +47,15 @@ type BackendServerDetails struct {
 	UpdatedTime     time.Time
 }
 
-// Entry holds all the backends
-type Entry struct {
-	Backends map[BackendServerKey]*BackendServerDetails
+// entry holds all the backends
+type entry struct {
+	backends map[BackendServerKey]*BackendServerDetails
 }
 
 // RoutingTable holds all tcp routing information
 type RoutingTable struct {
 	sync.RWMutex
-	Entries                    map[RoutingKey]Entry
+	entries                    map[RoutingKey]entry
 	logger                     logger.Logger
 	ticker                     *time.Ticker
 	pruneStaleDropletsInterval time.Duration
@@ -65,17 +65,17 @@ type RoutingTable struct {
 // NewRoutingTable returns a new RoutingTable
 func NewRoutingTable(logger logger.Logger, c *config.Config) *RoutingTable {
 	return &RoutingTable{
-		Entries: make(map[RoutingKey]Entry),
+		entries: make(map[RoutingKey]entry),
 		logger:  logger,
 		pruneStaleDropletsInterval: c.PruneStaleDropletsInterval,
 		dropletStaleThreshold:      c.DropletStaleThreshold,
 	}
 }
 
-// NewRoutingTableEntry accepts an array of BackendServerInfo and returns an Entry
-func NewRoutingTableEntry(backends []BackendServerInfo) Entry {
-	routingTableEntry := Entry{
-		Backends: make(map[BackendServerKey]*BackendServerDetails),
+// newRoutingTableEntry accepts an array of BackendServerInfo and returns an entry
+func newRoutingTableEntry(backends []BackendServerInfo) entry {
+	routingTableEntry := entry{
+		backends: make(map[BackendServerKey]*BackendServerDetails),
 	}
 	for _, backend := range backends {
 		backendServerKey := BackendServerKey{Address: backend.Address, Port: backend.Port}
@@ -85,29 +85,29 @@ func NewRoutingTableEntry(backends []BackendServerInfo) Entry {
 			UpdatedTime:     time.Now(),
 		}
 
-		routingTableEntry.Backends[backendServerKey] = backendServerDetails
+		routingTableEntry.backends[backendServerKey] = backendServerDetails
 	}
 	return routingTableEntry
 }
 
-// DifferentFrom is used to determine whether the details have changed such that
+// differentFrom is used to determine whether the details have changed such that
 // the routing configuration needs to be updated. e.g max number of connection
-func (d BackendServerDetails) DifferentFrom(other *BackendServerDetails) bool {
-	return d.UpdateSucceededBy(other) && false
+func (d BackendServerDetails) differentFrom(other *BackendServerDetails) bool {
+	return d.updateSucceededBy(other) && false
 }
 
-// UpdateSucceededBy returns true if the current backend is older than other
-func (d BackendServerDetails) UpdateSucceededBy(other *BackendServerDetails) bool {
+// updateSucceededBy returns true if the current backend is older than other
+func (d BackendServerDetails) updateSucceededBy(other *BackendServerDetails) bool {
 	return d.ModificationTag.SucceededBy(&other.ModificationTag)
 }
 
-// DeleteSucceededBy returns true if the current backend is older than other
-func (d BackendServerDetails) DeleteSucceededBy(other *BackendServerDetails) bool {
+// deleteSucceededBy returns true if the current backend is older than other
+func (d BackendServerDetails) deleteSucceededBy(other *BackendServerDetails) bool {
 	return d.ModificationTag == other.ModificationTag || d.ModificationTag.SucceededBy(&other.ModificationTag)
 }
 
-// Expired returns true if the backend has passed it's ttl
-func (d BackendServerDetails) Expired(defaultTTL time.Duration) bool {
+// expired returns true if the backend has passed it's ttl
+func (d BackendServerDetails) expired(defaultTTL time.Duration) bool {
 	ttl := d.TTL
 	if ttl == time.Duration(0) {
 		ttl = defaultTTL
@@ -116,23 +116,23 @@ func (d BackendServerDetails) Expired(defaultTTL time.Duration) bool {
 	return expiryTime.After(d.UpdatedTime)
 }
 
-// PruneBackends checks the expiration of backends and deletes any that are expired
-func (e Entry) PruneBackends(defaultTTL time.Duration) {
-	for backendKey, details := range e.Backends {
-		if details.Expired(defaultTTL) {
-			delete(e.Backends, backendKey)
+// pruneBackends checks the expiration of backends and deletes any that are expired
+func (e entry) pruneBackends(defaultTTL time.Duration) {
+	for backendKey, details := range e.backends {
+		if details.expired(defaultTTL) {
+			delete(e.backends, backendKey)
 		}
 	}
 }
 
-// PruneEntries removes stale backends - must be called with lock in place
-func (table *RoutingTable) PruneEntries(defaultTTL time.Duration) {
+// pruneEntries removes stale backends - only call through pruning cycle
+func (table *RoutingTable) pruneEntries(defaultTTL time.Duration) {
 	table.Lock()
 	defer table.Unlock()
-	for routeKey, entry := range table.Entries {
-		entry.PruneBackends(defaultTTL)
-		if len(entry.Backends) == 0 {
-			delete(table.Entries, routeKey)
+	for routeKey, entry := range table.entries {
+		entry.pruneBackends(defaultTTL)
+		if len(entry.backends) == 0 {
+			delete(table.entries, routeKey)
 		}
 	}
 }
@@ -151,27 +151,29 @@ func (table *RoutingTable) serverKeyDetailsFromInfo(
 // UpsertBackendServerKey returns true if routing configuration should be modified, false if it should not.
 func (table *RoutingTable) UpsertBackendServerKey(key RoutingKey, info BackendServerInfo) bool {
 	logger := table.logger.Session("upsert-backend")
-
-	existingEntry, routingKeyFound := table.Entries[key]
+	table.Lock()
+	defer table.Unlock()
+	existingEntry, routingKeyFound := table.entries[key]
 	if !routingKeyFound {
 		logger.Debug("routing-key-not-found", zap.Object("routing-key", key))
-		existingEntry = NewRoutingTableEntry([]BackendServerInfo{info})
-		table.Entries[key] = existingEntry
+		existingEntry = newRoutingTableEntry([]BackendServerInfo{info})
+		table.entries[key] = existingEntry
+		// FIXME anywhere we return true currently should be a call to the f5router listener
 		return true
 	}
 
 	newBackendKey, newBackendDetails := table.serverKeyDetailsFromInfo(info)
-	currentBackendDetails, backendFound := existingEntry.Backends[newBackendKey]
+	currentBackendDetails, backendFound := existingEntry.backends[newBackendKey]
 
 	if !backendFound ||
-		currentBackendDetails.UpdateSucceededBy(newBackendDetails) {
+		currentBackendDetails.updateSucceededBy(newBackendDetails) {
 		logger.Debug("applying-change-to-table", zap.Object("old", currentBackendDetails), zap.Object("new", newBackendDetails))
-		existingEntry.Backends[newBackendKey] = newBackendDetails
+		existingEntry.backends[newBackendKey] = newBackendDetails
 	} else {
 		logger.Debug("skipping-stale-event", zap.Object("old", currentBackendDetails), zap.Object("new", newBackendDetails))
 	}
 
-	if !backendFound || currentBackendDetails.DifferentFrom(newBackendDetails) {
+	if !backendFound || currentBackendDetails.differentFrom(newBackendDetails) {
 		return true
 	}
 
@@ -181,18 +183,19 @@ func (table *RoutingTable) UpsertBackendServerKey(key RoutingKey, info BackendSe
 // DeleteBackendServerKey returns true if routing configuration should be modified, false if it should not.
 func (table *RoutingTable) DeleteBackendServerKey(key RoutingKey, info BackendServerInfo) bool {
 	logger := table.logger.Session("delete-backend")
-
+	table.Lock()
+	defer table.Unlock()
 	backendServerKey, newDetails := table.serverKeyDetailsFromInfo(info)
-	existingEntry, routingKeyFound := table.Entries[key]
+	existingEntry, routingKeyFound := table.entries[key]
 
 	if routingKeyFound {
-		existingDetails, backendFound := existingEntry.Backends[backendServerKey]
+		existingDetails, backendFound := existingEntry.backends[backendServerKey]
 
-		if backendFound && existingDetails.DeleteSucceededBy(newDetails) {
+		if backendFound && existingDetails.deleteSucceededBy(newDetails) {
 			logger.Debug("removing-from-table", zap.Object("old", existingDetails), zap.Object("new", newDetails))
-			delete(existingEntry.Backends, backendServerKey)
-			if len(existingEntry.Backends) == 0 {
-				delete(table.Entries, key)
+			delete(existingEntry.backends, backendServerKey)
+			if len(existingEntry.backends) == 0 {
+				delete(table.entries, key)
 			}
 			return true
 		}
@@ -213,7 +216,7 @@ func (table *RoutingTable) StartPruningCycle() {
 				select {
 				case <-table.ticker.C:
 					table.logger.Debug("start-pruning-routes")
-					table.PruneEntries(table.pruneStaleDropletsInterval)
+					table.pruneEntries(table.pruneStaleDropletsInterval)
 					table.logger.Debug("finished-pruning-routes")
 				}
 			}
@@ -230,64 +233,40 @@ func (table *RoutingTable) StopPruningCycle() {
 	table.Unlock()
 }
 
-// CompareEntries returns a bool after comparing the new version of the Entries
-// from the api server to the current state
-func (table *RoutingTable) CompareEntries(newTable *RoutingTable) bool {
-	newEntries := newTable.Entries
-	oldEntries := table.Entries
+// NumberOfRoutes returns the number of routes
+func (table *RoutingTable) NumberOfRoutes() int {
+	table.RLock()
+	defer table.RUnlock()
+	return len(table.entries)
+}
 
-	if len(newEntries) != len(table.Entries) {
-		table.logger.Debug("Length of entries not equal", zap.Int("new", len(newEntries)), zap.Int("old", len(table.Entries)))
+// NumberOfBackends returns the number of backends for a particular route
+func (table *RoutingTable) NumberOfBackends(key RoutingKey) int {
+	table.RLock()
+	defer table.RUnlock()
+	entry, ok := table.entries[key]
+	if !ok {
+		return 0
+	}
+	return len(entry.backends)
+}
+
+func (table *RoutingTable) RouteExists(key RoutingKey) bool {
+	table.RLock()
+	defer table.RUnlock()
+	_, found := table.entries[key]
+	return found
+}
+
+func (table *RoutingTable) BackendExists(key RoutingKey, bk BackendServerKey) bool {
+	table.RLock()
+	defer table.RUnlock()
+	routes, entryFound := table.entries[key]
+	if !entryFound {
 		return false
 	}
-
-	for routingKey, newTableEntry := range newEntries {
-		oldTableEntry, found := oldEntries[routingKey]
-		if !found {
-			table.logger.Debug("routing key not found")
-			return false
-		}
-
-		if len(newTableEntry.Backends) != len(oldTableEntry.Backends) {
-			table.logger.Debug("Length of backends not equal")
-			return false
-		}
-
-		for backendServerKey, newDetails := range newTableEntry.Backends {
-			oldBackendDetails, foundDetail := oldTableEntry.Backends[backendServerKey]
-			if !foundDetail {
-				table.logger.Debug("backendServerKey not found")
-				return false
-			}
-			table.UpsertBackendDetails(newDetails, oldBackendDetails)
-		}
-	}
-	return true
-}
-
-// UpsertBackendDetails updates the UpdatedTime and ModificationTag with the
-// newest state
-func (table *RoutingTable) UpsertBackendDetails(
-	newDetails *BackendServerDetails,
-	oldDetails *BackendServerDetails,
-) {
-	table.logger.Debug(
-		"upsert-backend-details",
-		zap.Object("new", newDetails.ModificationTag),
-		zap.Object("old", oldDetails.ModificationTag),
-	)
-	oldDetails.UpdatedTime = time.Now()
-	oldDetails.ModificationTag = newDetails.ModificationTag
-}
-
-// Get returns the entry based off the key
-func (table *RoutingTable) Get(key RoutingKey) Entry {
-	return table.Entries[key]
-}
-
-// Size returns the number of routes
-func (table *RoutingTable) Size() int {
-	return len(table.Entries)
+	_, backendFound := routes.backends[bk]
+	return backendFound
 }
 
 func (k RoutingKey) String() string {

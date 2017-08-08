@@ -44,6 +44,7 @@ const (
 	TokenFetchErrors      = "token_fetch_errors"
 	SubscribeEventsErrors = "subscribe_events_errors"
 	maxRetries            = 3
+	unauthorized          = "unauthorized"
 )
 
 // NewRouteFetcher knows how to subscribe to the routing api
@@ -125,7 +126,7 @@ func (r *RouteFetcher) startEventCycle() {
 					return
 				}
 				err = r.subscribeToEvents(token)
-				if err != nil && err.Error() == "unauthorized" {
+				if err != nil && err.Error() == unauthorized {
 					forceUpdate = true
 				} else {
 					forceUpdate = false
