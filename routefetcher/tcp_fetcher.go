@@ -3,14 +3,14 @@ package routefetcher
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
+	"github.com/cloudfoundry/dropsonde/metrics"
 
 	"code.cloudfoundry.org/routing-api"
-	apimodels "code.cloudfoundry.org/routing-api/models"
+	"code.cloudfoundry.org/routing-api/models"
 	uaaclient "code.cloudfoundry.org/uaa-go-client"
 	"github.com/uber-go/zap"
 )
@@ -19,33 +19,25 @@ import (
 // satisfies RouteClient interface
 type TCPFetcher struct {
 	logger           logger.Logger
-	routingTable     *routingtable.RoutingTable
-	syncing          bool
+	routingTable     routingtable.RouteTable
 	routingAPIClient routing_api.Client
 	uaaClient        uaaclient.Client
-	cachedEvents     []routing_api.TcpEvent
-	lock             *sync.Mutex
-	defaultTTL       time.Duration
+	endpoints        []models.TcpRouteMapping
 	protocol         string
 }
 
 // NewTCPFetcher initializes a TCPFetcher
 func NewTCPFetcher(
 	logger logger.Logger,
-	routingTable *routingtable.RoutingTable,
+	routingTable routingtable.RouteTable,
 	routingAPIClient routing_api.Client,
 	uaaClient uaaclient.Client,
-	defaultTTL time.Duration,
 ) *TCPFetcher {
 	return &TCPFetcher{
 		logger:           logger,
 		routingTable:     routingTable,
-		lock:             new(sync.Mutex),
-		syncing:          false,
 		routingAPIClient: routingAPIClient,
 		uaaClient:        uaaClient,
-		cachedEvents:     nil,
-		defaultTTL:       defaultTTL,
 		protocol:         "tcp",
 	}
 }
@@ -59,38 +51,24 @@ func (tcpFetcher *TCPFetcher) ClientProtocol() string {
 // RouteTable if differences exist
 func (tcpFetcher *TCPFetcher) FetchRoutes() error {
 	logger := tcpFetcher.logger.Session("bulk-sync")
-	logger.Debug("starting")
-
-	defer func() {
-		tcpFetcher.lock.Lock()
-		tcpFetcher.applyCachedEvents()
-		tcpFetcher.syncing = false
-		tcpFetcher.cachedEvents = nil
-		tcpFetcher.lock.Unlock()
-		logger.Debug("completed")
-	}()
-
-	tcpFetcher.lock.Lock()
-	tcpFetcher.syncing = true
-	tcpFetcher.cachedEvents = []routing_api.TcpEvent{}
-	tcpFetcher.lock.Unlock()
+	logger.Debug("TCP-syncer-fetch-routes-started")
 
 	useCachedToken := true
 	var err error
-	var tcpRouteMappings []apimodels.TcpRouteMapping
+	var tcpRouteMappings []models.TcpRouteMapping
 	for count := 0; count < 2; count++ {
+		tcpFetcher.logger.Debug("TCP-syncer-fetching-token")
 		token, tokenErr := tcpFetcher.uaaClient.FetchToken(!useCachedToken)
 		if tokenErr != nil {
-			logger.Error("error-fetching-token", zap.Error(tokenErr))
+			metrics.IncrementCounter(TokenFetchErrors)
 			return tokenErr
 		}
 		tcpFetcher.routingAPIClient.SetToken(token.AccessToken)
+		tcpFetcher.logger.Debug("TCP-syncer-fetching-routes")
 		tcpRouteMappings, err = tcpFetcher.routingAPIClient.TcpRouteMappings()
 		if err != nil {
-			logger.Error("error-fetching-routes", zap.Error(err))
-			if err.Error() == "unauthorized" {
+			if err.Error() == unauthorized {
 				useCachedToken = false
-				logger.Info("retrying-sync")
 			} else {
 				return err
 			}
@@ -98,73 +76,79 @@ func (tcpFetcher *TCPFetcher) FetchRoutes() error {
 			break
 		}
 	}
-	logger.Debug("fetched-tcp-routes", zap.Int("num-routes", len(tcpRouteMappings)))
-	if err == nil {
-		// Create a new routingtable for comparison to the current known state
-		otherRouteTable := tcpFetcher.routingTableFromRouteMapping(tcpRouteMappings)
-		tcpFetcher.routingTable.Lock()
-		tableEqual := tcpFetcher.routingTable.CompareEntries(otherRouteTable)
-		logger.Debug("table-equal", zap.Bool("equal", tableEqual))
-		if !tableEqual {
-			tcpFetcher.routingTable.Entries = otherRouteTable.Entries
-			// FIXME add call to f5router
-		}
-		tcpFetcher.routingTable.Unlock()
+	if err != nil {
+		return err
 	}
+
+	logger.Debug("TCP-syncer-refreshing-endpoints", zap.Int("number-of-routes", len(tcpRouteMappings)))
+
+	tcpFetcher.refreshTCPEndpoints(tcpRouteMappings)
+
 	return nil
-}
-
-func (tcpFetcher *TCPFetcher) applyCachedEvents() {
-	tcpFetcher.logger.Debug("applying-cached-events", zap.Int("cache_size", len(tcpFetcher.cachedEvents)))
-	defer tcpFetcher.logger.Debug("applied-cached-events")
-	for _, e := range tcpFetcher.cachedEvents {
-		tcpFetcher.handleEvent(e)
-	}
-}
-
-// Syncing returns the sync state of the tcpFetcher
-func (tcpFetcher *TCPFetcher) Syncing() bool {
-	tcpFetcher.lock.Lock()
-	defer tcpFetcher.lock.Unlock()
-	return tcpFetcher.syncing
 }
 
 // HandleEvent handles events from the api client
 func (tcpFetcher *TCPFetcher) HandleEvent(e interface{}) {
+	logger := tcpFetcher.logger.Session("handle-event")
 	event, ok := e.(routing_api.TcpEvent)
 	if !ok {
-		tcpFetcher.logger.Warn("recieved-wrong-event-type",
+		logger.Warn("recieved-wrong-event-type",
 			zap.String("event-type", fmt.Sprint(reflect.TypeOf(event))),
 		)
 	}
-	tcpFetcher.lock.Lock()
-	defer tcpFetcher.lock.Unlock()
 
-	if tcpFetcher.syncing {
-		tcpFetcher.logger.Debug("caching-events")
-		tcpFetcher.cachedEvents = append(tcpFetcher.cachedEvents, event)
-	} else {
-		tcpFetcher.handleEvent(event)
-	}
-}
+	routingKey, backendServerInfo := tcpFetcher.toRoutingTableEntry(event.TcpRouteMapping)
 
-func (tcpFetcher *TCPFetcher) handleEvent(event routing_api.TcpEvent) {
-	logger := tcpFetcher.logger.Session("handle-event")
 	logger.Debug("starting", zap.Object("event", event))
 	defer logger.Debug("finished")
 	action := event.Action
 	switch action {
 	case "Upsert":
-		tcpFetcher.handleUpsert(event.TcpRouteMapping)
+		tcpFetcher.routingTable.UpsertBackendServerKey(routingKey, backendServerInfo)
 	case "Delete":
-		tcpFetcher.handleDelete(event.TcpRouteMapping)
+		tcpFetcher.routingTable.DeleteBackendServerKey(routingKey, backendServerInfo)
 	default:
 		logger.Info("unknown-event-action")
 	}
 }
 
+func (tcpFetcher *TCPFetcher) refreshTCPEndpoints(validRoutes []models.TcpRouteMapping) {
+	tcpFetcher.deleteTCPEndpoints(validRoutes)
+
+	tcpFetcher.endpoints = validRoutes
+
+	for _, aRoute := range tcpFetcher.endpoints {
+		routingKey, backendServerInfo := tcpFetcher.toRoutingTableEntry(aRoute)
+		tcpFetcher.routingTable.UpsertBackendServerKey(routingKey, backendServerInfo)
+	}
+}
+
+func (tcpFetcher *TCPFetcher) deleteTCPEndpoints(validRoutes []models.TcpRouteMapping) {
+	var diff []models.TcpRouteMapping
+
+	for _, curRoute := range tcpFetcher.endpoints {
+		routeFound := false
+
+		for _, validRoute := range validRoutes {
+			if routeEqualsTCP(curRoute, validRoute) {
+				routeFound = true
+				break
+			}
+		}
+
+		if !routeFound {
+			diff = append(diff, curRoute)
+		}
+	}
+
+	for _, aRoute := range diff {
+		routingKey, backendServerInfo := tcpFetcher.toRoutingTableEntry(aRoute)
+		tcpFetcher.routingTable.DeleteBackendServerKey(routingKey, backendServerInfo)
+	}
+}
+
 func (tcpFetcher *TCPFetcher) toRoutingTableEntry(
-	routeMapping apimodels.TcpRouteMapping,
+	routeMapping models.TcpRouteMapping,
 ) (routingtable.RoutingKey, routingtable.BackendServerInfo) {
 	tcpFetcher.logger.Debug("converting-tcp-route-mapping", zap.Object("tcp-route", routeMapping))
 	routingKey := routingtable.RoutingKey{Port: routeMapping.ExternalPort}
@@ -183,60 +167,11 @@ func (tcpFetcher *TCPFetcher) toRoutingTableEntry(
 	return routingKey, backendServerInfo
 }
 
-func (tcpFetcher *TCPFetcher) handleUpsert(
-	routeMapping apimodels.TcpRouteMapping,
-) {
-	routingKey, backendServerInfo := tcpFetcher.toRoutingTableEntry(routeMapping)
-	tcpFetcher.routingTable.Lock()
-	defer tcpFetcher.routingTable.Unlock()
-	if tcpFetcher.routingTable.UpsertBackendServerKey(routingKey, backendServerInfo) && !tcpFetcher.syncing {
-		tcpFetcher.logger.Info("tcp-route-Upsert")
-		// return tcpFetcher.configurer.Configure(*tcpFetcher.routingTable)
+func routeEqualsTCP(old, other models.TcpRouteMapping) bool {
+	if (old.ExternalPort == other.ExternalPort) &&
+		(old.HostIP == other.HostIP) &&
+		(old.HostPort == other.HostPort) {
+		return true
 	}
-}
-
-func (tcpFetcher *TCPFetcher) handleDelete(
-	routeMapping apimodels.TcpRouteMapping,
-) {
-	routingKey, backendServerInfo := tcpFetcher.toRoutingTableEntry(routeMapping)
-	tcpFetcher.routingTable.Lock()
-	defer tcpFetcher.routingTable.Unlock()
-	if tcpFetcher.routingTable.DeleteBackendServerKey(routingKey, backendServerInfo) && !tcpFetcher.syncing {
-		tcpFetcher.logger.Info("tcp-route-Delete")
-		// return tcpFetcher.configurer.Configure(*tcpFetcher.routingTable)
-	}
-}
-
-// routingTableFromRouteMapping provides a RoutingTable with only the Entries populated
-func (tcpFetcher *TCPFetcher) routingTableFromRouteMapping(
-	tcpRouteMappings []apimodels.TcpRouteMapping,
-) *routingtable.RoutingTable {
-	otherRouteTable := &routingtable.RoutingTable{}
-	tableEntries := make(map[routingtable.RoutingKey]routingtable.Entry)
-
-	for _, routeMapping := range tcpRouteMappings {
-		routingKey, backendServerInfo := tcpFetcher.toRoutingTableEntry(routeMapping)
-		existingEntry, routingKeyFound := tableEntries[routingKey]
-		if !routingKeyFound {
-			routeEntry := routingtable.NewRoutingTableEntry([]routingtable.BackendServerInfo{backendServerInfo})
-			tableEntries[routingKey] = routeEntry
-		} else {
-			backendKey, backendDetails := newBackend(backendServerInfo)
-			existingEntry.Backends[backendKey] = backendDetails
-		}
-	}
-
-	otherRouteTable.Entries = tableEntries
-	return otherRouteTable
-}
-
-func newBackend(
-	info routingtable.BackendServerInfo,
-) (routingtable.BackendServerKey, *routingtable.BackendServerDetails) {
-	return routingtable.BackendServerKey{Address: info.Address, Port: info.Port},
-		&routingtable.BackendServerDetails{
-			ModificationTag: info.ModificationTag,
-			TTL:             info.TTL,
-			UpdatedTime:     time.Now(),
-		}
+	return false
 }

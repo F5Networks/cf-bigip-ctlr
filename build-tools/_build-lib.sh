@@ -117,7 +117,7 @@ gather_coverage() {
 
   (
     cd $WKDIR/src/github.com/F5Networks
-    gocovmerge `find . -name *.coverprofile` > merged-coverage.out
+    gocovmerge `find . -not -name cf-bigip-ctlr.coverprofile -and -name '*.coverprofile'` > merged-coverage.out
     go tool cover -html=merged-coverage.out -o coverage.html
     go tool cover -func=merged-coverage.out
     # Total coverage for CI

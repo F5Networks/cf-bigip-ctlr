@@ -332,7 +332,6 @@ func setupTCPRouteFetcher(
 		routingTable,
 		routingAPIClient,
 		uaaClient,
-		c.DropletStaleThreshold,
 	)
 
 	routeFetcher := routefetcher.NewRouteFetcher(

@@ -4,9 +4,6 @@ import (
 	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
-	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
-
-	. "github.com/onsi/gomega"
 )
 
 func SpecConfig(statusPort uint16, natsPorts ...uint16) *config.Config {
@@ -66,19 +63,4 @@ func generateConfig(statusPort uint16, natsPorts ...uint16) *config.Config {
 	}
 
 	return c
-}
-
-func backendServerDetailsMatches(actualDetails, expectedDetails *routingtable.BackendServerDetails) {
-	Expect(actualDetails.ModificationTag).To(Equal(expectedDetails.ModificationTag))
-	Expect(actualDetails.TTL).To(Equal(expectedDetails.TTL))
-}
-
-// RoutingTableEntryMatches verifies actual vs expected entries
-func RoutingTableEntryMatches(actualEntry, expectedEntry routingtable.Entry) {
-	Expect(actualEntry.Backends).To(HaveLen(len(expectedEntry.Backends)))
-	for key, details := range actualEntry.Backends {
-		Expect(expectedEntry.Backends).To(HaveKey(key))
-		expectedDetails := expectedEntry.Backends[key]
-		backendServerDetailsMatches(details, expectedDetails)
-	}
 }

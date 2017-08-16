@@ -3,17 +3,11 @@ package fakes
 
 import (
 	"sync"
-	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
 )
 
 type FakeRouteTable struct {
-	PruneEntriesStub        func(defaultTTL time.Duration)
-	pruneEntriesMutex       sync.RWMutex
-	pruneEntriesArgsForCall []struct {
-		defaultTTL time.Duration
-	}
 	UpsertBackendServerKeyStub        func(key routingtable.RoutingKey, info routingtable.BackendServerInfo) bool
 	upsertBackendServerKeyMutex       sync.RWMutex
 	upsertBackendServerKeyArgsForCall []struct {
@@ -38,43 +32,28 @@ type FakeRouteTable struct {
 	deleteBackendServerKeyReturnsOnCall map[int]struct {
 		result1 bool
 	}
-	CompareEntriesStub        func(newTable *routingtable.RoutingTable) bool
-	compareEntriesMutex       sync.RWMutex
-	compareEntriesArgsForCall []struct {
-		newTable *routingtable.RoutingTable
+	NumberOfRoutesStub        func() int
+	numberOfRoutesMutex       sync.RWMutex
+	numberOfRoutesArgsForCall []struct{}
+	numberOfRoutesReturns     struct {
+		result1 int
 	}
-	compareEntriesReturns struct {
-		result1 bool
+	numberOfRoutesReturnsOnCall map[int]struct {
+		result1 int
 	}
-	compareEntriesReturnsOnCall map[int]struct {
-		result1 bool
+	NumberOfBackendsStub        func(key routingtable.RoutingKey) int
+	numberOfBackendsMutex       sync.RWMutex
+	numberOfBackendsArgsForCall []struct {
+		key routingtable.RoutingKey
+	}
+	numberOfBackendsReturns struct {
+		result1 int
+	}
+	numberOfBackendsReturnsOnCall map[int]struct {
+		result1 int
 	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
-}
-
-func (fake *FakeRouteTable) PruneEntries(defaultTTL time.Duration) {
-	fake.pruneEntriesMutex.Lock()
-	fake.pruneEntriesArgsForCall = append(fake.pruneEntriesArgsForCall, struct {
-		defaultTTL time.Duration
-	}{defaultTTL})
-	fake.recordInvocation("PruneEntries", []interface{}{defaultTTL})
-	fake.pruneEntriesMutex.Unlock()
-	if fake.PruneEntriesStub != nil {
-		fake.PruneEntriesStub(defaultTTL)
-	}
-}
-
-func (fake *FakeRouteTable) PruneEntriesCallCount() int {
-	fake.pruneEntriesMutex.RLock()
-	defer fake.pruneEntriesMutex.RUnlock()
-	return len(fake.pruneEntriesArgsForCall)
-}
-
-func (fake *FakeRouteTable) PruneEntriesArgsForCall(i int) time.Duration {
-	fake.pruneEntriesMutex.RLock()
-	defer fake.pruneEntriesMutex.RUnlock()
-	return fake.pruneEntriesArgsForCall[i].defaultTTL
 }
 
 func (fake *FakeRouteTable) UpsertBackendServerKey(key routingtable.RoutingKey, info routingtable.BackendServerInfo) bool {
@@ -175,65 +154,105 @@ func (fake *FakeRouteTable) DeleteBackendServerKeyReturnsOnCall(i int, result1 b
 	}{result1}
 }
 
-func (fake *FakeRouteTable) CompareEntries(newTable *routingtable.RoutingTable) bool {
-	fake.compareEntriesMutex.Lock()
-	ret, specificReturn := fake.compareEntriesReturnsOnCall[len(fake.compareEntriesArgsForCall)]
-	fake.compareEntriesArgsForCall = append(fake.compareEntriesArgsForCall, struct {
-		newTable *routingtable.RoutingTable
-	}{newTable})
-	fake.recordInvocation("CompareEntries", []interface{}{newTable})
-	fake.compareEntriesMutex.Unlock()
-	if fake.CompareEntriesStub != nil {
-		return fake.CompareEntriesStub(newTable)
+func (fake *FakeRouteTable) NumberOfRoutes() int {
+	fake.numberOfRoutesMutex.Lock()
+	ret, specificReturn := fake.numberOfRoutesReturnsOnCall[len(fake.numberOfRoutesArgsForCall)]
+	fake.numberOfRoutesArgsForCall = append(fake.numberOfRoutesArgsForCall, struct{}{})
+	fake.recordInvocation("NumberOfRoutes", []interface{}{})
+	fake.numberOfRoutesMutex.Unlock()
+	if fake.NumberOfRoutesStub != nil {
+		return fake.NumberOfRoutesStub()
 	}
 	if specificReturn {
 		return ret.result1
 	}
-	return fake.compareEntriesReturns.result1
+	return fake.numberOfRoutesReturns.result1
 }
 
-func (fake *FakeRouteTable) CompareEntriesCallCount() int {
-	fake.compareEntriesMutex.RLock()
-	defer fake.compareEntriesMutex.RUnlock()
-	return len(fake.compareEntriesArgsForCall)
+func (fake *FakeRouteTable) NumberOfRoutesCallCount() int {
+	fake.numberOfRoutesMutex.RLock()
+	defer fake.numberOfRoutesMutex.RUnlock()
+	return len(fake.numberOfRoutesArgsForCall)
 }
 
-func (fake *FakeRouteTable) CompareEntriesArgsForCall(i int) *routingtable.RoutingTable {
-	fake.compareEntriesMutex.RLock()
-	defer fake.compareEntriesMutex.RUnlock()
-	return fake.compareEntriesArgsForCall[i].newTable
-}
-
-func (fake *FakeRouteTable) CompareEntriesReturns(result1 bool) {
-	fake.CompareEntriesStub = nil
-	fake.compareEntriesReturns = struct {
-		result1 bool
+func (fake *FakeRouteTable) NumberOfRoutesReturns(result1 int) {
+	fake.NumberOfRoutesStub = nil
+	fake.numberOfRoutesReturns = struct {
+		result1 int
 	}{result1}
 }
 
-func (fake *FakeRouteTable) CompareEntriesReturnsOnCall(i int, result1 bool) {
-	fake.CompareEntriesStub = nil
-	if fake.compareEntriesReturnsOnCall == nil {
-		fake.compareEntriesReturnsOnCall = make(map[int]struct {
-			result1 bool
+func (fake *FakeRouteTable) NumberOfRoutesReturnsOnCall(i int, result1 int) {
+	fake.NumberOfRoutesStub = nil
+	if fake.numberOfRoutesReturnsOnCall == nil {
+		fake.numberOfRoutesReturnsOnCall = make(map[int]struct {
+			result1 int
 		})
 	}
-	fake.compareEntriesReturnsOnCall[i] = struct {
-		result1 bool
+	fake.numberOfRoutesReturnsOnCall[i] = struct {
+		result1 int
+	}{result1}
+}
+
+func (fake *FakeRouteTable) NumberOfBackends(key routingtable.RoutingKey) int {
+	fake.numberOfBackendsMutex.Lock()
+	ret, specificReturn := fake.numberOfBackendsReturnsOnCall[len(fake.numberOfBackendsArgsForCall)]
+	fake.numberOfBackendsArgsForCall = append(fake.numberOfBackendsArgsForCall, struct {
+		key routingtable.RoutingKey
+	}{key})
+	fake.recordInvocation("NumberOfBackends", []interface{}{key})
+	fake.numberOfBackendsMutex.Unlock()
+	if fake.NumberOfBackendsStub != nil {
+		return fake.NumberOfBackendsStub(key)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.numberOfBackendsReturns.result1
+}
+
+func (fake *FakeRouteTable) NumberOfBackendsCallCount() int {
+	fake.numberOfBackendsMutex.RLock()
+	defer fake.numberOfBackendsMutex.RUnlock()
+	return len(fake.numberOfBackendsArgsForCall)
+}
+
+func (fake *FakeRouteTable) NumberOfBackendsArgsForCall(i int) routingtable.RoutingKey {
+	fake.numberOfBackendsMutex.RLock()
+	defer fake.numberOfBackendsMutex.RUnlock()
+	return fake.numberOfBackendsArgsForCall[i].key
+}
+
+func (fake *FakeRouteTable) NumberOfBackendsReturns(result1 int) {
+	fake.NumberOfBackendsStub = nil
+	fake.numberOfBackendsReturns = struct {
+		result1 int
+	}{result1}
+}
+
+func (fake *FakeRouteTable) NumberOfBackendsReturnsOnCall(i int, result1 int) {
+	fake.NumberOfBackendsStub = nil
+	if fake.numberOfBackendsReturnsOnCall == nil {
+		fake.numberOfBackendsReturnsOnCall = make(map[int]struct {
+			result1 int
+		})
+	}
+	fake.numberOfBackendsReturnsOnCall[i] = struct {
+		result1 int
 	}{result1}
 }
 
 func (fake *FakeRouteTable) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
-	fake.pruneEntriesMutex.RLock()
-	defer fake.pruneEntriesMutex.RUnlock()
 	fake.upsertBackendServerKeyMutex.RLock()
 	defer fake.upsertBackendServerKeyMutex.RUnlock()
 	fake.deleteBackendServerKeyMutex.RLock()
 	defer fake.deleteBackendServerKeyMutex.RUnlock()
-	fake.compareEntriesMutex.RLock()
-	defer fake.compareEntriesMutex.RUnlock()
+	fake.numberOfRoutesMutex.RLock()
+	defer fake.numberOfRoutesMutex.RUnlock()
+	fake.numberOfBackendsMutex.RLock()
+	defer fake.numberOfBackendsMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
