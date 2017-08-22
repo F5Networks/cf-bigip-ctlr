@@ -2,6 +2,7 @@ package routingtable_test
 
 import (
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate/fakes"
 	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
@@ -17,12 +18,14 @@ var _ = Describe("RoutingTable", func() {
 		modificationTag routing_api_models.ModificationTag
 		logger          = test_util.NewTestZapLogger("routing-table-test")
 		c               *config.Config
+		routeListener   *fakes.FakeListener
 	)
 
 	BeforeEach(func() {
 		c = config.DefaultConfig()
 		c.PruneStaleDropletsInterval = 1
-		routingTable = routingtable.NewRoutingTable(logger, c)
+		routeListener = &fakes.FakeListener{}
+		routingTable = routingtable.NewRoutingTable(logger, c, routeListener)
 		modificationTag = routing_api_models.ModificationTag{Guid: "abc", Index: 1}
 	})
 
@@ -33,7 +36,7 @@ var _ = Describe("RoutingTable", func() {
 
 		BeforeEach(func() {
 			routingKey = routingtable.RoutingKey{Port: 12}
-			routingTable = routingtable.NewRoutingTable(logger, c)
+			routingTable = routingtable.NewRoutingTable(logger, c, routeListener)
 			modificationTag = routing_api_models.ModificationTag{Guid: "abc", Index: 5}
 		})
 
@@ -51,6 +54,7 @@ var _ = Describe("RoutingTable", func() {
 				Expect(updated).To(BeTrue())
 				Expect(routingTable.NumberOfRoutes()).To(Equal(1))
 				Expect(routingTable.RouteExists(routingKey)).To(BeTrue())
+				Expect(routeListener.UpdateRouteCallCount()).To(Equal(1))
 			})
 		})
 
@@ -75,12 +79,14 @@ var _ = Describe("RoutingTable", func() {
 					updated := routingTable.UpsertBackendServerKey(routingKey, sameBackendServerInfo)
 					Expect(updated).To(BeFalse())
 					Expect(logger).To(gbytes.Say("applying-change-to-table"))
+					Expect(routeListener.UpdateRouteCallCount()).To(Equal(1))
 				})
 
 				It("does not update routing configuration", func() {
 					sameBackendServerInfo := createBackendServerInfo("some-ip", 1234, modificationTag)
 					updated := routingTable.UpsertBackendServerKey(routingKey, sameBackendServerInfo)
 					Expect(updated).To(BeFalse())
+					Expect(routeListener.UpdateRouteCallCount()).To(Equal(1))
 				})
 			})
 
@@ -96,6 +102,7 @@ var _ = Describe("RoutingTable", func() {
 						routingKey,
 						routingtable.BackendServerKey{Address: "some-other-ip", Port: 1234},
 					)).To(BeTrue())
+					Expect(routeListener.UpdateRouteCallCount()).To(Equal(2))
 
 				})
 			})
@@ -110,6 +117,7 @@ var _ = Describe("RoutingTable", func() {
 					newBackendServerInfo := createBackendServerInfo("some-ip", 1234, modificationTag)
 					updated := routingTable.UpsertBackendServerKey(routingKey, newBackendServerInfo)
 					Expect(updated).To(BeFalse())
+					Expect(routeListener.UpdateRouteCallCount()).To(Equal(1))
 					Expect(logger).To(gbytes.Say("skipping-stale-event"))
 				})
 			})
@@ -141,6 +149,7 @@ var _ = Describe("RoutingTable", func() {
 				Expect(updated).To(BeFalse())
 				Expect(routingTable.NumberOfRoutes()).To(Equal(1))
 				Expect(routingTable.NumberOfBackends(routingKey)).To(Equal(1))
+				Expect(routeListener.UpdateRouteCallCount()).To(Equal(1))
 			})
 		})
 
@@ -160,6 +169,7 @@ var _ = Describe("RoutingTable", func() {
 					Expect(ok).To(BeFalse())
 					Expect(routingTable.NumberOfRoutes()).To(Equal(1))
 					Expect(routingTable.NumberOfBackends(routingKey)).To(Equal(2))
+					Expect(routeListener.UpdateRouteCallCount()).To(Equal(2))
 				})
 			})
 
@@ -171,6 +181,7 @@ var _ = Describe("RoutingTable", func() {
 					Expect(routingTable.NumberOfRoutes()).To(Equal(1))
 					Expect(routingTable.NumberOfBackends(routingKey)).To(Equal(1))
 					Expect(routingTable.BackendExists(routingKey, backendServerKey)).To(BeFalse())
+					Expect(routeListener.UpdateRouteCallCount()).To(Equal(3))
 				})
 
 				Context("when a modification tag has the same guid but current index is greater", func() {
@@ -183,6 +194,7 @@ var _ = Describe("RoutingTable", func() {
 						Expect(updated).To(BeFalse())
 						Expect(logger).To(gbytes.Say("skipping-stale-event"))
 						Expect(routingTable.BackendExists(routingKey, backendServerKey)).To(BeTrue())
+						Expect(routeListener.UpdateRouteCallCount()).To(Equal(2))
 					})
 				})
 
@@ -197,6 +209,7 @@ var _ = Describe("RoutingTable", func() {
 						Expect(updated).To(BeTrue())
 						Expect(logger).To(gbytes.Say("removing-from-table"))
 						Expect(routingTable.BackendExists(routingKey, backendServerKey)).To(BeFalse())
+						Expect(routeListener.UpdateRouteCallCount()).To(Equal(3))
 					})
 				})
 
@@ -211,6 +224,7 @@ var _ = Describe("RoutingTable", func() {
 						updated := routingTable.DeleteBackendServerKey(routingKey, backendServerInfo2)
 						Expect(updated).To(BeTrue())
 						Expect(routingTable.NumberOfRoutes()).Should(Equal(0))
+						Expect(routeListener.UpdateRouteCallCount()).To(Equal(4))
 					})
 				})
 			})
@@ -260,12 +274,14 @@ var _ = Describe("RoutingTable", func() {
 				Consistently(func() int {
 					return routingTable.NumberOfBackends(routingKey1)
 				}, 2).Should(Equal(1))
+				Expect(routeListener.UpdateRouteCallCount()).To(Equal(3))
 			})
 		})
 
 		Context("when all the backends expire for given routing key", func() {
 			It("prunes the expired entries and deletes the routing key", func() {
 				Eventually(routingTable.NumberOfRoutes, 5).Should(Equal(0))
+				Expect(routeListener.UpdateRouteCallCount()).To(Equal(2))
 			})
 		})
 	})

@@ -14,45 +14,41 @@
  * limitations under the License.
  */
 
-package f5router
+package bigipResources
 
 import (
-	"github.com/F5Networks/cf-bigip-ctlr/config"
-	"github.com/F5Networks/cf-bigip-ctlr/logger"
-
-	"github.com/F5Networks/cf-bigip-ctlr/registry"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
-
-	"k8s.io/client-go/util/workqueue"
 )
 
 type (
-	globalConfig struct {
+	// GlobalConfig for logging and checking the bigip
+	GlobalConfig struct {
 		LogLevel       string `json:"log-level"`
 		VerifyInterval int    `json:"verify-interval"`
 	}
 
-	// frontend bindaddr and port
-	virtualAddress struct {
+	// VirtualAddress is frontend bindaddr and port
+	VirtualAddress struct {
 		BindAddr string `json:"bindAddr,omitempty"`
 		Port     int32  `json:"port,omitempty"`
 	}
 
-	// virtual server policy/profile reference
-	nameRef struct {
+	// NameRef virtual server policy/profile reference
+	NameRef struct {
 		Name      string `json:"name"`
 		Partition string `json:"partition"`
 	}
 
-	resources struct {
-		Virtuals []*virtual `json:"virtualServers,omitempty"`
-		Pools    []*pool    `json:"pools,omitempty"`
-		Monitors []*monitor `json:"monitors,omitempty"`
-		Policies []*policy  `json:"l7Policies,omitempty"`
+	// Resources is what gets written to and dumped out for the python side
+	Resources struct {
+		Virtuals []*Virtual `json:"virtualServers,omitempty"`
+		Pools    []*Pool    `json:"pools,omitempty"`
+		Monitors []*Monitor `json:"monitors,omitempty"`
+		Policies []*Policy  `json:"l7Policies,omitempty"`
 	}
 
-	// virtual server frontend
-	virtual struct {
+	// Virtual server frontend
+	Virtual struct {
 		VirtualServerName string `json:"name"`
 		PoolName          string `json:"pool"`
 		// Mutual parameter, partition
@@ -60,16 +56,15 @@ type (
 
 		// VirtualServer parameters
 		Mode           string          `json:"mode,omitempty"`
-		VirtualAddress *virtualAddress `json:"virtualAddress,omitempty"`
-		Policies       []*nameRef      `json:"policies,omitempty"`
-		Profiles       []*nameRef      `json:"profiles,omitempty"`
+		VirtualAddress *VirtualAddress `json:"virtualAddress,omitempty"`
+		Policies       []*NameRef      `json:"policies,omitempty"`
+		Profiles       []*NameRef      `json:"profiles,omitempty"`
 	}
 
-	// pool backend
-	pool struct {
+	// Pool backend
+	Pool struct {
 		Name            string   `json:"name"`
 		Partition       string   `json:"partition"`
-		ServiceName     string   `json:"serviceName"`
 		ServicePort     int32    `json:"servicePort"`
 		Balance         string   `json:"balance"`
 		PoolMemberAddrs []string `json:"poolMemberAddrs"`
@@ -78,7 +73,7 @@ type (
 	}
 
 	// backend health monitor
-	monitor struct {
+	Monitor struct {
 		Name      string `json:"name"`
 		Partition string `json:"partition"`
 		Interval  int    `json:"interval,omitempty"`
@@ -87,14 +82,16 @@ type (
 		Timeout   int    `json:"timeout,omitempty"`
 	}
 
-	action struct {
+	// Action for a rule
+	Action struct {
 		Forward bool   `json:"forward"`
 		Name    string `json:"name"`
 		Pool    string `json:"pool"`
 		Request bool   `json:"request"`
 	}
 
-	condition struct {
+	// Condition for a rule
+	Condition struct {
 		Equals      bool     `json:"equals,omitempty"`
 		EndsWith    bool     `json:"endsWith,omitempty"`
 		Host        bool     `json:"host,omitempty"`
@@ -107,50 +104,44 @@ type (
 		Values      []string `json:"values"`
 	}
 
-	rule struct {
+	// Rule builds up a Policy
+	Rule struct {
 		FullURI     string       `json:"-"`
-		Actions     []*action    `json:"actions"`
-		Conditions  []*condition `json:"conditions"`
+		Actions     []*Action    `json:"actions"`
+		Conditions  []*Condition `json:"conditions"`
 		Name        string       `json:"name"`
 		Ordinal     int          `json:"ordinal"`
 		Description string       `json:"description"`
 	}
 
-	policy struct {
+	// Policy is the final object for the BIG-IP
+	Policy struct {
 		Controls    []string `json:"controls"`
 		Description string   `json:"description,omitempty"`
 		Legacy      bool     `json:"legacy"`
 		Name        string   `json:"name"`
 		Partition   string   `json:"partition"`
 		Requires    []string `json:"requires"`
-		Rules       []*rule  `json:"rules"`
+		Rules       []*Rule  `json:"rules"`
 		Strategy    string   `json:"strategy"`
 	}
 
-	policies []*policy
-	rules    []*rule
-	routeMap map[route.Uri]*pool
-	ruleMap  map[route.Uri]*rule
+	Policies []*Policy
+	Rules    []*Rule
+	RouteMap map[route.Uri]*Pool
+	RuleMap  map[route.Uri]*Rule
 
-	// F5Router controller of BigIP configuration objects
-	F5Router struct {
-		c            *config.Config
-		logger       logger.Logger
-		r            ruleMap
-		wildcards    ruleMap
-		queue        workqueue.RateLimitingInterface
-		writer       Writer
-		routeVSHTTP  *virtual
-		routeVSHTTPS *virtual
-		drainUpdate  bool
+	// RoutingKey is the port for the route
+	RoutingKey struct {
+		Port uint16
 	}
-
-	vsType      int
-	routeUpdate struct {
-		Name  string
-		URI   route.Uri
-		R     registry.Registry
-		Op    registry.Operation
-		AppID string
+	// BackendServerKey is the endpoints info
+	BackendServerKey struct {
+		Address string
+		Port    uint16
 	}
 )
+
+func (r Rules) Len() int           { return len(r) }
+func (r Rules) Less(i, j int) bool { return r[i].FullURI < r[j].FullURI }
+func (r Rules) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }

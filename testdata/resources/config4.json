@@ -1,0 +1,101 @@
+{
+  "bigip": {
+    "url": "http://example.com",
+    "username": "admin",
+    "password": "pass",
+    "partitions": ["cf"]
+  },
+  "global": {
+    "log-level": "debug",
+    "verify-interval": 30
+  },
+  "resources": {
+    "virtualServers": [{
+      "name": "cf-tcp-route-default-tcp-6010",
+      "pool": "cf-tcp-route-default-tcp-6010",
+      "partition": "cf",
+      "mode": "tcp",
+      "virtualAddress": {
+        "bindAddr": "127.0.0.1",
+        "port": 6010
+      }
+    }, {
+      "name": "cf-tcp-route-default-tcp-6020",
+      "pool": "cf-tcp-route-default-tcp-6020",
+      "partition": "cf",
+      "mode": "tcp",
+      "virtualAddress": {
+        "bindAddr": "127.0.0.1",
+        "port": 6020
+      }
+    }, {
+      "name": "cf-tcp-route-default-tcp-6030",
+      "pool": "cf-tcp-route-default-tcp-6030",
+      "partition": "cf",
+      "mode": "tcp",
+      "virtualAddress": {
+        "bindAddr": "127.0.0.1",
+        "port": 6030
+      }
+    }, {
+      "name": "cf-tcp-route-default-tcp-6040",
+      "pool": "cf-tcp-route-default-tcp-6040",
+      "partition": "cf",
+      "mode": "tcp",
+      "virtualAddress": {
+        "bindAddr": "127.0.0.1",
+        "port": 6040
+      }
+    }, {
+      "name": "cf-tcp-route-default-tcp-6050",
+      "pool": "cf-tcp-route-default-tcp-6050",
+      "partition": "cf",
+      "mode": "tcp",
+      "virtualAddress": {
+        "bindAddr": "127.0.0.1",
+        "port": 6050
+      }
+    }],
+    "pools": [{
+      "name": "cf-tcp-route-default-tcp-6010",
+      "partition": "cf",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["10.0.0.1:5000", "10.0.0.1:5001", "10.0.0.1:5002"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route-port: 6010, router-group: default-tcp"
+    }, {
+      "name": "cf-tcp-route-default-tcp-6020",
+      "partition": "cf",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["10.0.0.1:6000"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route-port: 6020, router-group: default-tcp"
+    }, {
+      "name": "cf-tcp-route-default-tcp-6030",
+      "partition": "cf",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["10.0.0.1:7000"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route-port: 6030, router-group: default-tcp"
+    }, {
+      "name": "cf-tcp-route-default-tcp-6040",
+      "partition": "cf",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["10.0.0.1:8000"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route-port: 6040, router-group: default-tcp"
+    }, {
+      "name": "cf-tcp-route-default-tcp-6050",
+      "partition": "cf",
+      "servicePort": -1,
+      "balance": "round-robin",
+      "poolMemberAddrs": ["10.0.0.1:9000"],
+      "monitor": ["/Common/tcp_half_open"],
+      "description": "route-port: 6050, router-group: default-tcp"
+    }]
+  }
+}

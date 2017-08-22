@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 
 	routing_api_models "code.cloudfoundry.org/routing-api/models"
@@ -55,20 +57,24 @@ type entry struct {
 // RoutingTable holds all tcp routing information
 type RoutingTable struct {
 	sync.RWMutex
+	c                          *config.Config
 	entries                    map[RoutingKey]entry
 	logger                     logger.Logger
 	ticker                     *time.Ticker
 	pruneStaleDropletsInterval time.Duration
 	dropletStaleThreshold      time.Duration
+	listener                   routeUpdate.Listener
 }
 
 // NewRoutingTable returns a new RoutingTable
-func NewRoutingTable(logger logger.Logger, c *config.Config) *RoutingTable {
+func NewRoutingTable(logger logger.Logger, c *config.Config, listener routeUpdate.Listener) *RoutingTable {
 	return &RoutingTable{
+		c:       c,
 		entries: make(map[RoutingKey]entry),
 		logger:  logger,
 		pruneStaleDropletsInterval: c.PruneStaleDropletsInterval,
 		dropletStaleThreshold:      c.DropletStaleThreshold,
+		listener:                   listener,
 	}
 }
 
@@ -117,12 +123,15 @@ func (d BackendServerDetails) expired(defaultTTL time.Duration) bool {
 }
 
 // pruneBackends checks the expiration of backends and deletes any that are expired
-func (e entry) pruneBackends(defaultTTL time.Duration) {
+func (e entry) pruneBackends(defaultTTL time.Duration) []BackendServerKey {
+	var removedBackends []BackendServerKey
 	for backendKey, details := range e.backends {
 		if details.expired(defaultTTL) {
+			removedBackends = append(removedBackends, backendKey)
 			delete(e.backends, backendKey)
 		}
 	}
+	return removedBackends
 }
 
 // pruneEntries removes stale backends - only call through pruning cycle
@@ -130,7 +139,12 @@ func (table *RoutingTable) pruneEntries(defaultTTL time.Duration) {
 	table.Lock()
 	defer table.Unlock()
 	for routeKey, entry := range table.entries {
-		entry.pruneBackends(defaultTTL)
+		removed := entry.pruneBackends(defaultTTL)
+		if len(removed) > 0 && table.listener != nil {
+			for _, backend := range removed {
+				table.updateRouter(routeUpdate.Remove, routeKey.Port, backend.Address, backend.Port)
+			}
+		}
 		if len(entry.backends) == 0 {
 			delete(table.entries, routeKey)
 		}
@@ -150,6 +164,7 @@ func (table *RoutingTable) serverKeyDetailsFromInfo(
 
 // UpsertBackendServerKey returns true if routing configuration should be modified, false if it should not.
 func (table *RoutingTable) UpsertBackendServerKey(key RoutingKey, info BackendServerInfo) bool {
+	var update bool
 	logger := table.logger.Session("upsert-backend")
 	table.Lock()
 	defer table.Unlock()
@@ -158,8 +173,7 @@ func (table *RoutingTable) UpsertBackendServerKey(key RoutingKey, info BackendSe
 		logger.Debug("routing-key-not-found", zap.Object("routing-key", key))
 		existingEntry = newRoutingTableEntry([]BackendServerInfo{info})
 		table.entries[key] = existingEntry
-		// FIXME anywhere we return true currently should be a call to the f5router listener
-		return true
+		update = true
 	}
 
 	newBackendKey, newBackendDetails := table.serverKeyDetailsFromInfo(info)
@@ -174,14 +188,19 @@ func (table *RoutingTable) UpsertBackendServerKey(key RoutingKey, info BackendSe
 	}
 
 	if !backendFound || currentBackendDetails.differentFrom(newBackendDetails) {
-		return true
+		update = true
 	}
 
-	return false
+	if update && table.listener != nil {
+		table.updateRouter(routeUpdate.Add, key.Port, info.Address, info.Port)
+	}
+
+	return update
 }
 
 // DeleteBackendServerKey returns true if routing configuration should be modified, false if it should not.
 func (table *RoutingTable) DeleteBackendServerKey(key RoutingKey, info BackendServerInfo) bool {
+	var update bool
 	logger := table.logger.Session("delete-backend")
 	table.Lock()
 	defer table.Unlock()
@@ -197,11 +216,16 @@ func (table *RoutingTable) DeleteBackendServerKey(key RoutingKey, info BackendSe
 			if len(existingEntry.backends) == 0 {
 				delete(table.entries, key)
 			}
-			return true
+			update = true
 		}
 		logger.Debug("skipping-stale-event", zap.Object("old", existingDetails), zap.Object("new", newDetails))
 	}
-	return false
+
+	if update && table.listener != nil {
+		table.updateRouter(routeUpdate.Remove, key.Port, info.Address, info.Port)
+	}
+
+	return update
 }
 
 // StartPruningCycle kicks off the prune ticker
@@ -267,6 +291,25 @@ func (table *RoutingTable) BackendExists(key RoutingKey, bk BackendServerKey) bo
 	}
 	_, backendFound := routes.backends[bk]
 	return backendFound
+}
+
+func (table *RoutingTable) updateRouter(
+	op routeUpdate.Operation,
+	routePort uint16,
+	ea string,
+	ep uint16,
+) {
+	addr := fmt.Sprintf("%s:%d", ea, ep)
+	update, err := f5router.NewTCPUpdate(table.c, table.logger, op, routePort, addr)
+
+	if nil != err {
+		table.logger.Warn(
+			"skipping-TCP-route-update",
+			zap.Error(err),
+		)
+	} else {
+		table.listener.UpdateRoute(update)
+	}
 }
 
 func (k RoutingKey) String() string {

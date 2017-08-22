@@ -39,7 +39,6 @@ const (
 // Driver type which provides ifrit process interface
 type Driver struct {
 	fname     string
-	global    globalConfig
 	bigIP     config.BigIPConfig
 	driverCmd string
 	logger    logger.Logger

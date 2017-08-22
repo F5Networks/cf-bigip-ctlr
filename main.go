@@ -179,7 +179,7 @@ func main() {
 	// setup the connection to the routing api
 	var routingTable *routingtable.RoutingTable
 	if c.RoutingMode != config.HTTP {
-		routingTable = routingtable.NewRoutingTable(logger.Session("tcp-routing-table"), c)
+		routingTable = routingtable.NewRoutingTable(logger.Session("tcp-routing-table"), c, f5Router)
 		tcpFetcher := setupTCPRouteFetcher(logger.Session("tcp-route-fetcher"), c, routingTable, routingAPIClient)
 		members = append(members, grouper.Member{Name: "tcp-route-fetcher", Runner: tcpFetcher})
 	}
