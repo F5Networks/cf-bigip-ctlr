@@ -179,10 +179,11 @@ type Config struct {
 	RouteMode                       string        `yaml:"route_mode"`
 	RoutingMode                     RoutingMode
 
-	DrainWait       time.Duration `yaml:"drain_wait,omitempty"`
-	DrainTimeout    time.Duration `yaml:"drain_timeout,omitempty"`
-	SecureCookies   bool          `yaml:"secure_cookies"`
-	RouterGroupName string        `yaml:"router_group"`
+	DrainWait          time.Duration `yaml:"drain_wait,omitempty"`
+	DrainTimeout       time.Duration `yaml:"drain_timeout,omitempty"`
+	SecureCookies      bool          `yaml:"secure_cookies"`
+	RouterGroupName    string        `yaml:"router_group"`
+	TCPRouterGroupName string        `yaml:"tcp_router_group"`
 
 	OAuth                      OAuthConfig      `yaml:"oauth"`
 	RoutingApi                 RoutingApiConfig `yaml:"routing_api"`
@@ -305,6 +306,10 @@ func (c *Config) Process() {
 	if c.RouterGroupName != "" && !c.RoutingApiEnabled() {
 		errMsg := fmt.Sprintf("Routing API must be enabled to assign Router Group")
 		panic(errMsg)
+	}
+
+	if len(c.TCPRouterGroupName) == 0 {
+		c.TCPRouterGroupName = "default-tcp"
 	}
 
 	switch c.RouteMode {

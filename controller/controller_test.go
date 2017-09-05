@@ -76,7 +76,7 @@ var _ = Describe("Controller", func() {
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("controller-test")
 		registry = rregistry.NewRouteRegistry(logger, config, nil, new(fakeMetrics.FakeRouteRegistryReporter), "")
-		routingTable = routingtable.NewRoutingTable(logger, config)
+		routingTable = routingtable.NewRoutingTable(logger, config, nil)
 		varz = vvarz.NewVarz(registry)
 
 		var err error

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 	"github.com/F5Networks/cf-bigip-ctlr/metrics"
 	"github.com/F5Networks/cf-bigip-ctlr/registry/container"
@@ -28,36 +30,6 @@ type Registry interface {
 	NumUris() int
 	NumEndpoints() int
 	MarshalJSON() ([]byte, error)
-}
-
-// Operation of registry change
-type Operation int
-
-const (
-	// Add operation
-	Add Operation = iota
-	// Update operation
-	Update
-	// Remove operation
-	Remove
-)
-
-func (op Operation) String() string {
-	switch op {
-	case Add:
-		return "Add"
-	case Update:
-		return "Update"
-	case Remove:
-		return "Remove"
-	}
-
-	return "Unknown"
-}
-
-// Listener optional listener for route registry updates
-type Listener interface {
-	RouteUpdate(op Operation, r Registry, uri route.Uri, appID string)
 }
 
 type PruneStatus int
@@ -89,13 +61,15 @@ type RouteRegistry struct {
 
 	routerGroupGUID string
 
-	listener Listener
+	listener routeUpdate.Listener
+
+	c *config.Config
 }
 
 func NewRouteRegistry(
 	logger logger.Logger,
 	c *config.Config,
-	listener Listener,
+	listener routeUpdate.Listener,
 	reporter metrics.RouteRegistryReporter,
 	routerGroupGUID string,
 ) *RouteRegistry {
@@ -110,6 +84,7 @@ func NewRouteRegistry(
 	r.reporter = reporter
 	r.routerGroupGUID = routerGroupGUID
 	r.listener = listener
+	r.c = c
 	return r
 }
 
@@ -127,10 +102,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 		pool = route.NewPool(r.dropletStaleThreshold/4, contextPath)
 		r.byURI.Insert(routekey, pool)
 		r.logger.Debug("uri-added", zap.Stringer("uri", routekey))
-
-		if nil != r.listener {
-			r.listener.RouteUpdate(Add, r, routekey, endpoint.ApplicationId)
-		}
+		updateRoute = true
 	} else {
 		if nil == pool.FindById(endpoint.CanonicalAddr()) {
 			updateRoute = true
@@ -139,7 +111,7 @@ func (r *RouteRegistry) Register(uri route.Uri, endpoint *route.Endpoint) {
 
 	endpointAdded := pool.Put(endpoint)
 	if endpointAdded && updateRoute && nil != r.listener {
-		r.listener.RouteUpdate(Update, r, routekey, endpoint.ApplicationId)
+		r.updateRouter(routeUpdate.Add, routekey, endpoint)
 	}
 
 	r.timeOfLastUpdate = t
@@ -194,13 +166,8 @@ func (r *RouteRegistry) Unregister(uri route.Uri, endpoint *route.Endpoint) {
 
 		if endpointRemoved {
 			if nil != r.listener {
-				if emptiedPool {
-					r.listener.RouteUpdate(Remove, r, uri, endpoint.ApplicationId)
-				} else {
-					r.listener.RouteUpdate(Update, r, uri, endpoint.ApplicationId)
-				}
+				r.updateRouter(routeUpdate.Remove, uri, endpoint)
 			}
-
 			r.logger.Debug("endpoint-unregistered", zapData...)
 		} else {
 			r.logger.Debug("endpoint-not-unregistered", zapData...)
@@ -360,16 +327,12 @@ func (r *RouteRegistry) pruneStaleDroplets() {
 		endpoints := t.Pool.PruneEndpoints(r.dropletStaleThreshold)
 		t.Snip()
 		if len(endpoints) > 0 {
-			if nil != r.listener {
-				if nil == t.Pool {
-					r.listener.RouteUpdate(Remove, r, route.Uri(t.ToPath()), "")
-				} else {
-					r.listener.RouteUpdate(Update, r, route.Uri(t.ToPath()), "")
-				}
-			}
 			addresses := []string{}
 			for _, e := range endpoints {
 				addresses = append(addresses, e.CanonicalAddr())
+				if nil != r.listener {
+					r.updateRouter(routeUpdate.Remove, route.Uri(t.ToPath()), e)
+				}
 			}
 			r.logger.Info("pruned-route",
 				zap.String("uri", t.ToPath()),
@@ -392,6 +355,22 @@ func (r *RouteRegistry) freshenRoutes() {
 	r.byURI.EachNodeWithPool(func(t *container.Trie) {
 		t.Pool.MarkUpdated(now)
 	})
+}
+
+func (r *RouteRegistry) updateRouter(
+	updateType routeUpdate.Operation,
+	uri route.Uri,
+	endpoint *route.Endpoint,
+) {
+	update, err := f5router.NewUpdate(r.logger, updateType, uri, endpoint)
+	if nil != err {
+		r.logger.Warn("f5router-skipping-update",
+			zap.Error(err),
+			zap.String("operation", routeUpdate.Remove.String()),
+		)
+	} else {
+		r.listener.UpdateRoute(update)
+	}
 }
 
 func parseContextPath(uri route.Uri) string {
