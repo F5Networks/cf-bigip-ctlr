@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import absolute_import
 
 import argparse
 import fcntl
@@ -30,9 +31,9 @@ import urllib
 import pyinotify
 
 from urlparse import urlparse
-from f5_cccl._f5 import CloudBigIP, get_protocol, has_partition, log_sequence
-from f5_cccl.common import extract_partition_and_name, ipv4_to_mac,\
-    list_diff_exclusive, IPV4FormatError, PartitionNameError
+from f5.bigip import ManagementRoot
+from f5_cccl.api import F5CloudServiceManager
+from f5_cccl.exceptions import F5CcclError
 
 log = logging.getLogger(__name__)
 console = logging.StreamHandler()
@@ -42,59 +43,126 @@ root_logger = logging.getLogger()
 root_logger.addHandler(console)
 
 
-class RootFilter(logging.Filter):
+class PartitionNameError(Exception):
+    """Exception type for F5 resource name."""
+
+    def __init__(self, msg):
+        """Create partition name exception object."""
+        Exception.__init__(self, msg)
+
+
+class IPV4FormatError(Exception):
+    """Exception type for improperly formatted IPv4 address."""
+
+    def __init__(self, msg):
+        """Create ipv4 format exception object."""
+        Exception.__init__(self, msg)
+
+
+class ResponseStatusFilter(logging.Filter):
     def filter(self, record):
         return not record.getMessage().startswith("RESPONSE::STATUS")
 
 
-root_logger.addFilter(RootFilter())
+class CertFilter(logging.Filter):
+    def filter(self, record):
+        return "CERTIFICATE" not in record.getMessage()
+
+
+class KeyFilter(logging.Filter):
+    def filter(self, record):
+        return "PRIVATE KEY" not in record.getMessage()
+
+
+root_logger.addFilter(ResponseStatusFilter())
+root_logger.addFilter(CertFilter())
+root_logger.addFilter(KeyFilter())
+
+
+def list_diff_exclusive(list1, list2):
+    """Return items found only in list1 or list2."""
+    return list(set(list1) ^ set(list2))
+
+
+def ipv4_to_mac(ip_str):
+    """Convert an IPV4 string to a fake MAC address."""
+    ip = ip_str.split('.')
+    if len(ip) != 4:
+        raise IPV4FormatError('Bad IPv4 address format specified for '
+                              'FDB record: {}'.format(ip_str))
+
+    return "0a:0a:%02x:%02x:%02x:%02x" % (
+        int(ip[0]), int(ip[1]), int(ip[2]), int(ip[3]))
+
+
+def extract_partition_and_name(f5_partition_name):
+    """Separate partition and name components for a Big-IP resource."""
+    parts = f5_partition_name.split('/')
+    count = len(parts)
+    if f5_partition_name[0] == '/' and count == 3:
+        # leading slash
+        partition = parts[1]
+        name = parts[2]
+    elif f5_partition_name[0] != '/' and count == 2:
+        # leading slash missing
+        partition = parts[0]
+        name = parts[1]
+    else:
+        raise PartitionNameError('Bad F5 resource name encountered: '
+                                 '{}'.format(f5_partition_name))
+    return partition, name
+
+
+def log_sequence(prefix, sequence_to_log):
+    """Helper function to log a sequence.
+
+    Dump a sequence to the logger, skip if it is empty
+
+    Args:
+        prefix: The prefix string to describe what's being logged
+        sequence_to_log: The sequence being logged
+    """
+    if sequence_to_log:
+        log.debug(prefix + ': %s', (', '.join(sequence_to_log)))
+
 
 DEFAULT_LOG_LEVEL = logging.INFO
 DEFAULT_VERIFY_INTERVAL = 30.0
 
 
-class K8sCloudBigIP(CloudBigIP):
-    """K8sCloudBigIP class.
+class CloudServiceManager():
+    """CloudServiceManager class.
 
-    Generates a configuration for a BigIP based upon the apps/tasks managed
-    by services/pods/nodes in Kubernetes.
-
-    - Matches apps/sevices by BigIP partition
-    - Creates a Virtual Server and pool for each service type that matches a
-      BigIP partition
-    - For each backend (task, node, or pod), it creates a pool member and adds
-      the member to the pool
-    - If the app has a Marathon Health Monitor configured, create a
-      corresponding health monitor for the BigIP pool member
-    - Token-based authentication is used by specifying a token named 'tmos'.
-      This will allow non-admin users to use the API (BIG-IP must configure
-      the accounts with proper permissions, for either local or remote auth).
+    Applies a configuration to a BigIP
 
     Args:
-        hostname: IP address of BIG-IP
-        username: BIG-IP username
-        password: BIG-IP password
-        partitions: List of BIG-IP partitions to manage
+        bigip: ManagementRoot object
+        partition: BIG-IP partition to manage
     """
 
-    def __init__(self, hostname, port, username, password, partitions,
-                 manage_types):
-        """Initialize the K8sCloudBigIP object."""
-        super(K8sCloudBigIP, self).__init__(hostname, port, username,
-                                            password, partitions,
-                                            token="tmos",
-                                            manage_types=manage_types)
+    def __init__(self, bigip, partition):
+        """Initialize the CloudServiceManager object."""
+        self._mgmt_root = bigip
+        self._cccl = F5CloudServiceManager(
+            bigip,
+            partition,
+            prefix="")
 
-    def _apply_config(self, config):
+    def mgmt_root(self):
+        """ Return the BIG-IP ManagementRoot object"""
+        return self._mgmt_root
+
+    def get_partition(self):
+        """ Return the managed partition."""
+        return self._cccl.get_partition()
+
+    def _apply_ltm_config(self, config):
         """Apply the configuration to the BIG-IP.
 
         Args:
             config: BIG-IP config dict
         """
-        if 'ltm' in config:
-            CloudBigIP._apply_config(self, config['ltm'])
-        if 'network' in config:
-            self._apply_network_config(config['network'])
+        return self._cccl.apply_config(config)
 
     def _apply_network_config(self, config):
         """Apply the network configuration to the BIG-IP.
@@ -103,7 +171,9 @@ class K8sCloudBigIP(CloudBigIP):
             config: BIG-IP network config dict
         """
         if 'fdb' in config:
-            self._apply_network_fdb_config(config['fdb'])
+            return self._apply_network_fdb_config(config['fdb'])
+        else:
+            return 0
 
     def _apply_network_fdb_config(self, fdb_config):
         """Apply the network fdb configuration to the BIG-IP.
@@ -125,12 +195,14 @@ class K8sCloudBigIP(CloudBigIP):
                                    req_fdb_record_endpoint_list):
                 self.fdb_records_update(req_vxlan_name,
                                         req_fdb_record_endpoint_list)
+            return 0
         except (PartitionNameError, IPV4FormatError) as e:
             log.error(e)
-            return
+            return 0
         except Exception as e:
             log.error('Failed to configure the FDB for VxLAN tunnel '
                       '{}: {}'.format(req_vxlan_name, e))
+            return 1
 
     def get_vxlan_tunnel(self, vxlan_name):
         """Get a vxlan tunnel object.
@@ -139,7 +211,7 @@ class K8sCloudBigIP(CloudBigIP):
             vxlan_name: Name of the vxlan tunnel
         """
         partition, name = extract_partition_and_name(vxlan_name)
-        vxlan_tunnel = self.net.fdb.tunnels.tunnel.load(
+        vxlan_tunnel = self._mgmt_root.tm.net.fdb.tunnels.tunnel.load(
             partition=partition, name=urllib.quote(name))
         return vxlan_tunnel
 
@@ -251,184 +323,270 @@ class ConfigError(Exception):
         Exception.__init__(self, msg)
 
 
-def create_config_kubernetes(bigip, config):
-    """Create a BIG-IP configuration from the Kubernetes configuration.
+def create_ltm_config(partition, config):
+    """Extract a BIG-IP configuration from the input configuration.
 
     Args:
-        config: Kubernetes BigIP config
+        config: BigIP config
     """
-    log.debug("Generating config for BIG-IP from Kubernetes state")
-    f5 = {'ltm': {}, 'network': {}}
-    if 'openshift-sdn' in config:
-        f5['network'] = create_network_config_kubernetes(config)
-    if 'resources' in config and 'virtualServers' in config['resources']:
-        f5['ltm'] = create_ltm_config_kubernetes(bigip, config['resources'])
+    ltm = {}
+    if 'resources' in config and partition in config['resources']:
+        ltm = config['resources'][partition]
 
-    return f5
+    log.debug("Service Config: %s", json.dumps(ltm))
+    return ltm
 
 
-def create_network_config_kubernetes(config):
-    """Create a BIG-IP Network configuration from the Kubernetes config.
+def create_network_config(config):
+    """Extract a BIG-IP Network configuration from the input config.
 
     Args:
-        config: Kubernetes BigIP config which contains openshift-sdn defs
+        config: BigIP config which contains openshift-sdn defs
     """
     f5_network = {}
     if 'openshift-sdn' in config:
-        openshift_sdn = config['openshift-sdn']
-        f5_network['fdb'] = openshift_sdn
+        f5_network['fdb'] = config['openshift-sdn']
+
     return f5_network
 
 
-def append_ssl_profile(profiles, profName):
-    profile = (profName.split('/'))
-    if len(profile) != 2:
-        log.error("Could not parse partition and name "
-                  "from SSL profile: %s", profName)
-    else:
-        profiles.append({'partition': profile[0],
-                         'name': profile[1]})
+def _create_custom_profiles(mgmt, partition, custom_profiles):
+    incomplete = 0
 
-
-def create_ltm_config_kubernetes(bigip, config):
-    """Create a BIG-IP LTM configuration from the Kubernetes configuration.
-
-    Args:
-        config: Kubernetes BigIP config which contains a svc list
-    """
-    configuration = {}
-    configuration['l7Policies'] = config.get('l7Policies', [])
-    configuration['monitors'] = config.get('monitors', [])
-    configuration['pools'] = []
-
-    f5_pools = config.get('pools', [])
-    f5_services = {}
-
-    # partitions this script is responsible for:
-    partitions = frozenset(bigip.get_partitions())
-
-    svcs = config['virtualServers']
-    for svc in svcs:
-        vs_partition = svc['partition']
-        # Only handle application if it's partition is one that this script
-        # is responsible for
-        if not has_partition(partitions, vs_partition):
-            continue
-
-        f5_service = {}
-        vs_name = svc['name']
-        f5_service['balance'] = svc.get('balance', '')
-
-        policies = svc.get('policies', [])
-        profiles = svc.get('profiles', [])
-
-        pool = {}
-
-        # No address for this port
-        if (('virtualAddress' not in svc or
-                'bindAddr' not in svc['virtualAddress']) and
-                'iapp' not in svc):
-            log.debug("Creating pool only for %s", vs_name)
-        elif ('iapp' not in svc and 'bindAddr' not in
-                svc['virtualAddress']):
-            continue
-
-        f5_service['name'] = vs_name
-        f5_service['partition'] = vs_partition
-
-        if 'iapp' in svc:
-            f5_service['iapp'] = {'template': svc['iapp'],
-                                  'poolMemberTable':
-                                  svc['iappPoolMemberTable'],
-                                  'variables': svc['iappVariables'],
-                                  'options': svc['iappOptions']}
-            f5_service['iapp']['tables'] = svc.get('iappTables', {})
+    customProfiles = False
+    for profile in custom_profiles:
+        if profile['context'] == 'clientside':
+            incomplete += _create_client_ssl_profile(mgmt, partition, profile)
+            customProfiles = True
+        elif profile['context'] == 'serverside':
+            incomplete += _create_server_ssl_profile(mgmt, partition, profile)
+            customProfiles = True
         else:
-            f5_service['virtual'] = {}
-            f5_service['pool'] = {}
-            f5_service['health'] = []
+            log.error(
+                "Only client or server custom profiles are supported.")
 
-            # Add default profiles if no profiles have been passed through
-            profile_http = {'partition': 'Common', 'name': 'http'}
-            profile_tcp = {'partition': 'Common', 'name': 'tcp'}
-            if str(svc['mode']).lower() == 'http' and len(profiles) == 0:
-                profiles.append(profile_http)
-            elif (get_protocol(svc['mode']) == 'tcp' and
-                    len(profiles) == 0):
-                profiles.append(profile_tcp)
+    return customProfiles, incomplete
 
-            # Parse the SSL profile into partition and name
-            if 'sslProfiles' in svc:
-                # The sslProfiles item can be empty or have either
-                # 'f5ProfileName' or 'f5ProfileNames', not both.
-                if 'f5ProfileName' in svc['sslProfiles']:
-                    append_ssl_profile(
-                        profiles, svc['sslProfiles']['f5ProfileName'])
-                elif 'f5ProfileNames' in svc['sslProfiles']:
-                    for profName in svc['sslProfiles']['f5ProfileNames']:
-                        append_ssl_profile(profiles, profName)
 
-            if ('virtualAddress' in svc and
-                    'bindAddr' in svc['virtualAddress']):
-                f5_service['virtual_address'] = \
-                    svc['virtualAddress']['bindAddr']
+def _create_client_ssl_profile(mgmt, partition, profile):
+    ssl_client_profile = mgmt.tm.ltm.profile.client_ssls.client_ssl
 
-                f5_service['virtual'].update({
-                    'enabled': True,
-                    'disabled': False,
-                    'ipProtocol': get_protocol(svc['mode']),
-                    'destination':
-                    "/%s/%s:%d" % (vs_partition,
-                                   svc['virtualAddress']['bindAddr'],
-                                   svc['virtualAddress']['port']),
-                    'pool': "%s" % (svc['pool']),
-                    'sourceAddressTranslation': {'type': 'automap'},
-                    'profiles': profiles,
-                    'policies': policies
-                })
-        f5_services.update({vs_name: f5_service})
-    configuration['virtualServers'] = f5_services
+    name = profile['name']
 
-    # FIXME(garyr): CCCL presently expects pools slightly differently than
-    # we get from the controller, so convert to the expected format here.
-    for pool in f5_pools:
-        new_pool = {}
-        members = {}
-        pname = pool['name']
-        new_pool['name'] = pname
-        monitors = None
-        if 'monitor' in pool and pool['monitor']:
-            monitors = ' and '.join(pool['monitor'])
-        new_pool['monitor'] = monitors
+    # No need to create if it exists
+    if ssl_client_profile.exists(name=name, partition=partition):
+        return 0
 
-        new_pool['loadBalancingMode'] = pool['balance']
-        new_pool['partition'] = pool['partition']
-        if 'poolMemberAddrs' in pool and pool['poolMemberAddrs'] is not None:
-            for member in pool['poolMemberAddrs']:
-                members.update({member: {
-                    'state': 'user-up',
-                    'session': 'user-enabled'
-                }})
+    cert = profile['cert']
+    cert_name = name + '.crt'
+    incomplete = _install_certificate(mgmt, cert, cert_name)
+    if incomplete > 0:
+        # Unable to install cert
+        return incomplete
 
-        if 'description' in pool:
-            new_pool['description'] = pool['description']
+    key = profile['key']
+    key_name = name + '.key'
+    incomplete = _install_key(mgmt, key, key_name)
+    if incomplete > 0:
+        # Unable to install key
+        return incomplete
 
-        new_pool['members'] = members
-        configuration['pools'].append(new_pool)
+    try:
+        # create ssl-client profile from cert/key pair
+        chain = [{'name': name,
+                  'cert': '/Common/' + cert_name,
+                  'key': '/Common/' + key_name}]
+        serverName = profile.get('serverName', None)
+        sniDefault = profile.get('sniDefault', False)
+        ssl_client_profile.create(name=name,
+                                  partition=partition,
+                                  certKeyChain=chain,
+                                  serverName=serverName,
+                                  sniDefault=sniDefault,
+                                  defaultsFrom=None)
+    except Exception as err:
+        log.error("Error creating client SSL profile: %s" % err.message)
+        incomplete = 1
 
-    return configuration
+    return incomplete
+
+
+def _create_server_ssl_profile(mgmt, partition, profile):
+    ssl_server_profile = mgmt.tm.ltm.profile.server_ssls.server_ssl
+
+    name = profile['name']
+
+    # No need to create if it exists
+    if ssl_server_profile.exists(name=name, partition=partition):
+        return 0
+
+    cert = profile['cert']
+    cert_name = name + '.crt'
+    incomplete = _install_certificate(mgmt, cert, cert_name)
+    if incomplete > 0:
+        # Unable to install cert
+        return incomplete
+
+    try:
+        # create ssl-server profile
+        serverName = profile.get('serverName', None)
+        sniDefault = profile.get('sniDefault', False)
+        ssl_server_profile.create(name=name,
+                                  partition=partition,
+                                  chain=cert_name,
+                                  serverName=serverName,
+                                  sniDefault=sniDefault)
+    except Exception as err:
+        incomplete += 1
+        log.error("Error creating server SSL profile: %s" % err.message)
+
+    return incomplete
+
+
+def _delete_unused_ssl_profiles(mgmt, partition, config):
+    incomplete = 0
+
+    # client profiles
+    try:
+        client_profiles = mgmt.tm.ltm.profile.client_ssls.get_collection(
+            requests_params={'params': '$filter=partition+eq+%s'
+                             % partition})
+        incomplete += _delete_ssl_profiles(config, client_profiles)
+    except Exception as err:
+        log.error("Error reading client SSL profiles from BIG-IP: %s" %
+                  err.message)
+        incomplete += 1
+
+    # server profiles
+    try:
+        server_profiles = mgmt.tm.ltm.profile.server_ssls.get_collection(
+            requests_params={'params': '$filter=partition+eq+%s'
+                             % partition})
+        incomplete += _delete_ssl_profiles(config, server_profiles)
+    except Exception as err:
+        log.error("Error reading server SSL profiles from BIG-IP: %s" %
+                  err.message)
+        incomplete += 1
+
+    return incomplete
+
+
+def _delete_ssl_profiles(config, profiles):
+    incomplete = 0
+
+    if 'customProfiles' not in config:
+        # delete any profiles in managed partition
+        for prof in profiles:
+            try:
+                prof.delete()
+            except Exception as err:
+                log.error("Error deleting SSL profile: %s" % err.message)
+                incomplete += 1
+    else:
+        # delete profiles no longer in our config
+        for prof in profiles:
+            if not any(d['name'] == prof.name
+                       for d in config['customProfiles']):
+                try:
+                    prof.delete()
+                except Exception as err:
+                    log.error("Error deleting SSL profile: %s" % err.message)
+                    incomplete += 1
+
+    return incomplete
+
+
+def _upload_crypto_file(mgmt, file_data, file_name):
+    # bigip object is of type f5.bigip.tm;
+    # we need f5.bigip.shared for the uploader
+    uploader = mgmt.shared.file_transfer.uploads
+
+    # In-memory upload -- data not written to local file system but
+    # is saved as a file on the BIG-IP
+    uploader.upload_bytes(file_data, file_name)
+
+
+def _import_certificate(mgmt, cert_name):
+    cert_registrar = mgmt.tm.sys.crypto.certs
+    param_set = {}
+    param_set['name'] = cert_name
+    param_set['from-local-file'] = os.path.join(
+        '/var/config/rest/downloads', cert_name)
+    cert_registrar.exec_cmd('install', **param_set)
+
+
+def _import_key(mgmt, key_name):
+    key_registrar = mgmt.tm.sys.crypto.keys
+    param_set = {}
+    param_set['name'] = key_name
+    param_set['from-local-file'] = os.path.join(
+        '/var/config/rest/downloads', key_name)
+    key_registrar.exec_cmd('install', **param_set)
+
+
+def _install_certificate(mgmt, cert_data, cert_name):
+    incomplete = 0
+
+    try:
+        if not _certificate_exists(mgmt, cert_name):
+            # Upload and install cert
+            _upload_crypto_file(mgmt, cert_data, cert_name)
+            _import_certificate(mgmt, cert_name)
+
+    except Exception as err:
+        incomplete += 1
+        log.error("Error uploading certificate %s: %s" %
+                  (cert_name, err.message))
+
+    return incomplete
+
+
+def _install_key(mgmt, key_data, key_name):
+    incomplete = 0
+
+    try:
+        if not _key_exists(mgmt, key_name):
+            # Upload and install cert
+            _upload_crypto_file(mgmt, key_data, key_name)
+            _import_key(mgmt, key_name)
+
+    except Exception as err:
+        incomplete += 1
+        log.error("Error uploading key %s: %s" %
+                  (key_name, err.message))
+
+    return incomplete
+
+
+def _certificate_exists(mgmt, cert_name):
+    # All certs are in the Common partition
+    name_to_find = "/Common/{}".format(cert_name)
+    for cert in mgmt.tm.sys.crypto.certs.get_collection():
+        if cert.name == name_to_find:
+            return True
+    return False
+
+
+def _key_exists(mgmt, key_name):
+    # All keys are in the Common partition
+    name_to_find = "/Common/{}".format(key_name)
+    for key in mgmt.tm.sys.crypto.keys.get_collection():
+        if key.name == name_to_find:
+            return True
+    return False
 
 
 class ConfigHandler():
-    def __init__(self, config_file, bigip, verify_interval):
+    def __init__(self, config_file, managers, verify_interval):
         self._config_file = config_file
-        self._bigip = bigip
+        self._managers = managers
 
         self._condition = threading.Condition()
         self._thread = threading.Thread(target=self._do_reset)
         self._pending_reset = False
         self._stop = False
-        self._backoff_timer = 1
+        self._backoff_time = 1
+        self._backoff_timer = None
         self._max_backoff_time = 128
 
         self._interval = None
@@ -453,6 +611,8 @@ class ConfigHandler():
         self._stop = True
         self._condition.notify()
         self._condition.release()
+        if self._backoff_timer is not None:
+            self.cleanup_backoff()
 
     def notify_reset(self):
         self._condition.acquire()
@@ -464,6 +624,10 @@ class ConfigHandler():
         log.debug('config handler thread start')
 
         with self._condition:
+            # customProfiles is true when we've written out a custom profile.
+            # Once we know we've written out a profile, we can call delete
+            # if needed.
+            customProfiles = False
             while True:
                 self._condition.acquire()
                 if not self._pending_reset and not self._stop:
@@ -475,80 +639,132 @@ class ConfigHandler():
 
                 if self._stop:
                     log.info('stopping config handler')
+                    if self._backoff_timer is not None:
+                        self.cleanup_backoff()
                     break
 
-                try:
-                    start_time = time.time()
+                start_time = time.time()
 
-                    config = _parse_config(self._config_file)
-                    if 'resources' not in config:
-                        continue
-                    verify_interval, _ = _handle_global_config(config)
-                    _handle_openshift_sdn_config(config)
-                    self.set_interval_timer(verify_interval)
-                    cfg = create_config_kubernetes(self._bigip, config)
-                    if self._bigip.regenerate_config_f5(cfg):
-                        # Error occurred, perform retries
-                        log.warning(
-                            'regenerate operation failed, restarting')
+                config = _parse_config(self._config_file)
+                # No 'resources' indicates that the controller is not
+                # yet ready -- it does not mean to apply an empty config
+                if 'resources' not in config:
+                    continue
+                verify_interval, _ = _handle_global_config(config)
+                _handle_openshift_sdn_config(config)
+                self.set_interval_timer(verify_interval)
 
-                        if (self._interval and self._interval.is_running() is
-                                True):
-                            self._interval.stop()
-                        self.retry_backoff(self.notify_reset)
-                    else:
-                        if (self._interval and self._interval.is_running() is
-                                False):
-                            self._interval.start()
-                        self._backoff_timer = 1
+                cfg_network = create_network_config(config)
+                incomplete = 0
 
-                        perf_enable = os.environ.get('SCALE_PERF_ENABLE')
-                        if perf_enable:  # pragma: no cover
-                            test_data = {}
-                            app_count = 0
-                            backend_count = 0
-                            for service in config['virtualServers']:
-                                app_count += 1
-                                backends = 0
-                                for pool in config['pools']:
-                                    if pool['name'] == service['name']:
-                                        backends = len(pool['poolMemberAddrs'])
-                                        break
-                                test_data[service['name']] = backends
-                                backend_count += backends
-                            test_data['Total_Services'] = app_count
-                            test_data['Total_Backends'] = backend_count
-                            test_data['Time'] = time.time()
-                            json_data = json.dumps(test_data)
-                            log.info('SCALE_PERF: Test data: %s', json_data)
+                for mgr in self._managers:
+                    partition = mgr.get_partition()
+                    cfg_ltm = create_ltm_config(partition, config)
+                    try:
+                        # Manually create custom profiles;
+                        # CCCL doesn't yet do this
+                        if 'customProfiles' in cfg_ltm:
+                            tmp = 0
+                            customProfiles, tmp = _create_custom_profiles(
+                                mgr.mgmt_root(),
+                                partition,
+                                cfg_ltm['customProfiles'])
+                            incomplete += tmp
 
-                    log.debug('updating tasks finished, took %s seconds',
-                              time.time() - start_time)
-                except Exception:
-                    log.exception('Unexpected error')
+                        # Apply the BIG-IP config after creating profiles
+                        # and before deleting profiles
+                        incomplete += mgr._apply_ltm_config(cfg_ltm)
+
+                        # Manually delete custom profiles (if needed)
+                        if customProfiles:
+                            _delete_unused_ssl_profiles(
+                                mgr.mgmt_root(),
+                                partition,
+                                cfg_ltm)
+
+                    except F5CcclError as e:
+                        # We created an invalid configuration, raise the
+                        # exception and fail
+                        log.error("CCCL Error: %s", e.msg)
+                        raise e
+
+                incomplete += mgr._apply_network_config(cfg_network)
+
+                if incomplete:
+                    # Error occurred, perform retries
+                    self.handle_backoff()
+                else:
+                    if (self._interval and self._interval.is_running()
+                            is False):
+                        self._interval.start()
+                    self._backoff_time = 1
+                    if self._backoff_timer is not None:
+                        self.cleanup_backoff()
+
+                perf_enable = os.environ.get('SCALE_PERF_ENABLE')
+                if perf_enable:  # pragma: no cover
+                    test_data = {}
+                    app_count = 0
+                    backend_count = 0
+                    for service in config['resources']['virtualServers']:
+                        app_count += 1
+                        backends = 0
+                        for pool in config['resources']['pools']:
+                            if pool['name'] == service['name']:
+                                backends = len(pool['poolMemberAddrs'])
+                                break
+                        test_data[service['name']] = backends
+                        backend_count += backends
+                    test_data['Total_Services'] = app_count
+                    test_data['Total_Backends'] = backend_count
+                    test_data['Time'] = time.time()
+                    json_data = json.dumps(test_data)
+                    log.info('SCALE_PERF: Test data: %s',
+                             json_data)
+
+                log.debug('updating tasks finished, took %s seconds',
+                          time.time() - start_time)
 
         if self._interval:
             self._interval.stop()
 
-    def retry_backoff(self, func):
+    def cleanup_backoff(self):
+        """Cleans up canceled backoff timers."""
+        self._backoff_timer.cancel()
+        self._backoff_timer.join()
+        self._backoff_timer = None
+
+    def handle_backoff(self):
+        """Wrapper for calls to retry_backoff."""
+        if (self._interval and self._interval.is_running() is
+                True):
+            self._interval.stop()
+        if self._backoff_timer is None:
+            self.retry_backoff()
+
+    def retry_backoff(self):
         """Add a backoff timer to retry in case of failure."""
-        e = threading.Event()
+        def timer_cb():
+            self._backoff_timer = None
+            self.notify_reset()
+
+        self._backoff_timer = threading.Timer(
+            self._backoff_time, timer_cb
+        )
         log.error("Error applying config, will try again in %s seconds",
-                  self._backoff_timer)
-        e.wait(self._backoff_timer)
-        if self._backoff_timer < self._max_backoff_time:
-            self._backoff_timer *= 2
-        func()
+                  self._backoff_time)
+        self._backoff_timer.start()
+        if self._backoff_time < self._max_backoff_time:
+            self._backoff_time *= 2
 
 
 class ConfigWatcher(pyinotify.ProcessEvent):
-    def __init__(self, config_file, bigip, on_change):
+    def __init__(self, config_file, on_change):
         basename = os.path.basename(config_file)
         if not basename or 0 == len(basename):
             raise ConfigError('config_file must be a file path')
 
         self._config_file = config_file
-        self._bigip = bigip
         self._on_change = on_change
 
         self._config_dir = os.path.dirname(self._config_file)
@@ -810,23 +1026,31 @@ def main():
         # FIXME (kenr): Big-IP settings are currently static (we ignore any
         #               changes to these fields in subsequent updates). We
         #               may want to make the changes dynamic in the future.
-        bigip = K8sCloudBigIP(host, port,
-                              config['bigip']['username'],
-                              config['bigip']['password'],
-                              config['bigip']['partitions'],
-                              manage_types=[
-                                  '/tm/ltm/virtual',
-                                  '/tm/ltm/pool',
-                                  '/tm/ltm/monitor',
-                                  '/tm/sys/application/service',
-                                  '/tm/ltm/policy'])
 
-        handler = ConfigHandler(args.config_file, bigip, verify_interval)
+        # BIG-IP to manage
+        bigip = ManagementRoot(
+            host,
+            config['bigip']['username'],
+            config['bigip']['password'],
+            port=port,
+            token="tmos")
+
+        managers = []
+        for partition in config['bigip']['partitions']:
+            # Management for the BIG-IP partitions
+            manager = CloudServiceManager(
+                bigip,
+                partition)
+            managers.append(manager)
+
+        handler = ConfigHandler(args.config_file,
+                                managers,
+                                verify_interval)
 
         if os.path.exists(args.config_file):
             handler.notify_reset()
 
-        watcher = ConfigWatcher(args.config_file, bigip, handler.notify_reset)
+        watcher = ConfigWatcher(args.config_file, handler.notify_reset)
         watcher.loop()
         handler.stop()
     except (IOError, ValueError, ConfigError) as e:

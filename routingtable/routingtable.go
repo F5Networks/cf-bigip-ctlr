@@ -7,6 +7,7 @@ import (
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/bigipResources"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 
@@ -299,8 +300,12 @@ func (table *RoutingTable) updateRouter(
 	ea string,
 	ep uint16,
 ) {
-	addr := fmt.Sprintf("%s:%d", ea, ep)
-	update, err := f5router.NewTCPUpdate(table.c, table.logger, op, routePort, addr)
+	member := bigipResources.Member{
+		Address: ea,
+		Port:    ep,
+		Session: "user-enabled",
+	}
+	update, err := f5router.NewTCPUpdate(table.c, table.logger, op, routePort, member)
 
 	if nil != err {
 		table.logger.Warn(

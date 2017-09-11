@@ -64,11 +64,16 @@ func (hu updateHTTP) CreateResources(c *config.Config) bigipResources.Resources 
 	//  This will create the pool for the http update
 	rs := bigipResources.Resources{}
 
+	member := bigipResources.Member{
+		Address: hu.endpoint.Address,
+		Port:    hu.endpoint.Port,
+		Session: "user-enabled",
+	}
 	pool := makePool(
 		c,
 		hu.name,
 		makeDescription(hu.uri.String(), hu.endpoint.ApplicationId),
-		hu.endpoint.CanonicalAddr(),
+		member,
 	)
 	rs.Pools = append(rs.Pools, pool)
 

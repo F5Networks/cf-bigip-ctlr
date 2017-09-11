@@ -31,7 +31,7 @@ type updateTCP struct {
 	logger    logger.Logger
 	op        routeUpdate.Operation
 	routePort uint16
-	addr      string
+	member    bigipResources.Member
 	name      string
 	protocol  string
 }
@@ -42,7 +42,7 @@ func NewTCPUpdate(
 	logger logger.Logger,
 	op routeUpdate.Operation,
 	routePort uint16,
-	addr string,
+	member bigipResources.Member,
 ) (updateTCP, error) {
 
 	return updateTCP{
@@ -50,7 +50,7 @@ func NewTCPUpdate(
 		logger:    logger,
 		op:        op,
 		routePort: routePort,
-		addr:      addr,
+		member:    member,
 		name:      createTCPObjectName(c, routePort),
 		protocol:  "tcp",
 	}, nil
@@ -60,7 +60,7 @@ func (tu updateTCP) CreateResources(c *config.Config) bigipResources.Resources {
 	rs := bigipResources.Resources{}
 	// FIXME need to handle multiple tcp router groups
 	poolDescrip := fmt.Sprintf("route-port: %d, router-group: %s", tu.routePort, c.TCPRouterGroupName)
-	pool := makePool(c, tu.name, poolDescrip, tu.addr)
+	pool := makePool(c, tu.name, poolDescrip, tu.member)
 	rs.Pools = append(rs.Pools, pool)
 
 	va := &bigipResources.VirtualAddress{
@@ -79,7 +79,9 @@ func (tu updateTCP) CreateResources(c *config.Config) bigipResources.Resources {
 		[]*bigipResources.NameRef{},
 	)
 
-	rs.Virtuals = append(rs.Virtuals, vs)
+	if nil != vs {
+		rs.Virtuals = append(rs.Virtuals, vs)
+	}
 	return rs
 }
 

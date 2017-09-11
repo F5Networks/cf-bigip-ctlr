@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"sort"
@@ -192,7 +193,7 @@ func (r *F5Router) createHTTPVirtuals() {
 			"",
 			r.c.BigIP.Partitions[0],
 			va,
-			"http",
+			"tcp",
 			plcs,
 			prfls,
 		)
@@ -210,7 +211,7 @@ func (r *F5Router) createHTTPVirtuals() {
 				"",
 				r.c.BigIP.Partitions[0],
 				va,
-				"http",
+				"tcp",
 				plcs,
 				prfls,
 			)
@@ -279,48 +280,60 @@ func (r *F5Router) generatePolicyList() []*bigipResources.NameRef {
 	return n
 }
 
-func (r *F5Router) createPolicies(rs *bigipResources.Resources, wg *sync.WaitGroup) {
+func (r *F5Router) createPolicies(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if len(r.wildcards) != 0 || len(r.r) != 0 {
-		rs.Policies = bigipResources.Policies{
+		pm[partition].Policies = bigipResources.Policies{
 			r.makeRoutePolicy(CFRoutingPolicyName),
 		}
 	}
 }
 
-func (r *F5Router) createVirtuals(rs *bigipResources.Resources, wg *sync.WaitGroup) {
+func (r *F5Router) createVirtuals(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for _, virtual := range r.virtualResources {
-		rs.Virtuals = append(rs.Virtuals, virtual)
+		pm[partition].Virtuals = append(pm[partition].Virtuals, virtual)
 	}
 }
 
-func (r *F5Router) createPools(rs *bigipResources.Resources, wg *sync.WaitGroup) {
+func (r *F5Router) createPools(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for _, pool := range r.poolResources {
-		rs.Pools = append(rs.Pools, pool)
+		pm[partition].Pools = append(pm[partition].Pools, pool)
 	}
 }
 
-func (r *F5Router) createResources() *bigipResources.Resources {
-	rs := &bigipResources.Resources{}
+// Create a partition entry in the map if it doesn't exist
+func initPartitionData(pm bigipResources.PartitionMap, partition string) {
+	if _, ok := pm[partition]; !ok {
+		pm[partition] = &bigipResources.Resources{}
+	}
+}
+
+func (r *F5Router) createResources() bigipResources.PartitionMap {
+	// Organize the data as a map of arrays of resources (per partition)
+	pm := bigipResources.PartitionMap{}
+
+	//FIXME need to handle multiple partitions
+	partition := r.c.BigIP.Partitions[0]
+	initPartitionData(pm, partition)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	go r.createPolicies(rs, &wg)
+	go r.createPolicies(pm, partition, &wg)
 
 	wg.Add(1)
-	go r.createVirtuals(rs, &wg)
+	go r.createVirtuals(pm, partition, &wg)
 
 	wg.Add(1)
-	go r.createPools(rs, &wg)
+	go r.createPools(pm, partition, &wg)
 
 	wg.Wait()
 
-	return rs
+	return pm
 }
 
 func (r *F5Router) process() bool {
@@ -396,19 +409,16 @@ func makePool(
 	c *config.Config,
 	name string,
 	descrip string,
-	addrs ...string,
+	members ...bigipResources.Member,
 ) *bigipResources.Pool {
 
 	prefixHealthMonitors := fixupNames(c.BigIP.HealthMonitors)
 	return &bigipResources.Pool{
-		Name: name,
-		//FIXME need to handle multiple partitions
-		Partition:       c.BigIP.Partitions[0],
-		Balance:         c.BigIP.LoadBalancingMode,
-		ServicePort:     -1, // unused
-		PoolMemberAddrs: addrs,
-		MonitorNames:    prefixHealthMonitors,
-		Description:     descrip,
+		Name:         name,
+		Balance:      c.BigIP.LoadBalancingMode,
+		Members:      members,
+		MonitorNames: prefixHealthMonitors,
+		Description:  descrip,
 	}
 }
 
@@ -421,17 +431,34 @@ func makeVirtual(
 	policies []*bigipResources.NameRef,
 	profiles []*bigipResources.NameRef,
 ) *bigipResources.Virtual {
-	vs := &bigipResources.Virtual{
-		VirtualServerName: name,
-		//FIXME need to handle multiple partitions
-		PoolName:       poolName,
-		Partition:      partition,
-		VirtualAddress: virtualAddress,
-		Mode:           mode,
-		Policies:       policies,
-		Profiles:       profiles,
+	// Validate the IP address, and create the destination
+	addr := net.ParseIP(virtualAddress.BindAddr)
+	if nil != addr {
+		var format string
+		if nil != addr.To4() {
+			format = "/%s/%s:%d"
+		} else {
+			format = "/%s/%s.%d"
+		}
+		destination := fmt.Sprintf(
+			format,
+			partition,
+			virtualAddress.BindAddr,
+			virtualAddress.Port)
+
+		vs := &bigipResources.Virtual{
+			Enabled:           true,
+			VirtualServerName: name,
+			PoolName:          poolName,
+			Destination:       destination,
+			Mode:              mode,
+			Policies:          policies,
+			Profiles:          profiles,
+		}
+		return vs
+	} else {
+		return nil
 	}
-	return vs
 }
 
 func (r *F5Router) makeRouteRule(ru updateHTTP) (*bigipResources.Rule, error) {
@@ -512,13 +539,12 @@ func (r *F5Router) makeRouteRule(ru updateHTTP) (*bigipResources.Rule, error) {
 
 func (r *F5Router) makeRoutePolicy(policyName string) *bigipResources.Policy {
 	plcy := bigipResources.Policy{
-		Controls:  []string{"forwarding"},
-		Legacy:    true,
-		Name:      policyName,
-		Partition: r.c.BigIP.Partitions[0], //FIXME handle multiple partitions
-		Requires:  []string{"http"},
-		Rules:     []*bigipResources.Rule{},
-		Strategy:  "/Common/first-match",
+		Controls: []string{"forwarding"},
+		Legacy:   true,
+		Name:     policyName,
+		Requires: []string{"http"},
+		Rules:    []*bigipResources.Rule{},
+		Strategy: "/Common/first-match",
 	}
 
 	var wg sync.WaitGroup
@@ -596,14 +622,14 @@ func (r *F5Router) addPool(pool *bigipResources.Pool) {
 	p, exists := r.poolResources[key]
 
 	if exists {
-		for _, addr := range p.PoolMemberAddrs {
+		for _, addr := range p.Members {
 			// Currently only a single update comes through at a time so we always
 			// know to look at the first addr
-			if addr == pool.PoolMemberAddrs[0] {
+			if addr == pool.Members[0] {
 				return
 			}
 		}
-		p.PoolMemberAddrs = append(p.PoolMemberAddrs, pool.PoolMemberAddrs...)
+		p.Members = append(p.Members, pool.Members...)
 	} else {
 		r.poolResources[key] = pool
 	}
@@ -616,17 +642,17 @@ func (r *F5Router) removePool(pool *bigipResources.Pool) bool {
 
 	p, exists := r.poolResources[key]
 	if exists {
-		for i, addr := range p.PoolMemberAddrs {
+		for i, addr := range p.Members {
 			// Currently only a single update comes through at a time so we always
 			// know to look at the first addr
-			if addr == pool.PoolMemberAddrs[0] {
-				p.PoolMemberAddrs[i] = p.PoolMemberAddrs[len(p.PoolMemberAddrs)-1]
-				p.PoolMemberAddrs[len(p.PoolMemberAddrs)-1] = ""
-				p.PoolMemberAddrs = p.PoolMemberAddrs[:len(p.PoolMemberAddrs)-1]
+			if addr == pool.Members[0] {
+				p.Members[i] = p.Members[len(p.Members)-1]
+				p.Members[len(p.Members)-1] = bigipResources.Member{"", 0, ""}
+				p.Members = p.Members[:len(p.Members)-1]
 			}
 		}
 		// delete the pool and virtual if there are no members
-		if len(p.PoolMemberAddrs) == 0 {
+		if len(p.Members) == 0 {
 			delete(r.poolResources, key)
 			return true
 		}

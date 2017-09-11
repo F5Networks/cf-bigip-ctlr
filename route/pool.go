@@ -43,7 +43,8 @@ func NewStats() *Stats {
 
 type Endpoint struct {
 	ApplicationId        string
-	addr                 string
+	Address              string
+	Port                 uint16
 	Tags                 map[string]string
 	PrivateInstanceId    string
 	staleThreshold       time.Duration
@@ -93,7 +94,8 @@ func NewEndpoint(
 ) *Endpoint {
 	return &Endpoint{
 		ApplicationId:        appId,
-		addr:                 fmt.Sprintf("%s:%d", host, port),
+		Address:              host,
+		Port:                 port,
 		Tags:                 tags,
 		PrivateInstanceId:    privateInstanceId,
 		PrivateInstanceIndex: privateInstanceIndex,
@@ -307,7 +309,7 @@ func (e *Endpoint) MarshalJSON() ([]byte, error) {
 		Tags            map[string]string `json:"tags"`
 	}
 
-	jsonObj.Address = e.addr
+	jsonObj.Address = e.CanonicalAddr()
 	jsonObj.RouteServiceUrl = e.RouteServiceUrl
 	jsonObj.TTL = int(e.staleThreshold.Seconds())
 	jsonObj.Tags = e.Tags
@@ -315,7 +317,7 @@ func (e *Endpoint) MarshalJSON() ([]byte, error) {
 }
 
 func (e *Endpoint) CanonicalAddr() string {
-	return e.addr
+	return fmt.Sprintf("%s:%d", e.Address, e.Port)
 }
 
 func (rm *Endpoint) Component() string {
@@ -325,7 +327,7 @@ func (rm *Endpoint) Component() string {
 func (e *Endpoint) ToLogData() []zap.Field {
 	return []zap.Field{
 		zap.String("ApplicationId", e.ApplicationId),
-		zap.String("Addr", e.addr),
+		zap.String("Addr", e.CanonicalAddr()),
 		zap.Object("Tags", e.Tags),
 		zap.String("RouteServiceUrl", e.RouteServiceUrl),
 	}

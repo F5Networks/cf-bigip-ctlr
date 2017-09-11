@@ -352,16 +352,16 @@ var _ = Describe("F5Router", func() {
 		Context("tcp routing", func() {
 			registerTCP := func() {
 				ups := []tcpPair{
-					{6010, "10.0.0.1:5000"},
-					{6010, "10.0.0.1:5001"},
-					{6010, "10.0.0.1:5002"},
-					{6020, "10.0.0.1:6000"},
-					{6030, "10.0.0.1:7000"},
-					{6040, "10.0.0.1:8000"},
-					{6050, "10.0.0.1:9000"},
+					{6010, bigipResources.Member{"10.0.0.1", 5000, "user-enabled"}},
+					{6010, bigipResources.Member{"10.0.0.1", 5001, "user-enabled"}},
+					{6010, bigipResources.Member{"10.0.0.1", 5002, "user-enabled"}},
+					{6020, bigipResources.Member{"10.0.0.1", 6000, "user-enabled"}},
+					{6030, bigipResources.Member{"10.0.0.1", 7000, "user-enabled"}},
+					{6040, bigipResources.Member{"10.0.0.1", 8000, "user-enabled"}},
+					{6050, bigipResources.Member{"10.0.0.1", 9000, "user-enabled"}},
 				}
 				for _, pair := range ups {
-					up, _ := NewTCPUpdate(c, logger, routeUpdate.Add, pair.port, pair.addr)
+					up, _ := NewTCPUpdate(c, logger, routeUpdate.Add, pair.port, pair.member)
 					router.UpdateRoute(up)
 				}
 			}
@@ -393,16 +393,20 @@ var _ = Describe("F5Router", func() {
 				registerTCP()
 				matchConfig(mw, expectedConfigs[4])
 				// add a pool member to existing pool
-				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6020, "10.0.0.1:6001")
+				member := bigipResources.Member{"10.0.0.1", 6001, "user-enabled"}
+				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6020, member)
 				router.UpdateRoute(ad)
 				// add a new pool - new pool and vs created
-				ad2, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6060, "10.0.0.1:6000")
+				member = bigipResources.Member{"10.0.0.1", 6000, "user-enabled"}
+				ad2, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6060, member)
 				router.UpdateRoute(ad2)
 				// remove a pool member with other members left
-				rmEP, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6010, "10.0.0.1:5000")
+				member = bigipResources.Member{"10.0.0.1", 5000, "user-enabled"}
+				rmEP, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6010, member)
 				router.UpdateRoute(rmEP)
 				// remove a pool member and none are left - pool and vs is deleted
-				rmEP2, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6050, "10.0.0.1:9000")
+				member = bigipResources.Member{"10.0.0.1", 9000, "user-enabled"}
+				rmEP2, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6050, member)
 				router.UpdateRoute(rmEP2)
 
 				matchConfig(mw, expectedConfigs[5])
@@ -412,7 +416,8 @@ var _ = Describe("F5Router", func() {
 				registerTCP()
 				matchConfig(mw, expectedConfigs[4])
 
-				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6010, "10.0.0.1:5000")
+				member := bigipResources.Member{"10.0.0.1", 5000, "user-enabled"}
+				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6010, member)
 				router.UpdateRoute(ad)
 				router.UpdateRoute(ad)
 				router.UpdateRoute(ad)
@@ -429,7 +434,7 @@ var _ = Describe("F5Router", func() {
 type configMatcher struct {
 	Global    bigipResources.GlobalConfig `json:"global"`
 	BigIP     config.BigIPConfig          `json:"bigip"`
-	Resources bigipResources.Resources    `json:"resources"`
+	Resources bigipResources.PartitionMap `json:"resources"`
 }
 
 type testRoutes struct {
@@ -449,8 +454,8 @@ type routePair struct {
 }
 
 type tcpPair struct {
-	port uint16
-	addr string
+	port   uint16
+	member bigipResources.Member
 }
 
 func (mw *MockWriter) GetOutputFilename() string {
@@ -526,18 +531,31 @@ func matchConfig(mw *MockWriter, expected []byte) {
 	}).Should(Equal(matcher.BigIP))
 
 	EventuallyWithOffset(1, func() []*bigipResources.Virtual {
-		return mw.getInput().Resources.Virtuals
-	}).Should(ConsistOf(matcher.Resources.Virtuals))
-
+		if _, ok := mw.getInput().Resources["cf"]; ok {
+			return mw.getInput().Resources["cf"].Virtuals
+		} else {
+			return nil
+		}
+	}).Should(ConsistOf(matcher.Resources["cf"].Virtuals))
 	EventuallyWithOffset(1, func() []*bigipResources.Pool {
-		return mw.getInput().Resources.Pools
-	}).Should(ConsistOf(matcher.Resources.Pools))
-
+		if _, ok := mw.getInput().Resources["cf"]; ok {
+			return mw.getInput().Resources["cf"].Pools
+		} else {
+			return nil
+		}
+	}).Should(ConsistOf(matcher.Resources["cf"].Pools))
 	EventuallyWithOffset(1, func() []*bigipResources.Monitor {
-		return mw.getInput().Resources.Monitors
-	}).Should(ConsistOf(matcher.Resources.Monitors))
-
+		if _, ok := mw.getInput().Resources["cf"]; ok {
+			return mw.getInput().Resources["cf"].Monitors
+		} else {
+			return nil
+		}
+	}).Should(ConsistOf(matcher.Resources["cf"].Monitors))
 	EventuallyWithOffset(1, func() []*bigipResources.Policy {
-		return mw.getInput().Resources.Policies
-	}).Should(ConsistOf(matcher.Resources.Policies))
+		if _, ok := mw.getInput().Resources["cf"]; ok {
+			return mw.getInput().Resources["cf"].Policies
+		} else {
+			return nil
+		}
+	}).Should(ConsistOf(matcher.Resources["cf"].Policies))
 }
