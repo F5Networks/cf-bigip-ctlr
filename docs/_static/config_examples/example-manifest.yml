@@ -46,6 +46,7 @@ applications:
                       prune_stale_droplets_interval: 30s
                       droplet_stale_threshold: 120s
                       suspend_pruning_if_nats_unavailable: false
+                      route_mode: all
 
                       oauth:
                         token_endpoint: uaa.system.pcf.local

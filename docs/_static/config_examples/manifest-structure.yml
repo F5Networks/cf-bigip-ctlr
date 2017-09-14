@@ -36,6 +36,7 @@ applications:
                       prune_stale_droplets_interval: number
                       droplet_stale_threshold: number
                       suspend_pruning_if_nats_unavailable: boolean
+                      route_mode: string
 
                       oauth:
                         token_endpoint: string

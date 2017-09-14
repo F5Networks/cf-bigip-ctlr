@@ -149,6 +149,8 @@ Configuration Parameters
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | suspend_prune_if_nats_unavailable        | boolean | Optional | false          | If NATS becomes unavailable should pruning suspend                              |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+| route_mode                               | string  | Optional | http           | Route types you want to watch, provide a single value                           | http, tcp, all |
++------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | start_response_delay_interval            | integer | Optional | 5              | In seconds, wait time to achieve steady state from routing message bus          |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_max_retries                | integer | Optional | 3              | Number of retries to fetch auth token                                           |                |
@@ -156,6 +158,8 @@ Configuration Parameters
 | token_fetcher_retry_interval             | integer | Optional | 5              | In seconds, time to wait between token fetch retries                            |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_expiration_buffer_time     | integer | Optional | 30             | In seconds, time to re-fetch auth token                                         |                |
++------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+| tcp_router_group                         | string  | Optional | default-tcp    | Name of TCP router group                                                        |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 
 The F5 BIG-IP Controller for Cloud Foundry manages the BIG-IP virtual servers used for policy routing. It will always create an HTTP  virtual server (virtual address port 80) for routing into `Cloud Foundry`_. If one or more SSL profiles exist in the configuration (the ``ssl_profiles`` parameter) the controller creates an additional HTTPS virtual server (virtual address port 443).

@@ -1,4 +1,4 @@
-package route_fetcher_test
+package routefetcher_test
 
 import (
 	"testing"

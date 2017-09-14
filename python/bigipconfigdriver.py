@@ -401,17 +401,7 @@ def create_ltm_config_kubernetes(bigip, config):
             monitors = ' and '.join(pool['monitor'])
         new_pool['monitor'] = monitors
 
-        balance = None
-        vname = pname.rsplit('_', 1)[0]
-        if pname in f5_services:
-            if 'balance' in f5_services[pname]:
-                balance = f5_services[pname]['balance']
-        elif vname in f5_services:
-            if 'balance' in f5_services[vname]:
-                balance = f5_services[vname]['balance']
-        elif 'balance' in pool:
-            balance = pool['balance']
-        new_pool['loadBalancingMode'] = balance
+        new_pool['loadBalancingMode'] = pool['balance']
         new_pool['partition'] = pool['partition']
         if 'poolMemberAddrs' in pool and pool['poolMemberAddrs'] is not None:
             for member in pool['poolMemberAddrs']:
@@ -419,11 +409,6 @@ def create_ltm_config_kubernetes(bigip, config):
                     'state': 'user-up',
                     'session': 'user-enabled'
                 }})
-        else:
-            log.info(
-                'Pool "{}" has service "{}", which is empty - '
-                'configuring 0 pool members.'.format(
-                    pname, pool['serviceName']))
 
         if 'description' in pool:
             new_pool['description'] = pool['description']

@@ -32,6 +32,7 @@ import (
 	fakeMetrics "github.com/F5Networks/cf-bigip-ctlr/metrics/fakes"
 	rregistry "github.com/F5Networks/cf-bigip-ctlr/registry"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
 	"github.com/F5Networks/cf-bigip-ctlr/test"
 	"github.com/F5Networks/cf-bigip-ctlr/test/common"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
@@ -52,12 +53,13 @@ var _ = Describe("Controller", func() {
 		natsPort   uint16
 		config     *cfg.Config
 
-		mbusClient *nats.Conn
-		registry   *rregistry.RouteRegistry
-		varz       vvarz.Varz
-		logger     logger.Logger
-		controller *Controller
-		statusPort uint16
+		mbusClient   *nats.Conn
+		registry     *rregistry.RouteRegistry
+		routingTable *routingtable.RoutingTable
+		varz         vvarz.Varz
+		logger       logger.Logger
+		controller   *Controller
+		statusPort   uint16
 	)
 
 	BeforeEach(func() {
@@ -74,10 +76,11 @@ var _ = Describe("Controller", func() {
 		mbusClient = natsRunner.MessageBus
 		logger = test_util.NewTestZapLogger("controller-test")
 		registry = rregistry.NewRouteRegistry(logger, config, nil, new(fakeMetrics.FakeRouteRegistryReporter), "")
+		routingTable = routingtable.NewRoutingTable(logger, config, nil)
 		varz = vvarz.NewVarz(registry)
 
 		var err error
-		controller, err = NewController(logger, config, mbusClient, registry, varz)
+		controller, err = NewController(logger, config, mbusClient, registry, routingTable, varz)
 
 		Expect(err).ToNot(HaveOccurred())
 

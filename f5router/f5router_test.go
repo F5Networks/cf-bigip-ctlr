@@ -23,8 +23,8 @@ import (
 	"sync"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
-	"github.com/F5Networks/cf-bigip-ctlr/metrics/fakes"
-	"github.com/F5Networks/cf-bigip-ctlr/registry"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/bigipResources"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
@@ -38,56 +38,56 @@ var _ = Describe("F5Router", func() {
 	Describe("sorting", func() {
 		Context("rules", func() {
 			It("should sort correctly", func() {
-				l7 := rules{}
+				l7 := bigipResources.Rules{}
 
-				expectedList := make(rules, 10)
+				expectedList := make(bigipResources.Rules, 10)
 
-				p := rule{}
+				p := bigipResources.Rule{}
 				p.FullURI = "bar"
 				l7 = append(l7, &p)
 				expectedList[1] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "foo"
 				l7 = append(l7, &p)
 				expectedList[5] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "foo"
 				l7 = append(l7, &p)
 				expectedList[7] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "baz"
 				l7 = append(l7, &p)
 				expectedList[2] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "foo"
 				l7 = append(l7, &p)
 				expectedList[6] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "foo"
 				l7 = append(l7, &p)
 				expectedList[9] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "baz"
 				l7 = append(l7, &p)
 				expectedList[3] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "foo"
 				l7 = append(l7, &p)
 				expectedList[8] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "foo"
 				l7 = append(l7, &p)
 				expectedList[4] = &p
 
-				p = rule{}
+				p = bigipResources.Rule{}
 				p.FullURI = "bar"
 				l7 = append(l7, &p)
 				expectedList[0] = &p
@@ -147,9 +147,9 @@ var _ = Describe("F5Router", func() {
 		var mw *MockWriter
 		var router *F5Router
 		var err error
+		var up updateHTTP
 		var logger *test_util.TestZapLogger
 		var c *config.Config
-		var r registry.Registry
 
 		var (
 			fooEndpoint,
@@ -167,32 +167,22 @@ var _ = Describe("F5Router", func() {
 		)
 
 		registerRoutes := func() {
-			// this weird pattern let's us test some concurrency while still
-			// keeping the pool internal lists sorted for easier matching
-			go func() {
-				r.Register("foo.cf.com", fooEndpoint)
-			}()
-			go func() {
-				r.Register("bar.cf.com", barEndpoint)
-				r.Register("bar.cf.com", bar2Endpoint)
-			}()
-			go func() {
-				r.Register("baz.cf.com", bazEndpoint)
-			}()
-			go func() {
-				r.Register("baz.cf.com/segment1", bazSegment1Endpoint)
-				r.Register("baz.cf.com/segment1", baz2Segment1Endpoint)
-			}()
-			go func() {
-				r.Register("baz.cf.com/segment1/segment2/segment3", bazSegment3Endpoint)
-				r.Register("baz.cf.com/segment1/segment2/segment3", baz2Segment3Endpoint)
-			}()
-			go func() {
-				r.Register("*.cf.com", wildCfEndpoint)
-			}()
-			go func() {
-				r.Register("*.foo.cf.com", wildFooEndpoint)
-			}()
+			rp := []routePair{
+				routePair{"foo.cf.com", fooEndpoint},
+				routePair{"bar.cf.com", barEndpoint},
+				routePair{"bar.cf.com", bar2Endpoint},
+				routePair{"baz.cf.com", bazEndpoint},
+				routePair{"baz.cf.com/segment1", bazSegment1Endpoint},
+				routePair{"baz.cf.com/segment1", baz2Segment1Endpoint},
+				routePair{"baz.cf.com/segment1/segment2/segment3", bazSegment3Endpoint},
+				routePair{"baz.cf.com/segment1/segment2/segment3", baz2Segment3Endpoint},
+				routePair{"*.cf.com", wildCfEndpoint},
+				routePair{"*.foo.cf.com", wildFooEndpoint},
+			}
+			for _, pair := range rp {
+				up, _ = NewUpdate(logger, routeUpdate.Add, pair.url, pair.ep)
+				router.UpdateRoute(up)
+			}
 		}
 
 		BeforeEach(func() {
@@ -218,13 +208,6 @@ var _ = Describe("F5Router", func() {
 			wildFooEndpoint = makeEndpoint("127.0.6.1")
 			quxEndpoint = makeEndpoint("127.0.7.1")
 
-			r = registry.NewRouteRegistry(
-				logger,
-				c,
-				router,
-				new(fakes.FakeRouteRegistryReporter),
-				"",
-			)
 		})
 
 		AfterEach(func() {
@@ -275,36 +258,34 @@ var _ = Describe("F5Router", func() {
 			update++
 
 			// make some changes and update the verification function
-			r.Unregister("bar.cf.com", barEndpoint)
-			p := r.LookupWithoutWildcard("bar.cf.com")
-			Expect(p).ToNot(BeNil())
-			Expect(p.FindById(barEndpoint.CanonicalAddr())).To(BeNil())
+			up, err = NewUpdate(logger, routeUpdate.Remove, "bar.cf.com", barEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
 
-			r.Unregister("baz.cf.com/segment1", baz2Segment1Endpoint)
-			p = r.LookupWithoutWildcard("baz.cf.com/segment1")
-			Expect(p).ToNot(BeNil())
-			Expect(p.FindById(baz2Segment1Endpoint.CanonicalAddr())).To(BeNil())
+			up, err = NewUpdate(logger, routeUpdate.Remove, "baz.cf.com/segment1", baz2Segment1Endpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
 
-			r.Register("baz.cf.com", baz2Endpoint)
-			p = r.LookupWithoutWildcard("baz.cf.com")
-			Expect(p).ToNot(BeNil())
-			Expect(p.FindById(baz2Endpoint.CanonicalAddr())).ToNot(BeNil())
+			up, err = NewUpdate(logger, routeUpdate.Add, "baz.cf.com", baz2Endpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
 
-			r.Unregister("*.foo.cf.com", wildFooEndpoint)
-			p = r.LookupWithoutWildcard("*.foo.cf.com")
-			Expect(p).To(BeNil())
+			up, err = NewUpdate(logger, routeUpdate.Remove, "*.foo.cf.com", wildFooEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
 
-			r.Unregister("foo.cf.com", fooEndpoint)
-			p = r.LookupWithoutWildcard("foo.cf.com")
-			Expect(p).To(BeNil())
+			up, err = NewUpdate(logger, routeUpdate.Remove, "foo.cf.com", fooEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
+
 			// config1
 			matchConfig(mw, expectedConfigs[update])
 			update++
 
-			r.Register("qux.cf.com", quxEndpoint)
-			p = r.LookupWithoutWildcard("qux.cf.com")
-			Expect(p).ToNot(BeNil())
-			Expect(p.FindById(quxEndpoint.CanonicalAddr())).ToNot(BeNil())
+			up, err = NewUpdate(logger, routeUpdate.Add, "qux.cf.com", quxEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
+
 			// config2
 			matchConfig(mw, expectedConfigs[update])
 
@@ -323,13 +304,6 @@ var _ = Describe("F5Router", func() {
 			c.BigIP.Policies = []string{"Common/fakepolicy", "/cf/anotherpolicy"}
 
 			router, err = NewF5Router(logger, c, mw)
-			r = registry.NewRouteRegistry(
-				logger,
-				c,
-				router,
-				new(fakes.FakeRouteRegistryReporter),
-				"",
-			)
 
 			go func() {
 				defer GinkgoRecover()
@@ -348,22 +322,8 @@ var _ = Describe("F5Router", func() {
 
 		Context("fail cases", func() {
 			It("should error when not passing a URI for route update", func() {
-				done := make(chan struct{})
-				os := make(chan os.Signal)
-				ready := make(chan struct{})
-
-				go func() {
-					defer GinkgoRecover()
-					Expect(func() {
-						err = router.Run(os, ready)
-						Expect(err).NotTo(HaveOccurred())
-						close(done)
-					}).NotTo(Panic())
-				}()
-
-				r.Register("", fooEndpoint)
-
-				Eventually(logger).Should(Say("f5router-skipping-update"))
+				_, updateErr := NewUpdate(logger, routeUpdate.Add, "", fooEndpoint)
+				Expect(updateErr).To(MatchError("uri length of zero is not allowed"))
 			})
 
 			It("should error on invalid policy format", func() {
@@ -374,13 +334,6 @@ var _ = Describe("F5Router", func() {
 				c.BigIP.Policies = []string{"fakepolicy", "/cf/anotherpolicy"}
 
 				router, err = NewF5Router(logger, c, mw)
-				r = registry.NewRouteRegistry(
-					logger,
-					c,
-					router,
-					new(fakes.FakeRouteRegistryReporter),
-					"",
-				)
 
 				go func() {
 					defer GinkgoRecover()
@@ -393,9 +346,79 @@ var _ = Describe("F5Router", func() {
 				Eventually(ready).Should(BeClosed())
 
 				Eventually(logger).Should(Say("f5router-skipping-name"))
-				p, _ := json.Marshal(router.routeVSHTTP.Policies)
-				cp := `[{"name":"anotherpolicy","partition":"cf"},{"name":"cf-routing-policy","partition":"cf"}]`
-				Eventually(p).Should(MatchJSON(cp))
+			})
+
+		})
+		Context("tcp routing", func() {
+			registerTCP := func() {
+				ups := []tcpPair{
+					{6010, "10.0.0.1:5000"},
+					{6010, "10.0.0.1:5001"},
+					{6010, "10.0.0.1:5002"},
+					{6020, "10.0.0.1:6000"},
+					{6030, "10.0.0.1:7000"},
+					{6040, "10.0.0.1:8000"},
+					{6050, "10.0.0.1:9000"},
+				}
+				for _, pair := range ups {
+					up, _ := NewTCPUpdate(c, logger, routeUpdate.Add, pair.port, pair.addr)
+					router.UpdateRoute(up)
+				}
+			}
+			BeforeEach(func() {
+				c.RoutingMode = config.TCP
+				router, err = NewF5Router(logger, c, mw)
+
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+
+			})
+
+			It("should register tcp routes", func() {
+				registerTCP()
+				matchConfig(mw, expectedConfigs[4])
+			})
+
+			It("should update tcp routes", func() {
+				registerTCP()
+				matchConfig(mw, expectedConfigs[4])
+				// add a pool member to existing pool
+				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6020, "10.0.0.1:6001")
+				router.UpdateRoute(ad)
+				// add a new pool - new pool and vs created
+				ad2, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6060, "10.0.0.1:6000")
+				router.UpdateRoute(ad2)
+				// remove a pool member with other members left
+				rmEP, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6010, "10.0.0.1:5000")
+				router.UpdateRoute(rmEP)
+				// remove a pool member and none are left - pool and vs is deleted
+				rmEP2, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6050, "10.0.0.1:9000")
+				router.UpdateRoute(rmEP2)
+
+				matchConfig(mw, expectedConfigs[5])
+			})
+
+			It("should not add the same pool member more than once", func() {
+				registerTCP()
+				matchConfig(mw, expectedConfigs[4])
+
+				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6010, "10.0.0.1:5000")
+				router.UpdateRoute(ad)
+				router.UpdateRoute(ad)
+				router.UpdateRoute(ad)
+
+				matchConfig(mw, expectedConfigs[4])
+
 			})
 
 		})
@@ -404,9 +427,9 @@ var _ = Describe("F5Router", func() {
 })
 
 type configMatcher struct {
-	Global    globalConfig       `json:"global"`
-	BigIP     config.BigIPConfig `json:"bigip"`
-	Resources resources          `json:"resources"`
+	Global    bigipResources.GlobalConfig `json:"global"`
+	BigIP     config.BigIPConfig          `json:"bigip"`
+	Resources bigipResources.Resources    `json:"resources"`
 }
 
 type testRoutes struct {
@@ -418,6 +441,16 @@ type testRoutes struct {
 type MockWriter struct {
 	sync.Mutex
 	input []byte
+}
+
+type routePair struct {
+	url route.Uri
+	ep  *route.Endpoint
+}
+
+type tcpPair struct {
+	port uint16
+	addr string
 }
 
 func (mw *MockWriter) GetOutputFilename() string {
@@ -484,22 +517,27 @@ func matchConfig(mw *MockWriter, expected []byte) {
 	err := json.Unmarshal(expected, &matcher)
 	ExpectWithOffset(1, err).To(BeNil())
 
-	EventuallyWithOffset(1, func() globalConfig {
+	EventuallyWithOffset(1, func() bigipResources.GlobalConfig {
 		return mw.getInput().Global
 	}).Should(Equal(matcher.Global))
+
 	EventuallyWithOffset(1, func() config.BigIPConfig {
 		return mw.getInput().BigIP
 	}).Should(Equal(matcher.BigIP))
-	EventuallyWithOffset(1, func() []*virtual {
+
+	EventuallyWithOffset(1, func() []*bigipResources.Virtual {
 		return mw.getInput().Resources.Virtuals
 	}).Should(ConsistOf(matcher.Resources.Virtuals))
-	EventuallyWithOffset(1, func() []*pool {
+
+	EventuallyWithOffset(1, func() []*bigipResources.Pool {
 		return mw.getInput().Resources.Pools
 	}).Should(ConsistOf(matcher.Resources.Pools))
-	EventuallyWithOffset(1, func() []*monitor {
+
+	EventuallyWithOffset(1, func() []*bigipResources.Monitor {
 		return mw.getInput().Resources.Monitors
 	}).Should(ConsistOf(matcher.Resources.Monitors))
-	EventuallyWithOffset(1, func() []*policy {
+
+	EventuallyWithOffset(1, func() []*bigipResources.Policy {
 		return mw.getInput().Resources.Policies
 	}).Should(ConsistOf(matcher.Resources.Policies))
 }
