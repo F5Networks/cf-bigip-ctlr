@@ -46,11 +46,11 @@ ginkgo -keepGoing -trace -p -progress -r -failOnPending -randomizeAllSpecs -race
 ```
 go install
 ```
-- Update configuration file or BIGIP_CTLR_CFG environment variable for your specific environment
+- Update BIGIP_CTLR_CFG environment variable for your specific environment
   as described in "Configuration"
 - Run the controller
 ```
-cf-bigip-ctlr -c [CONFIG_FILE]
+cf-bigip-ctlr
 ```
 
 Option standalone:
@@ -110,7 +110,7 @@ Prerequisites:
 
 ```bash
 mkdir -p $GOPATH/src/github.com/F5Networks
-cf $GOPATH/src/github.com/F5Networks
+cd $GOPATH/src/github.com/F5Networks
 git clone https://github.com/F5Networks/cf-bigip-ctlr.git
 cd cf-bigip-ctlr
 
@@ -122,13 +122,61 @@ Configuration
 -------------
 
 When pushing the controller into a Cloud Foundry environment a configuration must be passed
-via the application manifest. An example manifest is located in the example_config directory.
+via the application manifest. An example manifest is located in the
+`docs/_static/config_examples` directory.
 
 Update required sections for environment:
 - nats: leave empty for gnatsd otherwise update with CF installed NATS information
-- bigip: leave empty if no BigIP is required otherwise update with BigIP information
-- routing_api: only required if routing API access is required
-- oauth: only required if routing API access is required
+- bigip: leave empty if no BIG-IP is required otherwise update with BIG-IP information
+- routing_api: only required if routing API access is required (TCP routing with route_mode
+set to all, or tcp)
+- oauth: only required if routing API access is required (TCP routing with route_mode
+set to all, or tcp)
+
+On startup, the controller will get the `BIGIP_CTLR_CFG` variable from the environment;
+setting this variable via an application manifest is required, environment parameters
+are set in the manifest `env` section. The controller also supports Cloud Foundry health
+checks. These can be configured in the manifest fields: `health-check-type`, and
+`health-check-http-endpoint`. In order to configure health checking of the controller use
+these settings:
+
+```
+health-check-type: http
+health-check-http-endpoint: /health
+```
+
+To explore what other settings are available refer to the Cloud Foundry documentation
+[Deploying with Application Manifests](https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html).
+
+A minimal configuration manifest to support HTTP routing mode would be written as such
+(`route_mode` set to 'http'):
+```
+applications:
+  - name: cf-bigip-ctlr
+    health-check-type: http
+    health-check-http-endpoint: /health
+    env:
+      BIGIP_CTLR_CFG: |
+                      bigip:
+                        url: https://bigip.example.com
+                        user: admin
+                        pass: password
+                        partition:
+                          - example
+                        external_addr: 192.168.1.1
+                      nats:
+                        - host: 192.168.10.1
+                          port: 4222
+                          user: nats
+                          pass: nats-password
+                      route_mode: http
+```
+
+If TCP routing is required, the `oauth` and `routing_api` sections are required
+but not the `nats` section. Set `route_mode` to 'tcp'.
+
+If both modes are required, the `oauth`, `routing_api`, and `nats` sections are required.
+Set `route_mode` to 'all'.
 
 Development
 -----------
@@ -228,72 +276,3 @@ Such a message can be sent to both the `router.register` subject to register
 URIs, and to the `router.unregister` subject to unregister URIs, respectively.
 
 **Note:** In order to use `nats-pub` to register a route, you must run the command on the NATS VM. If you are using [`cf-deployment`](https://github.com/cloudfoundry/cf-deployment), you can run `nats-pub` from any VM.
-
-## Healthchecking
-
-The controller has a health endpoint `/health` that returns a 200 OK which indicates
-the controller instance is healthy; any other response indicates unhealthy.
-This port can be configured via the `status.port` property in the application configuration for development purposes,
-but will override to the Diego PORT value provided to the container environment.
-
-
-```bash
-curl -v http://10.0.32.15/health
-*   Trying 10.0.32.15..
-* Connected to 10.0.32.15 (10.0.32.15) port 80 (#0)
-> GET /health HTTP/1.1
-> Host: 10.0.32.15
-> User-Agent: curl/7.43.0
-> Accept: */*
->
-< HTTP/1.1 200 OK
-< Cache-Control: private, max-age=0
-< Expires: 0
-< Date: Thu, 22 Sep 2016 00:13:54 GMT
-< Content-Length: 3
-< Content-Type: text/plain; charset=utf-8
-<
-ok
-* Connection #0 to host 10.0.32.15 left intact
-```
-
-## Instrumentation
-
-### The Routing Table
-
-The `/routes` endpoint returns the entire routing table as JSON. This endpoint
-requires basic authentication. Each route has an associated array of host:port entries.
-
-```bash
-curl "http://someuser:somepass@10.0.32.15/routes"
-{"api.catwoman.cf-app.com":[{"address":"10.244.0.138:9022","ttl":0,"tags":{"component":"CloudController"}}],"dora-dora.catwoman.cf-app.com":[{"address":"10.244.16.4:60035","ttl":0,"tags":{"component":"route-emitter"}},{"address":"10.244.16.4:60060","ttl":0,"tags":{"component":"route-emitter"}}]}
-```
-
-Because of the nature of the data present in `/routes`, it require http basic
-authentication credentials. These credentials can be found the application
-configuration:
-
-```
-status:
-  password: zed292_bevesselled
-  user: paronymy61-polaric
-```
-
-## Logs
-
-The controller's logging is specified in its YAML configuration file, or application manifest. It supports the following log levels:
-
-* `fatal` - A fatal error has occurred that makes the controller unable to execute.
-* `error` - An unexpected error has occurred.
-* `info`, `debug` - An expected event has occurred.
-
-Sample log message.
-
-`[2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":1485989648.0895808,"message":"endpoint-registered","source":"vcap.cf-bigip-ctlr.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
-`
-
-- `log_level`: This represents logging level of the message
-- `timestamp`: Epoch time of the log
-- `message`: Content of the log line
-- `source`: The function within the controller that initiated the log message
-- `data`: Additional information that varies based on the message
