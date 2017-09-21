@@ -14,8 +14,8 @@
       "virtualServers": [{
         "name": "routing-vip-http",
         "ipProtocol": "tcp",
-        "destination": "/cf/127.0.0.1:80",
         "enabled": true,
+        "destination": "/cf/127.0.0.1:80",
         "policies": [{
           "name": "cf-routing-policy",
           "partition": "cf"
@@ -26,15 +26,29 @@
         }]
       }],
       "pools": [{
-        "name": "cf-foo-e500900501f76ce8",
+        "name": "cf-bar-d21aa8a505891ac9",
         "loadBalancingMode": "round-robin",
         "members": [{
-          "address": "127.0.0.1",
+          "address": "127.0.1.1",
+          "port": 80,
+          "session": "user-enabled"
+        }, {
+          "address": "127.0.1.2",
           "port": 80,
           "session": "user-enabled"
         }],
         "monitors": ["/Common/tcp_half_open"],
-        "description": "route: foo.cf.com - App GUID: 1"
+        "description": "route: bar.cf.com - App GUID: 1"
+      }, {
+        "name": "cf-baz-9a96ddcfe07bb46e",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.2.1",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: baz.cf.com - App GUID: 1"
       }, {
         "name": "cf-foo.cf.com",
         "loadBalancingMode": "round-robin",
@@ -46,15 +60,35 @@
         "monitors": ["/Common/tcp_half_open"],
         "description": "route: *.foo.cf.com - App GUID: 1"
       }, {
-        "name": "cf-baz-9a96ddcfe07bb46e",
+        "name": "cf-ser_.cf.com",
         "loadBalancingMode": "round-robin",
         "members": [{
-          "address": "127.0.2.1",
+          "address": "127.0.6.2",
           "port": 80,
           "session": "user-enabled"
         }],
         "monitors": ["/Common/tcp_half_open"],
-        "description": "route: baz.cf.com - App GUID: 1"
+        "description": "route: ser*.cf.com - App GUID: 1"
+      }, {
+        "name": "cf-ser_es.cf.com",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.6.3",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: ser*es.cf.com - App GUID: 1"
+      }, {
+        "name": "cf-foo-e500900501f76ce8",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.0.1",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: foo.cf.com - App GUID: 1"
       }, {
         "name": "cf-baz-69cf12df3b85f455",
         "loadBalancingMode": "round-robin",
@@ -94,19 +128,15 @@
         "monitors": ["/Common/tcp_half_open"],
         "description": "route: *.cf.com - App GUID: 1"
       }, {
-        "name": "cf-bar-d21aa8a505891ac9",
+        "name": "cf-_vices.cf.com",
         "loadBalancingMode": "round-robin",
         "members": [{
-          "address": "127.0.1.1",
-          "port": 80,
-          "session": "user-enabled"
-        }, {
-          "address": "127.0.1.2",
+          "address": "127.0.6.4",
           "port": 80,
           "session": "user-enabled"
         }],
         "monitors": ["/Common/tcp_half_open"],
-        "description": "route: bar.cf.com - App GUID: 1"
+        "description": "route: *vices.cf.com - App GUID: 1"
       }],
       "l7Policies": [{
         "controls": ["forwarding"],
@@ -244,6 +274,79 @@
           "actions": [{
             "forward": true,
             "name": "0",
+            "pool": "/cf/cf-ser_es.cf.com",
+            "request": true
+          }],
+          "conditions": [{
+            "startsWith": true,
+            "host": true,
+            "httpHost": true,
+            "name": "0",
+            "index": 0,
+            "request": true,
+            "values": ["ser"]
+          }, {
+            "endsWith": true,
+            "host": true,
+            "httpHost": true,
+            "name": "1",
+            "index": 1,
+            "request": true,
+            "values": ["es.cf.com"]
+          }],
+          "name": "cf-ser_es.cf.com",
+          "ordinal": 5,
+          "description": "route: ser*es.cf.com - App GUID: 1"
+        }, {
+          "actions": [{
+            "forward": true,
+            "name": "0",
+            "pool": "/cf/cf-ser_.cf.com",
+            "request": true
+          }],
+          "conditions": [{
+            "startsWith": true,
+            "host": true,
+            "httpHost": true,
+            "name": "0",
+            "index": 0,
+            "request": true,
+            "values": ["ser"]
+          }, {
+            "endsWith": true,
+            "host": true,
+            "httpHost": true,
+            "name": "1",
+            "index": 1,
+            "request": true,
+            "values": [".cf.com"]
+          }],
+          "name": "cf-ser_.cf.com",
+          "ordinal": 6,
+          "description": "route: ser*.cf.com - App GUID: 1"
+        }, {
+          "actions": [{
+            "forward": true,
+            "name": "0",
+            "pool": "/cf/cf-_vices.cf.com",
+            "request": true
+          }],
+          "conditions": [{
+            "endsWith": true,
+            "host": true,
+            "httpHost": true,
+            "name": "0",
+            "index": 0,
+            "request": true,
+            "values": ["vices.cf.com"]
+          }],
+          "name": "cf-_vices.cf.com",
+          "ordinal": 7,
+          "description": "route: *vices.cf.com - App GUID: 1"
+        }, {
+          "actions": [{
+            "forward": true,
+            "name": "0",
             "pool": "/cf/cf-foo.cf.com",
             "request": true
           }],
@@ -257,7 +360,7 @@
             "values": [".foo.cf.com"]
           }],
           "name": "cf-foo.cf.com",
-          "ordinal": 5,
+          "ordinal": 8,
           "description": "route: *.foo.cf.com - App GUID: 1"
         }, {
           "actions": [{
@@ -276,7 +379,7 @@
             "values": [".cf.com"]
           }],
           "name": "cf-cf.com",
-          "ordinal": 6,
+          "ordinal": 9,
           "description": "route: *.cf.com - App GUID: 1"
         }],
         "strategy": "/Common/first-match"

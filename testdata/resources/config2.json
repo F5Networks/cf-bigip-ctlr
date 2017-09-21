@@ -14,8 +14,8 @@
       "virtualServers": [{
         "name": "routing-vip-http",
         "ipProtocol": "tcp",
-        "destination": "/cf/127.0.0.1:80",
         "enabled": true,
+        "destination": "/cf/127.0.0.1:80",
         "policies": [{
           "name": "cf-routing-policy",
           "partition": "cf"
@@ -26,26 +26,6 @@
         }]
       }],
       "pools": [{
-        "name": "cf-qux-ac504dcd7f58634d",
-        "loadBalancingMode": "round-robin",
-        "members": [{
-          "address": "127.0.7.1",
-          "port": 80,
-          "session": "user-enabled"
-        }],
-        "monitors": ["/Common/tcp_half_open"],
-        "description": "route: qux.cf.com - App GUID: 1"
-      }, {
-        "name": "cf-bar-d21aa8a505891ac9",
-        "loadBalancingMode": "round-robin",
-        "members": [{
-          "address": "127.0.1.2",
-          "port": 80,
-          "session": "user-enabled"
-        }],
-        "monitors": ["/Common/tcp_half_open"],
-        "description": "route: bar.cf.com - App GUID: 1"
-      }, {
         "name": "cf-baz-9a96ddcfe07bb46e",
         "loadBalancingMode": "round-robin",
         "members": [{
@@ -69,6 +49,26 @@
         }],
         "monitors": ["/Common/tcp_half_open"],
         "description": "route: baz.cf.com/segment1 - App GUID: 1"
+      }, {
+        "name": "cf-qux-ac504dcd7f58634d",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.7.1",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: qux.cf.com - App GUID: 1"
+      }, {
+        "name": "cf-bar-d21aa8a505891ac9",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.1.2",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: bar.cf.com - App GUID: 1"
       }, {
         "name": "cf-baz-beac6f8bec5a4446",
         "loadBalancingMode": "round-robin",
