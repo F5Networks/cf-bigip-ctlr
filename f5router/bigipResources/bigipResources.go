@@ -39,6 +39,9 @@ type (
 		Partition string `json:"partition"`
 	}
 
+	// Configs for each BIG-IP partition
+	PartitionMap map[string]*Resources
+
 	// Resources is what gets written to and dumped out for the python side
 	Resources struct {
 		Virtuals []*Virtual `json:"virtualServers,omitempty"`
@@ -49,37 +52,38 @@ type (
 
 	// Virtual server frontend
 	Virtual struct {
-		VirtualServerName string `json:"name"`
-		PoolName          string `json:"pool"`
-		// Mutual parameter, partition
-		Partition string `json:"partition"`
+		VirtualServerName string     `json:"name"`
+		PoolName          string     `json:"pool,omitempty"`
+		Mode              string     `json:"ipProtocol,omitempty"`
+		Enabled           bool       `json:"enabled,omitempty"`
+		Destination       string     `json:"destination,omitempty"`
+		Policies          []*NameRef `json:"policies,omitempty"`
+		Profiles          []*NameRef `json:"profiles,omitempty"`
+	}
 
-		// VirtualServer parameters
-		Mode           string          `json:"mode,omitempty"`
-		VirtualAddress *VirtualAddress `json:"virtualAddress,omitempty"`
-		Policies       []*NameRef      `json:"policies,omitempty"`
-		Profiles       []*NameRef      `json:"profiles,omitempty"`
+	// Pool Member
+	Member struct {
+		Address string `json:"address"`
+		Port    uint16 `json:"port"`
+		Session string `json:"session,omitempty"`
 	}
 
 	// Pool backend
 	Pool struct {
-		Name            string   `json:"name"`
-		Partition       string   `json:"partition"`
-		ServicePort     int32    `json:"servicePort"`
-		Balance         string   `json:"balance"`
-		PoolMemberAddrs []string `json:"poolMemberAddrs"`
-		MonitorNames    []string `json:"monitor"`
-		Description     string   `json:"description"`
+		Name         string   `json:"name"`
+		Balance      string   `json:"loadBalancingMode"`
+		Members      []Member `json:"members"`
+		MonitorNames []string `json:"monitors"`
+		Description  string   `json:"description"`
 	}
 
 	// backend health monitor
 	Monitor struct {
-		Name      string `json:"name"`
-		Partition string `json:"partition"`
-		Interval  int    `json:"interval,omitempty"`
-		Protocol  string `json:"protocol"`
-		Send      string `json:"send,omitempty"`
-		Timeout   int    `json:"timeout,omitempty"`
+		Name     string `json:"name"`
+		Interval int    `json:"interval,omitempty"`
+		Protocol string `json:"protocol"`
+		Send     string `json:"send,omitempty"`
+		Timeout  int    `json:"timeout,omitempty"`
 	}
 
 	// Action for a rule
@@ -120,7 +124,6 @@ type (
 		Description string   `json:"description,omitempty"`
 		Legacy      bool     `json:"legacy"`
 		Name        string   `json:"name"`
-		Partition   string   `json:"partition"`
 		Requires    []string `json:"requires"`
 		Rules       []*Rule  `json:"rules"`
 		Strategy    string   `json:"strategy"`
