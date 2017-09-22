@@ -33,4 +33,19 @@ k8s.io/client-go/kubernetes/typed/apps/v1beta1, but since that package wasn't
 in vendor it satisfied that import with the version of the package that was in
 $GOAPTH.
 
+## Travis builds on GitHub
 
+To run system/integration tests against a development image your fork will need to be configured to work with travis.org and you will need a docker hub repository to accpet the images. 
+
+GitHub:
+- Navigate to `github.com/<user-name>/cf-bigip-cltr/settings/installations`
+- Search for "travis" and click on it to add. 
+
+Travis:
+- Navigate to `travis-ci.org/profile/<_github_user_name>`.
+- Click "Sync account".
+- Click on `cf-bigip-ctlr` fork, then on "settings".
+- Add `DOCKER_U`, `DOCKER_P` and `DOCKER_NAMESPACE` -- this is the user or organization name on Docker Hub, and may be different than `DOCKER_U` in organziations.
+
+In Docker Hub:  
+- Add a repo to that account named `cf-bigip-ctlr`.
