@@ -5,7 +5,6 @@ services:
 
 before_install:
   - docker pull golang:1.7.5
-  - docker pull node:6.11.0-slim
   - docker pull f5devcentral/containthedocs
 
 script:
@@ -25,6 +24,7 @@ script:
   - export CLEAN_BUILD=true
   - export BASE_OS=alpine
   - ./build-tools/build-devel-image.sh
+  - ./build-tools/run-in-docker.sh ./build-tools/python-tests.sh
   - ./build-tools/run-in-docker.sh make verify
   - ./build-tools/build-debug-artifacts.sh
   - ./build-tools/build-release-artifacts.sh
@@ -38,3 +38,20 @@ script:
       docker push "$BASE_PUSH_TARGET:devel-$TRAVIS_BRANCH-n-$TRAVIS_BUILD_NUMBER-id-$TRAVIS_BUILD_ID"
     fi
 
+deploy:
+  - provider: script
+    skip_cleanup: true
+    on:
+      branch: 1.0-stable
+      repo: F5Networks/cf-bigip-ctlr
+    script:
+      - ./build-tools/deploy-docs.sh publish-product-docs-to-prod connectors/cf-bigip-ctlr v1.0
+
+notifications:
+  slack:
+    rooms:
+      # cloud-foundry channel
+      - secure: ZtCTWHavj3oGCuz9pbs1aMLx9ducWyr6/lcmjL2x42AtzN14claWS4SW724bSrFppxftPqo73pt7S+XgjoW80+uaHN5mjTLwFbdZw2mkeeBs7k+VOniyAIRSgFsXLEO+1yeV38tP8bIXmZyNotqPKBmdeVSDmU+ITYQZfwzAW5wSm3PDICgUsZ6Bz3zMw8Fnq+lG9AW8/kygeHPIfiW0LZCDqNxuDvmxcp3QTOnk9Vuub9l0oEwcUTJitphP4ONaChOhUHUHTcC1JJq2e7LOJzK/PiR2lak86988gcVEp88N89p1aJUZZz51zfT0lJPpgM2LTw6TkBfI27mqNFZ8UmwcyOd04ZoAs9WRL1vXm9bY2YTL9+JKfsb2yT6vyw325Cs0U6KgI885IMNosjzgljeDnHJUhAqLvRZaRWmLLjH4Oo1ZHT0yTZq59rGDNqpkBiIvNs0TInwUFDnSoQ5t6xtPV6nmtEhjfhIDO1W+yHf8xQ1MjuhOPqybsk9mbh5aqHGSBunvLwl+bTn0a0WBk3KnIsd2AIvttJQMqOcD4z1+UuXFpMLCSSQwZjUyVxKXh9HkzWMAJNfdZfGYRr07wA4uSqWOol7p9l7AIE8AfX38+CwDOQbzJqV7gqur+g8dfF0XO2z2i9NODSV9FFe8fJg4TbeXKu0Gy6MEYTCkn1U=
+    on_success: change
+    on_failure: always
+    on_pull_requests: false

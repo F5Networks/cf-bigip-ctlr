@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/F5Networks/cf-bigip-ctlr.svg?branch=master)](https://travis-ci.org/F5Networks/cf-bigip-ctlr) [![Coverage Status](https://coveralls.io/repos/github/F5Networks/cf-bigip-ctlr/badge.svg?branch=master)](https://coveralls.io/github/F5Networks/cf-bigip-ctlr?branch=master)
+
 F5 BIG-IP Controller for Cloud Foundry
 ======================================
 
