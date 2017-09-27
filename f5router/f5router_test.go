@@ -163,6 +163,10 @@ var _ = Describe("F5Router", func() {
 			baz2Segment3Endpoint,
 			wildCfEndpoint,
 			wildFooEndpoint,
+			wildEndEndpoint,
+			wildMidEndpoint,
+			wildBeginEndpoint,
+			wild2Endpoint,
 			quxEndpoint *route.Endpoint
 		)
 
@@ -178,6 +182,10 @@ var _ = Describe("F5Router", func() {
 				routePair{"baz.cf.com/segment1/segment2/segment3", baz2Segment3Endpoint},
 				routePair{"*.cf.com", wildCfEndpoint},
 				routePair{"*.foo.cf.com", wildFooEndpoint},
+				routePair{"ser*.cf.com", wildEndEndpoint},
+				routePair{"ser*es.cf.com", wildMidEndpoint},
+				routePair{"*vices.cf.com", wildBeginEndpoint},
+				routePair{"*vic*.cf.com", wild2Endpoint},
 			}
 			for _, pair := range rp {
 				up, _ = NewUpdate(logger, routeUpdate.Add, pair.url, pair.ep)
@@ -206,6 +214,10 @@ var _ = Describe("F5Router", func() {
 			baz2Segment3Endpoint = makeEndpoint("127.0.4.2")
 			wildCfEndpoint = makeEndpoint("127.0.5.1")
 			wildFooEndpoint = makeEndpoint("127.0.6.1")
+			wildEndEndpoint = makeEndpoint("127.0.6.2")
+			wildMidEndpoint = makeEndpoint("127.0.6.3")
+			wildBeginEndpoint = makeEndpoint("127.0.6.4")
+			wild2Endpoint = makeEndpoint("127.0.7.1")
 			quxEndpoint = makeEndpoint("127.0.7.1")
 
 		})
@@ -271,6 +283,18 @@ var _ = Describe("F5Router", func() {
 			router.UpdateRoute(up)
 
 			up, err = NewUpdate(logger, routeUpdate.Remove, "*.foo.cf.com", wildFooEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
+
+			up, err = NewUpdate(logger, routeUpdate.Remove, "ser*.cf.com", wildEndEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
+
+			up, err = NewUpdate(logger, routeUpdate.Remove, "ser*es.cf.com", wildMidEndpoint)
+			Expect(err).NotTo(HaveOccurred())
+			router.UpdateRoute(up)
+
+			up, err = NewUpdate(logger, routeUpdate.Remove, "*vices.cf.com", wildBeginEndpoint)
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 

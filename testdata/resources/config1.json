@@ -14,8 +14,8 @@
       "virtualServers": [{
         "name": "routing-vip-http",
         "ipProtocol": "tcp",
-        "destination": "/cf/127.0.0.1:80",
         "enabled": true,
+        "destination": "/cf/127.0.0.1:80",
         "policies": [{
           "name": "cf-routing-policy",
           "partition": "cf"
@@ -64,16 +64,6 @@
         "monitors": ["/Common/tcp_half_open"],
         "description": "route: baz.cf.com/segment1/segment2/segment3 - App GUID: 1"
       }, {
-        "name": "cf-bar-d21aa8a505891ac9",
-        "loadBalancingMode": "round-robin",
-        "members": [{
-          "address": "127.0.1.2",
-          "port": 80,
-          "session": "user-enabled"
-        }],
-        "monitors": ["/Common/tcp_half_open"],
-        "description": "route: bar.cf.com - App GUID: 1"
-      }, {
         "name": "cf-cf.com",
         "loadBalancingMode": "round-robin",
         "members": [{
@@ -83,6 +73,16 @@
         }],
         "monitors": ["/Common/tcp_half_open"],
         "description": "route: *.cf.com - App GUID: 1"
+      }, {
+        "name": "cf-bar-d21aa8a505891ac9",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.1.2",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: bar.cf.com - App GUID: 1"
       }],
       "l7Policies": [{
         "controls": ["forwarding"],

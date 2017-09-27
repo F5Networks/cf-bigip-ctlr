@@ -62,10 +62,20 @@ type F5Router struct {
 	poolResources    map[string]*bigipResources.Pool
 }
 
+func verifyRouteURI(ru updateHTTP) error {
+	uri := ru.URI().String()
+	if strings.Count(uri, "*") > 1 {
+		return fmt.Errorf("Invalid URI: %s multiple wildcards are not supported", uri)
+	}
+	return nil
+}
+
 func makeObjectName(uri string) string {
 	var name string
 	if strings.HasPrefix(uri, "*.") {
 		name = "cf-" + strings.TrimPrefix(uri, "*.")
+	} else if strings.Contains(uri, "*") {
+		name = "cf-" + strings.Replace(uri, "*", "_", -1)
 	} else {
 		sum := sha256.Sum256([]byte(uri))
 		index := strings.Index(uri, ".")
@@ -482,17 +492,42 @@ func (r *F5Router) makeRouteRule(ru updateHTTP) (*bigipResources.Rule, error) {
 		Request: true,
 	}
 
+	uriString := ru.URI().String()
+
 	var c []*bigipResources.Condition
-	if true == strings.HasPrefix(ru.URI().String(), "*.") {
-		c = append(c, &bigipResources.Condition{
-			EndsWith: true,
-			Host:     true,
-			HTTPHost: true,
-			Name:     "0",
-			Index:    0,
-			Request:  true,
-			Values:   []string{strings.TrimPrefix(u.Host, "*")},
-		})
+	if strings.Contains(uriString, "*") {
+		splits := strings.Split(u.Host, "*")
+		numSplits := len(splits)
+		ruleIndex := 0
+		if strings.HasPrefix(u.Host, splits[0]) {
+			if splits[0] != "" {
+				c = append(c, &bigipResources.Condition{
+					StartsWith: true,
+					Host:       true,
+					HTTPHost:   true,
+					Name:       strconv.Itoa(ruleIndex),
+					Index:      ruleIndex,
+					Request:    true,
+					Values:     []string{splits[0]},
+				})
+				ruleIndex++
+			}
+			splits = splits[1:]
+			numSplits--
+		}
+		if strings.HasSuffix(u.Host, splits[numSplits-1]) {
+			if splits[numSplits-1] != "" {
+				c = append(c, &bigipResources.Condition{
+					EndsWith: true,
+					Host:     true,
+					HTTPHost: true,
+					Name:     strconv.Itoa(ruleIndex),
+					Index:    ruleIndex,
+					Request:  true,
+					Values:   []string{splits[numSplits-1]},
+				})
+			}
+		}
 	} else {
 		c = append(c, &bigipResources.Condition{
 			Equals:   true,
@@ -521,8 +556,6 @@ func (r *F5Router) makeRouteRule(ru updateHTTP) (*bigipResources.Rule, error) {
 			}
 		}
 	}
-
-	uriString := ru.URI().String()
 
 	rl := bigipResources.Rule{
 		FullURI:     uriString,
@@ -582,6 +615,12 @@ func (r *F5Router) makeRoutePolicy(policyName string) *bigipResources.Policy {
 func (r *F5Router) processRouteAdd(ru updateHTTP) {
 	r.logger.Debug("process-HTTP-route-add", zap.String("name", ru.Name()), zap.String("route", ru.Route()))
 
+	err := verifyRouteURI(ru)
+	if nil != err {
+		r.logger.Warn("f5router-URI-error", zap.Error(err))
+		return
+	}
+
 	rs := ru.CreateResources(r.c)
 	r.addPool(rs.Pools[0])
 
@@ -590,6 +629,12 @@ func (r *F5Router) processRouteAdd(ru updateHTTP) {
 
 func (r *F5Router) processRouteRemove(ru updateHTTP) {
 	r.logger.Debug("process-HTTP-route-remove", zap.String("name", ru.Name()), zap.String("route", ru.Route()))
+
+	err := verifyRouteURI(ru)
+	if nil != err {
+		r.logger.Warn("f5router-URI-error", zap.Error(err))
+		return
+	}
 
 	rs := ru.CreateResources(r.c)
 	poolRemoved := r.removePool(rs.Pools[0])
@@ -680,7 +725,7 @@ func (r *F5Router) addRule(ru updateHTTP) {
 		r.logger.Warn("f5router-rule-error", zap.Error(err))
 	}
 
-	if true == strings.HasPrefix(ru.URI().String(), "*.") {
+	if strings.Contains(ru.URI().String(), "*") {
 		r.wildcards[ru.URI()] = rule
 		r.logger.Debug("f5router-wildcard-rule-updated",
 			zap.String("name", ru.Name()),
@@ -696,7 +741,7 @@ func (r *F5Router) addRule(ru updateHTTP) {
 }
 
 func (r *F5Router) removeRule(ru updateHTTP) {
-	if true == strings.HasPrefix(ru.URI().String(), "*.") {
+	if strings.Contains(ru.URI().String(), "*") {
 		delete(r.wildcards, ru.URI())
 		r.logger.Debug("f5router-wildcard-rule-removed",
 			zap.String("name", ru.Name()),

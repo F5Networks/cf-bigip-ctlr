@@ -97,6 +97,7 @@ type (
 	// Condition for a rule
 	Condition struct {
 		Equals      bool     `json:"equals,omitempty"`
+		StartsWith  bool     `json:"startsWith,omitempty"`
 		EndsWith    bool     `json:"endsWith,omitempty"`
 		Host        bool     `json:"host,omitempty"`
 		HTTPHost    bool     `json:"httpHost,omitempty"`
