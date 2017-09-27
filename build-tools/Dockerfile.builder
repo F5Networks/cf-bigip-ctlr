@@ -60,6 +60,7 @@ RUN apk add --no-cache \
   go get github.com/nats-io/gnatsd && \
   go get github.com/onsi/ginkgo/ginkgo && \
   go get github.com/onsi/gomega && \
+  go get github.com/mattn/goveralls && \
 	chmod 755 /entrypoint.sh
 
 ENTRYPOINT [ "/entrypoint.sh" ]
