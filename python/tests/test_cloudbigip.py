@@ -22,7 +22,9 @@ from __future__ import absolute_import
 import unittest
 import json
 from mock import Mock, patch
-from f5.bigip import ManagementRoot
+from f5_cccl.utils.mgmt import ManagementRoot
+from f5_cccl.utils.mgmt import mgmt_root
+from f5_cccl.utils.network import apply_network_fdb_config
 from f5_cccl.exceptions import F5CcclValidationError
 from .. import bigipconfigdriver as ctlr
 
@@ -87,7 +89,7 @@ class CloudTest(unittest.TestCase):
         # connection
         partition = 'test'
         with patch.object(ManagementRoot, '_get_tmos_version'):
-            bigip = ManagementRoot('1.2.3.4', 'admin', 'default')
+            bigip = mgmt_root('1.2.3.4', 'admin', 'default', 443, 'tmos')
 
             self.mgr = ctlr.CloudServiceManager(
                 bigip,
@@ -161,7 +163,7 @@ class CloudTest(unittest.TestCase):
                           cfg)
 
     def test_cloud_configs(self):
-        """Test: Verify expected BIG-IP config created from Marathon state."""
+        """Test: Verify expected BIG-IP config created from cloud state."""
         # Verify configuration
         for data_file in cloud_test_data:
             expected_file = data_file.replace('.json', '_expected.json')
@@ -217,7 +219,7 @@ class CloudTest(unittest.TestCase):
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
 
         # Verify we only query bigip once for the initial state and
         # don't try to write an update if nothing has changed.
@@ -238,7 +240,7 @@ class CloudTest(unittest.TestCase):
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
 
         # Verify we only query bigip once for the initial state and
         # don't try to write an update if nothing has changed.
@@ -259,7 +261,7 @@ class CloudTest(unittest.TestCase):
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
 
         # Verify we first query bigip once for the initial state and
         # then perform an update due to differences
@@ -280,7 +282,7 @@ class CloudTest(unittest.TestCase):
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
 
         # Verify we first query bigip once for the initial state and
         # then perform an update due to differences
@@ -301,7 +303,7 @@ class CloudTest(unittest.TestCase):
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
 
         # Verify we first query bigip once for the initial state and
         # then perform an update due to differences
@@ -322,7 +324,7 @@ class CloudTest(unittest.TestCase):
 
         # Do the BIG-IP configuration
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
 
         # Verify we first query bigip once for the initial state and
         # then perform an update due to differences
@@ -344,17 +346,17 @@ class CloudTest(unittest.TestCase):
         # in the cloud config file
         self.cloud_data['openshift-sdn']['vxlan-node-ips'][0] = '55'
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
         self.assertEqual(self.network_data, self.vxlan_tunnel.records)
 
         self.cloud_data['openshift-sdn']['vxlan-node-ips'][0] = 55
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
         self.assertEqual(self.network_data, self.vxlan_tunnel.records)
 
         self.cloud_data['openshift-sdn']['vxlan-node-ips'][0] = 'myaddr'
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
         self.assertEqual(self.network_data, self.vxlan_tunnel.records)
 
     def test_network_bad_partition_name(
@@ -370,18 +372,18 @@ class CloudTest(unittest.TestCase):
         self.cloud_data['openshift-sdn']['vxlan-name'] = \
             '/bad/partition/name/idf/'
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
         self.assertFalse(hasattr(self, 'vxlan_tunnel'))
 
         self.cloud_data['openshift-sdn']['vxlan-name'] = \
             'bad/partition/name'
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
         self.assertFalse(hasattr(self, 'vxlan_tunnel'))
 
         self.cloud_data['openshift-sdn']['vxlan-name'] = ''
         cfg = ctlr.create_network_config(self.cloud_data)
-        self.mgr._apply_network_config(cfg)
+        apply_network_fdb_config(self.mgr.mgmt_root(), cfg['fdb'])
         self.assertFalse(hasattr(self, 'vxlan_tunnel'))
 
     def compute_fdb_records(self):
