@@ -52,13 +52,14 @@ type (
 
 	// Virtual server frontend
 	Virtual struct {
-		VirtualServerName string     `json:"name"`
-		PoolName          string     `json:"pool,omitempty"`
-		Mode              string     `json:"ipProtocol,omitempty"`
-		Enabled           bool       `json:"enabled,omitempty"`
-		Destination       string     `json:"destination,omitempty"`
-		Policies          []*NameRef `json:"policies,omitempty"`
-		Profiles          []*NameRef `json:"profiles,omitempty"`
+		VirtualServerName     string                `json:"name"`
+		PoolName              string                `json:"pool,omitempty"`
+		Mode                  string                `json:"ipProtocol,omitempty"`
+		Enabled               bool                  `json:"enabled,omitempty"`
+		Destination           string                `json:"destination,omitempty"`
+		Policies              []*NameRef            `json:"policies,omitempty"`
+		Profiles              []*NameRef            `json:"profiles,omitempty"`
+		SourceAddrTranslation SourceAddrTranslation `json:"sourceAddressTranslation,omitempty"`
 	}
 
 	// Pool Member
@@ -128,6 +129,11 @@ type (
 		Requires    []string `json:"requires"`
 		Rules       []*Rule  `json:"rules"`
 		Strategy    string   `json:"strategy"`
+	}
+
+	// SourceAddrTranslation is the Virtual Server Source Address Translation
+	SourceAddrTranslation struct {
+		Type string `json:"type"`
 	}
 
 	Policies []*Policy

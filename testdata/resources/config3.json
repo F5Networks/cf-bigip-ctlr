@@ -32,7 +32,10 @@
         }, {
           "name": "fakeprofile",
           "partition": "Common"
-        }]
+        }],
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }, {
         "name": "routing-vip-https",
         "ipProtocol": "tcp",
@@ -57,7 +60,10 @@
         }, {
           "name": "clientssl",
           "partition": "Common"
-        }]
+        }],
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }],
       "pools": [{
         "name": "cf-ser_.cf.com",

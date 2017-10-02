@@ -23,7 +23,10 @@
         "profiles": [{
           "name": "http",
           "partition": "Common"
-        }]
+        }],
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }],
       "pools": [{
         "name": "cf-bar-d21aa8a505891ac9",

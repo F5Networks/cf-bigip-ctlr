@@ -193,6 +193,7 @@ func (r *F5Router) validateConfig() error {
 func (r *F5Router) createHTTPVirtuals() {
 	plcs := r.generatePolicyList()
 	prfls := r.generateNameList(r.c.BigIP.Profiles)
+	srcAddrTrans := bigipResources.SourceAddrTranslation{Type: "automap"}
 	va := &bigipResources.VirtualAddress{
 		BindAddr: r.c.BigIP.ExternalAddr,
 		Port:     80,
@@ -206,6 +207,7 @@ func (r *F5Router) createHTTPVirtuals() {
 			"tcp",
 			plcs,
 			prfls,
+			srcAddrTrans,
 		)
 
 	if 0 != len(r.c.BigIP.SSLProfiles) {
@@ -224,6 +226,7 @@ func (r *F5Router) createHTTPVirtuals() {
 				"tcp",
 				plcs,
 				prfls,
+				srcAddrTrans,
 			)
 	}
 }
@@ -440,6 +443,7 @@ func makeVirtual(
 	mode string,
 	policies []*bigipResources.NameRef,
 	profiles []*bigipResources.NameRef,
+	srcAddrTrans bigipResources.SourceAddrTranslation,
 ) *bigipResources.Virtual {
 	// Validate the IP address, and create the destination
 	addr := net.ParseIP(virtualAddress.BindAddr)
@@ -457,13 +461,14 @@ func makeVirtual(
 			virtualAddress.Port)
 
 		vs := &bigipResources.Virtual{
-			Enabled:           true,
-			VirtualServerName: name,
-			PoolName:          poolName,
-			Destination:       destination,
-			Mode:              mode,
-			Policies:          policies,
-			Profiles:          profiles,
+			Enabled:               true,
+			VirtualServerName:     name,
+			PoolName:              poolName,
+			Destination:           destination,
+			Mode:                  mode,
+			Policies:              policies,
+			Profiles:              profiles,
+			SourceAddrTranslation: srcAddrTrans,
 		}
 		return vs
 	} else {
