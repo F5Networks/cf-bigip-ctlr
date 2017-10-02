@@ -77,6 +77,7 @@ func (tu updateTCP) CreateResources(c *config.Config) bigipResources.Resources {
 		"tcp",
 		[]*bigipResources.NameRef{},
 		[]*bigipResources.NameRef{},
+		bigipResources.SourceAddrTranslation{Type: "automap"},
 	)
 
 	if nil != vs {

@@ -16,31 +16,46 @@
         "pool": "cf-tcp-route-default-tcp-6060",
         "ipProtocol": "tcp",
         "enabled": true,
-        "destination": "/cf/127.0.0.1:6060"
+        "destination": "/cf/127.0.0.1:6060",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }, {
         "name": "cf-tcp-route-default-tcp-6010",
         "pool": "cf-tcp-route-default-tcp-6010",
         "ipProtocol": "tcp",
         "enabled": true,
-        "destination": "/cf/127.0.0.1:6010"
+        "destination": "/cf/127.0.0.1:6010",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }, {
         "name": "cf-tcp-route-default-tcp-6020",
         "pool": "cf-tcp-route-default-tcp-6020",
         "ipProtocol": "tcp",
         "enabled": true,
-        "destination": "/cf/127.0.0.1:6020"
+        "destination": "/cf/127.0.0.1:6020",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }, {
         "name": "cf-tcp-route-default-tcp-6030",
         "pool": "cf-tcp-route-default-tcp-6030",
         "ipProtocol": "tcp",
         "enabled": true,
-        "destination": "/cf/127.0.0.1:6030"
+        "destination": "/cf/127.0.0.1:6030",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }, {
         "name": "cf-tcp-route-default-tcp-6040",
         "pool": "cf-tcp-route-default-tcp-6040",
         "ipProtocol": "tcp",
         "enabled": true,
-        "destination": "/cf/127.0.0.1:6040"
+        "destination": "/cf/127.0.0.1:6040",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
       }],
       "pools": [{
         "name": "cf-tcp-route-default-tcp-6010",
