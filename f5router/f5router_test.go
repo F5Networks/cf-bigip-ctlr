@@ -326,6 +326,7 @@ var _ = Describe("F5Router", func() {
 			c.BigIP.SSLProfiles = []string{"Common/clientssl"}
 			c.BigIP.Profiles = []string{"Common/http", "/Common/fakeprofile"}
 			c.BigIP.Policies = []string{"Common/fakepolicy", "/cf/anotherpolicy"}
+			c.BigIP.LoadBalancingMode = "least-connections-member"
 
 			router, err = NewF5Router(logger, c, mw)
 
