@@ -67,7 +67,7 @@
       }],
       "pools": [{
         "name": "cf-ser_.cf.com",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.6.2",
           "port": 80,
@@ -77,7 +77,7 @@
         "description": "route: ser*.cf.com - App GUID: 1"
       }, {
         "name": "cf-_vices.cf.com",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.6.4",
           "port": 80,
@@ -87,7 +87,7 @@
         "description": "route: *vices.cf.com - App GUID: 1"
       }, {
         "name": "cf-foo-e500900501f76ce8",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.0.1",
           "port": 80,
@@ -97,7 +97,7 @@
         "description": "route: foo.cf.com - App GUID: 1"
       }, {
         "name": "cf-baz-beac6f8bec5a4446",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.4.1",
           "port": 80,
@@ -111,7 +111,7 @@
         "description": "route: baz.cf.com/segment1/segment2/segment3 - App GUID: 1"
       }, {
         "name": "cf-cf.com",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.5.1",
           "port": 80,
@@ -121,7 +121,7 @@
         "description": "route: *.cf.com - App GUID: 1"
       }, {
         "name": "cf-foo.cf.com",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.6.1",
           "port": 80,
@@ -131,7 +131,7 @@
         "description": "route: *.foo.cf.com - App GUID: 1"
       }, {
         "name": "cf-ser_es.cf.com",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.6.3",
           "port": 80,
@@ -141,7 +141,7 @@
         "description": "route: ser*es.cf.com - App GUID: 1"
       }, {
         "name": "cf-bar-d21aa8a505891ac9",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.1.1",
           "port": 80,
@@ -155,7 +155,7 @@
         "description": "route: bar.cf.com - App GUID: 1"
       }, {
         "name": "cf-baz-9a96ddcfe07bb46e",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.2.1",
           "port": 80,
@@ -165,7 +165,7 @@
         "description": "route: baz.cf.com - App GUID: 1"
       }, {
         "name": "cf-baz-69cf12df3b85f455",
-        "loadBalancingMode": "round-robin",
+        "loadBalancingMode": "least-connections-member",
         "members": [{
           "address": "127.0.3.1",
           "port": 80,
