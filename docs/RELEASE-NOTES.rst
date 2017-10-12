@@ -6,8 +6,9 @@ Release Notes for BIG-IP Controller for Cloud Foundry
 
 Added Functionality
 ^^^^^^^^^^^^^^^^^^^
-* Users can specify their own custom policy, profile, or health monitor to associate with the objects created on the BIG-IP
-* Manages the following Local Traffic Manager (LTM) resources for the BIG-IP partition
+* Support for TCP and HTTP routing.
+* Attach custom policy, profile, or health monitor to L7 objects created on the BIG-IP device.
+* Manages the following Local Traffic Manager (LTM) resources for the BIG-IP partition:
 
   * Virtual Servers
   * Pools
@@ -22,7 +23,9 @@ Added Functionality
 
 Limitations
 ^^^^^^^^^^^
-* The configurations defined in the application manifest apply to all BIG-IP LTM objects created in the designated partition for Cloud Foundry. 
-* If using HTTPS, the SSL profile(s) defined in the application manifest only attach to the HTTPS virtual server.
-* The BIG-IP Controller only controls one partition on the BIG-IP device.
-* Version |release| does not support TCP routing.
+* The BIG-IP Controller controls one (1) partition on the BIG-IP device.
+* Controller configurations are global: they apply to all L7 (HTTP) LTM objects in the designated BIG-IP partition.
+* This release supports custom policies and profiles for **L7 virtual servers** only.
+* Configured health monitor objects apply to all pools (both L4 and L7 routes).
+* SSL profile(s) defined in the application manifest do not attach to the HTTP virtual server.
+* Modification of a Controller-owned policy resulting in a state change may cause traffic flow interruptions. If the modification changes the state to ‘published’, the Controller will delete the policy and recreate it with a ‘legacy’ status.
