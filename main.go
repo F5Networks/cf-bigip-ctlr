@@ -1,3 +1,6 @@
+/*
+ * Portions Copyright (c) 2017, F5 Networks, Inc.
+ */
 package main // import "github.com/F5Networks/cf-bigip-ctlr"
 
 import (
