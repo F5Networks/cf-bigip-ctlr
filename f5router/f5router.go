@@ -446,18 +446,23 @@ func makeVirtual(
 	srcAddrTrans bigipResources.SourceAddrTranslation,
 ) *bigipResources.Virtual {
 	// Validate the IP address, and create the destination
-	addr := net.ParseIP(virtualAddress.BindAddr)
+	ip, rd := split_ip_with_route_domain(virtualAddress.BindAddr)
+	if len(rd) > 0 {
+		rd = "%" + rd
+	}
+	addr := net.ParseIP(ip)
 	if nil != addr {
 		var format string
 		if nil != addr.To4() {
-			format = "/%s/%s:%d"
+			format = "/%s/%s%s:%d"
 		} else {
-			format = "/%s/%s.%d"
+			format = "/%s/%s%s.%d"
 		}
 		destination := fmt.Sprintf(
 			format,
 			partition,
-			virtualAddress.BindAddr,
+			ip,
+			rd,
 			virtualAddress.Port)
 
 		vs := &bigipResources.Virtual{

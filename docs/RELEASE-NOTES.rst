@@ -26,3 +26,6 @@ Limitations
 * If using HTTPS, the SSL profile(s) defined in the application manifest only attach to the HTTPS virtual server.
 * The BIG-IP Controller only controls one partition on the BIG-IP device.
 * Version |release| does not support TCP routing.
+* The default route domain for a partition managed by an F5 controller cannot be changed once a controller has been deployed.
+  To specify a new default route domain, a new partition should be used.
+
