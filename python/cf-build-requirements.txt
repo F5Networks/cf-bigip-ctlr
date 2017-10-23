@@ -1,6 +1,6 @@
--e git+https://github.com/f5devcentral/f5-cccl.git@cbc456dce3996d81ec7b5563388cf5b0fab6e3c7#egg=f5-cccl
+-e git+https://github.com/f5devcentral/f5-cccl.git@5edac6c7be8fb105cc3394d846949c329f5b829d#egg=f5-cccl
 pytest==3.0.2
 mock
-flake8
+flake8==3.4.1
 pytest-cov==2.5.1
 coveralls==1.1
