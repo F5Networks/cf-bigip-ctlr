@@ -29,5 +29,5 @@ Limitations
 * Configured health monitor objects apply to all pools (both L4 and L7 routes).
 * SSL profile(s) defined in the application manifest do not attach to the HTTP virtual server.
 * Modification of a Controller-owned policy resulting in a state change may cause traffic flow interruptions. If the modification changes the state to ‘published’, the Controller will delete the policy and recreate it with a ‘legacy’ status.
-* The default route domain for a partition managed by an F5 controller cannot be changed once a controller has been deployed. To specify a new default route domain, a new partition should be used.
+* You cannot change the default route domain for a partition managed by an F5 controller after the controller has deployed. To specify a new default route domain, use a different partition.
 

@@ -41,6 +41,7 @@ script:
       docker push "$BASE_PUSH_TARGET:$BUILD_STAMP"
       docker push "$BASE_PUSH_TARGET:latest"      
     fi
+  - make docs
 
 deploy:
   - provider: script
