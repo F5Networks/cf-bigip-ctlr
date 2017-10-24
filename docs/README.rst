@@ -111,7 +111,7 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | verify_interval                     | integer | Optional | 30             | In seconds; interval at which to verify the BIG-IP configuration.               |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | external_addr                       | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
+|    | external_addr [#ext_addr]_          | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | ssl_profiles                        | array   | Optional | n/a            | List of BIG-IP SSL policies to attach to the HTTPS routing virtual server.      |                |
 |    |                                     |         |          |                | [#ssl]_                                                                         |                |
@@ -201,9 +201,10 @@ Define the parameters in the ``env`` section of your `application manifest </con
 | tcp_router_group                         | string  | Optional | default-tcp    | Name of TCP router group                                                        |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 
-\
-
+.. [#ext_addr] The controller supports BIG-IP `route domain`_ specific addresses.
 .. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
+
+\
 
 .. _cfctlr-config-examples:
 
@@ -347,3 +348,4 @@ The Controller supports the following log levels:
 .. _BIG-IP profiles: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0.html
 .. _policies: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-local-traffic-policies-getting-started-13-0-0.html
 .. _BIG-IP SSL profiles: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0/6.html
+.. _route domain: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/tmos-routing-administration-12-0-0/9.html
