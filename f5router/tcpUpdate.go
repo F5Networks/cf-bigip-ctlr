@@ -69,6 +69,7 @@ func (tu updateTCP) CreateResources(c *config.Config) bigipResources.Resources {
 	}
 
 	// pass in empty objs for profile and policy as we don't attach any currently
+	var iRules []string
 	vs := makeVirtual(
 		tu.name,
 		tu.name,
@@ -77,6 +78,7 @@ func (tu updateTCP) CreateResources(c *config.Config) bigipResources.Resources {
 		"tcp",
 		[]*bigipResources.NameRef{},
 		[]*bigipResources.NameRef{},
+		iRules,
 		bigipResources.SourceAddrTranslation{Type: "automap"},
 	)
 

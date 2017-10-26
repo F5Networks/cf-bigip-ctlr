@@ -48,6 +48,21 @@ balancing_algorithm: foo-bar
 			})
 		})
 
+		Context("session persistence config", func() {
+			It("sets default session persistence", func() {
+				Expect(config.SessionPersistence).To(Equal(true))
+			})
+
+			It("can override the default session persistence", func() {
+				cfg := DefaultConfig()
+				var b = []byte(`session_persistence: false`)
+
+				cfg.Initialize(b)
+				cfg.Process()
+				Expect(cfg.SessionPersistence).To(Equal(false))
+			})
+		})
+
 		It("sets router group config", func() {
 			var b = []byte(`
 router_group: test
