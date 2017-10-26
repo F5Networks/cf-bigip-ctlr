@@ -60,6 +60,7 @@ type F5Router struct {
 	routeVSHTTPS     *bigipResources.Virtual
 	virtualResources map[string]*bigipResources.Virtual
 	poolResources    map[string]*bigipResources.Pool
+	ruleResources    map[string]*bigipResources.IRule
 }
 
 func verifyRouteURI(ru updateHTTP) error {
@@ -123,6 +124,7 @@ func NewF5Router(
 		writer:           writer,
 		virtualResources: make(map[string]*bigipResources.Virtual),
 		poolResources:    make(map[string]*bigipResources.Pool),
+		ruleResources:    make(map[string]*bigipResources.IRule),
 	}
 
 	err := r.validateConfig()
@@ -190,9 +192,22 @@ func (r *F5Router) validateConfig() error {
 	return nil
 }
 
+func (r *F5Router) initiRule(name string, code string) {
+	iRule := bigipResources.IRule{
+		Name: name,
+		Code: code,
+	}
+	r.ruleResources[name] = &iRule
+}
+
 func (r *F5Router) createHTTPVirtuals() {
 	plcs := r.generatePolicyList()
 	prfls := r.generateNameList(r.c.BigIP.Profiles)
+	var iRules []string
+	if r.c.SessionPersistence {
+		iRules = append(iRules, bigipResources.JsessionidIRuleName)
+		r.initiRule(bigipResources.JsessionidIRuleName, bigipResources.JsessionidIRule)
+	}
 	srcAddrTrans := bigipResources.SourceAddrTranslation{Type: "automap"}
 	va := &bigipResources.VirtualAddress{
 		BindAddr: r.c.BigIP.ExternalAddr,
@@ -207,6 +222,7 @@ func (r *F5Router) createHTTPVirtuals() {
 			"tcp",
 			plcs,
 			prfls,
+			iRules,
 			srcAddrTrans,
 		)
 
@@ -226,6 +242,7 @@ func (r *F5Router) createHTTPVirtuals() {
 				"tcp",
 				plcs,
 				prfls,
+				iRules,
 				srcAddrTrans,
 			)
 	}
@@ -318,6 +335,14 @@ func (r *F5Router) createPools(pm bigipResources.PartitionMap, partition string,
 	}
 }
 
+func (r *F5Router) createiRules(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for _, rule := range r.ruleResources {
+		pm[partition].IRules = append(pm[partition].IRules, rule)
+	}
+}
+
 // Create a partition entry in the map if it doesn't exist
 func initPartitionData(pm bigipResources.PartitionMap, partition string) {
 	if _, ok := pm[partition]; !ok {
@@ -343,6 +368,9 @@ func (r *F5Router) createResources() bigipResources.PartitionMap {
 
 	wg.Add(1)
 	go r.createPools(pm, partition, &wg)
+
+	wg.Add(1)
+	go r.createiRules(pm, partition, &wg)
 
 	wg.Wait()
 
@@ -443,6 +471,7 @@ func makeVirtual(
 	mode string,
 	policies []*bigipResources.NameRef,
 	profiles []*bigipResources.NameRef,
+	iRules []string,
 	srcAddrTrans bigipResources.SourceAddrTranslation,
 ) *bigipResources.Virtual {
 	// Validate the IP address, and create the destination
@@ -473,6 +502,7 @@ func makeVirtual(
 			Mode:                  mode,
 			Policies:              policies,
 			Profiles:              profiles,
+			IRules:                iRules,
 			SourceAddrTranslation: srcAddrTrans,
 		}
 		return vs

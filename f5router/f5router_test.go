@@ -317,7 +317,7 @@ var _ = Describe("F5Router", func() {
 			Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
 		})
 
-		It("should handle policies, profiles and health monitors", func() {
+		It("should handle policies, profiles, session persistence, and health monitors", func() {
 			done := make(chan struct{})
 			os := make(chan os.Signal)
 			ready := make(chan struct{})
@@ -327,6 +327,7 @@ var _ = Describe("F5Router", func() {
 			c.BigIP.Profiles = []string{"Common/http", "/Common/fakeprofile"}
 			c.BigIP.Policies = []string{"Common/fakepolicy", "/cf/anotherpolicy"}
 			c.BigIP.LoadBalancingMode = "least-connections-member"
+			c.SessionPersistence = false
 
 			router, err = NewF5Router(logger, c, mw)
 

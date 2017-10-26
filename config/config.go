@@ -208,6 +208,8 @@ type Config struct {
 	PidFile     string `yaml:"pid_file"`
 	LoadBalance string `yaml:"balancing_algorithm"`
 
+	SessionPersistence bool `yaml:"session_persistence"`
+
 	DisableKeepAlives   bool `yaml:"disable_keep_alives"`
 	MaxIdleConns        int  `yaml:"max_idle_conns"`
 	MaxIdleConnsPerHost int  `yaml:"max_idle_conns_per_host"`
@@ -240,6 +242,8 @@ var defaultConfig = Config{
 	RouteMode: HTTP.String(),
 
 	LoadBalance: LOAD_BALANCE_RR,
+
+	SessionPersistence: true,
 
 	DisableKeepAlives:   true,
 	MaxIdleConns:        100,
