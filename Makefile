@@ -65,6 +65,7 @@ pre-build:
 
 prod-build: pre-build
 	@echo "Building with minimal instrumentation..."
+	$(CURDIR)/build-tools/build-devel-image.sh
 	$(CURDIR)/build-tools/build-release-artifacts.sh
 	$(CURDIR)/build-tools/build-release-images.sh
 
