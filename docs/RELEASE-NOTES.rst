@@ -5,7 +5,13 @@ Release Notes for BIG-IP Controller for Cloud Foundry
 ---------
 
 Added Functionality
-^^^^^^^^^^^^^^^^^^^
+```````````````````
+
+v1.0.0
+------
+
+Added Functionality
+```````````````````
 * Support for TCP and HTTP routing.
 * Attach custom policy, profile, or health monitor to L7 objects created on the BIG-IP device.
 * Manages the following Local Traffic Manager (LTM) resources for the BIG-IP partition:
@@ -22,7 +28,7 @@ Added Functionality
       * Conditions
 
 Limitations
-^^^^^^^^^^^
+```````````
 * The BIG-IP Controller controls one (1) partition on the BIG-IP device.
 * Controller configurations are global: they apply to all L7 (HTTP) LTM objects in the designated BIG-IP partition.
 * This release supports custom policies and profiles for **L7 virtual servers** only.
