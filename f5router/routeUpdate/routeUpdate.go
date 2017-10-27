@@ -29,7 +29,7 @@ type Listener interface {
 
 // RouteUpdate interface to wrap different protocols
 type RouteUpdate interface {
-	CreateResources(*config.Config) bigipResources.Resources
+	CreateResources(*config.Config) (bigipResources.Resources, error)
 	Protocol() string
 	Op() Operation
 	Name() string
