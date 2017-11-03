@@ -70,9 +70,9 @@ To do so, create the desired objects on the BIG-IP manually *before* adding them
 - health monitors
 
 .. danger::
- 
+
    The |cfctlr| monitors the BIG-IP partition it manages for configuration changes. If it discovers changes, the Controller reapplies its own configuration to the BIG-IP system.
-   
+
    F5 does not recommend making configuration changes to objects in any partition managed by the |cfctlr| via any other means (for example, the configuration utility, TMOS, or by syncing configuration with another device or service group). Doing so may result in disruption of service or unexpected behavior.
 
 .. _cfctlr-configuration:
@@ -192,6 +192,8 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | route_mode                               | string  | Optional | http           | :ref:`Route type <route types>` you want to watch; must be a single value       | http, tcp, all |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+| session_persistence                      | boolean | Optional | true           | Enables JSESSIONID cookie session persistence on the BIG-IP device              | true, false    |
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | start_response_delay_interval            | integer | Optional | 5              | In seconds, wait time to achieve steady state from routing message bus          |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_max_retries                | integer | Optional | 3              | Number of retries to fetch auth token                                           |                |
@@ -249,6 +251,37 @@ If you define an SSL profile in the configuration (the ``ssl_profiles`` paramete
 You can attach multiple certificate/key pairs to the HTTPS virtual server.
 The BIG-IP device uses `TLS Server Name Indication`_ (SNI) to choose the correct certificate to present to the client; SNI allows the `Cloud Foundry`_ instance to support multiple hostnames (foo.mycf.com and bar.mycf.com).
 Some of these cert/key pairs can be wildcard (\*.mycf.com).
+
+.. _session persistence:
+
+JSESSIONID Session Persistence
+------------------------------
+
+The |cfctlr| enables session persistence on the BIG-IP device using cookies by default. To turn it off, set the :code:`session_persistence` :ref:`configuration parameter <cfctlr-configuration>` to "false", as shown below.
+
+.. code-block:: yaml
+
+   session_persistence: false
+
+To configure session persistence for the |cfctlr|, set cookies in your application's HTTP response headers as follows:
+
+``Set-Cookie: JSESSIONID=<value>; Max-Age=<age>``
+
+.. note::
+
+   - The cookie name of JSESSIONID is case insensitive so jsessionid and JSessionID are also valid.
+   - The cookie value can be any distinct value (in other words, be sure it's not the same as other cookies set by other responses).
+   - Setting the cookie Max-Age to the following values will result in the following behavior:
+
+.. table:: Cookie Max-Age values
+
+   ==== =====================================================
+   Age    Behavior
+   ==== =====================================================
+   < 0     Session persists until client connection closes or one hour elapses.
+   > 0     Session persists until the Max-Age of the cookie.
+   = 0     Delete session persistence record if one exists on the BIG-IP system.
+   ==== =====================================================
 
 .. _health checks:
 
