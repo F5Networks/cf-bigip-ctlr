@@ -24,6 +24,7 @@
           "name": "http",
           "partition": "Common"
         }],
+        "rules": ["jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }

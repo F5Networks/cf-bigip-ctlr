@@ -48,6 +48,7 @@ type (
 		Pools    []*Pool    `json:"pools,omitempty"`
 		Monitors []*Monitor `json:"monitors,omitempty"`
 		Policies []*Policy  `json:"l7Policies,omitempty"`
+		IRules   []*IRule   `json:"iRules,omitempty"`
 	}
 
 	// Virtual server frontend
@@ -59,6 +60,7 @@ type (
 		Destination           string                `json:"destination,omitempty"`
 		Policies              []*NameRef            `json:"policies,omitempty"`
 		Profiles              []*NameRef            `json:"profiles,omitempty"`
+		IRules                []string              `json:"rules,omitempty"`
 		SourceAddrTranslation SourceAddrTranslation `json:"sourceAddressTranslation,omitempty"`
 	}
 
@@ -129,6 +131,12 @@ type (
 		Requires    []string `json:"requires"`
 		Rules       []*Rule  `json:"rules"`
 		Strategy    string   `json:"strategy"`
+	}
+
+	// IRule definition
+	IRule struct {
+		Name string `json:"name"`
+		Code string `json:"apiAnonymous"`
 	}
 
 	// SourceAddrTranslation is the Virtual Server Source Address Translation
