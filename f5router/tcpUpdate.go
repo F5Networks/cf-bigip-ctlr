@@ -56,36 +56,36 @@ func NewTCPUpdate(
 	}, nil
 }
 
-func (tu updateTCP) CreateResources(c *config.Config) bigipResources.Resources {
+func (tu updateTCP) CreateResources(c *config.Config) (bigipResources.Resources, error) {
 	rs := bigipResources.Resources{}
-	// FIXME need to handle multiple tcp router groups
-	poolDescrip := fmt.Sprintf("route-port: %d, router-group: %s", tu.routePort, c.TCPRouterGroupName)
-	pool := makePool(c, tu.name, poolDescrip, tu.member)
-	rs.Pools = append(rs.Pools, pool)
-
 	va := &bigipResources.VirtualAddress{
 		BindAddr: tu.c.BigIP.ExternalAddr,
 		Port:     int32(tu.routePort),
 	}
 
-	// pass in empty objs for profile and policy as we don't attach any currently
-	var iRules []string
-	vs := makeVirtual(
-		tu.name,
-		tu.name,
-		tu.c.BigIP.Partitions[0],
-		va,
-		"tcp",
-		[]*bigipResources.NameRef{},
-		[]*bigipResources.NameRef{},
-		iRules,
-		bigipResources.SourceAddrTranslation{Type: "automap"},
-	)
+	dest, err := verifyDestAddress(va, tu.c.BigIP.Partitions[0])
+	if err != nil {
+		return rs, err
+	}
+
+	// FIXME need to handle multiple tcp router groups
+	poolDescrip := fmt.Sprintf("route-port: %d, router-group: %s", tu.routePort, c.TCPRouterGroupName)
+	pool := makePool(c, tu.name, poolDescrip, tu.member)
+	rs.Pools = append(rs.Pools, pool)
+
+	vs := &bigipResources.Virtual{
+		VirtualServerName:     tu.name,
+		PoolName:              tu.name,
+		Mode:                  "tcp",
+		Enabled:               true,
+		Destination:           dest,
+		SourceAddrTranslation: bigipResources.SourceAddrTranslation{Type: "automap"},
+	}
 
 	if nil != vs {
 		rs.Virtuals = append(rs.Virtuals, vs)
 	}
-	return rs
+	return rs, nil
 }
 
 func (tu updateTCP) Protocol() string {
