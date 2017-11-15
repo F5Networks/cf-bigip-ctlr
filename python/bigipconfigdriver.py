@@ -33,7 +33,6 @@ from urlparse import urlparse
 from f5_cccl.api import F5CloudServiceManager
 from f5_cccl.exceptions import F5CcclError
 from f5_cccl.utils.mgmt import mgmt_root
-from f5_cccl.utils.network import apply_network_fdb_config
 from f5_cccl.utils.profile import (delete_unused_ssl_profiles,
                                    create_client_ssl_profile,
                                    create_server_ssl_profile)
@@ -102,7 +101,7 @@ class CloudServiceManager():
         Args:
             config: BIG-IP config dict
         """
-        return self._cccl.apply_config(config)
+        return self._cccl.apply_ltm_config(config)
 
 
 class IntervalTimerError(Exception):
@@ -195,19 +194,6 @@ def create_ltm_config(partition, config):
     return ltm
 
 
-def create_network_config(config):
-    """Extract a BIG-IP Network configuration from the network config.
-
-    Args:
-        config: BigIP config which contains openshift-sdn defs
-    """
-    f5_network = {}
-    if 'openshift-sdn' in config:
-        f5_network['fdb'] = config['openshift-sdn']
-
-    return f5_network
-
-
 def _create_custom_profiles(mgmt, partition, custom_profiles):
     incomplete = 0
 
@@ -243,22 +229,10 @@ class ConfigHandler():
         self._backoff_timer = None
         self._max_backoff_time = 128
 
-        self._interval = None
-        self._verify_interval = 0
-        self.set_interval_timer(verify_interval)
-
+        self._verify_interval = verify_interval
+        self._interval = IntervalTimer(self._verify_interval,
+                                       self.notify_reset)
         self._thread.start()
-
-    def set_interval_timer(self, verify_interval):
-        if verify_interval != self._verify_interval:
-            if self._interval is not None:
-                self._interval.stop()
-                self._interval = None
-
-            self._verify_interval = verify_interval
-            if self._verify_interval > 0:
-                self._interval = IntervalTimer(self._verify_interval,
-                                               self.notify_reset)
 
     def stop(self):
         self._condition.acquire()
@@ -304,13 +278,8 @@ class ConfigHandler():
                 # yet ready -- it does not mean to apply an empty config
                 if 'resources' not in config:
                     continue
-                verify_interval, _ = _handle_global_config(config)
-                _handle_openshift_sdn_config(config)
-                self.set_interval_timer(verify_interval)
 
-                cfg_network = create_network_config(config)
                 incomplete = 0
-
                 for mgr in self._managers:
                     partition = mgr.get_partition()
                     cfg_ltm = create_ltm_config(partition, config)
@@ -341,11 +310,6 @@ class ConfigHandler():
                         # exception and fail
                         log.error("CCCL Error: %s", e.msg)
                         raise e
-
-                if 'fdb' in cfg_network:
-                    incomplete += apply_network_fdb_config(
-                        self._managers[0].mgmt_root(),
-                        cfg_network['fdb'])
 
                 if incomplete:
                     # Error occurred, perform retries
@@ -660,17 +624,6 @@ def _handle_bigip_config(config):
         port = 443
 
     return host, port
-
-
-def _handle_openshift_sdn_config(config):
-    if config and 'openshift-sdn' in config:
-        sdn = config['openshift-sdn']
-        if 'vxlan-name' not in sdn:
-            raise ConfigError('Configuration file missing '
-                              '"openshift-sdn:vxlan-name" section')
-        if 'vxlan-node-ips' not in sdn:
-            raise ConfigError('Configuration file missing '
-                              '"openshift-sdn:vxlan-node-ips" section')
 
 
 def main():

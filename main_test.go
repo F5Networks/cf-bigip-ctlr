@@ -103,6 +103,7 @@ var _ = Describe("Router Integration", func() {
 			Partitions:   []string{"cloud-foundry"},
 			ExternalAddr: "127.0.0.1",
 			DriverCmd:    "testdata/fake_driver.py",
+			Tier2IPRange: "10.0.0.1/32",
 		}
 
 		writeConfig(cfg, cfgFile)

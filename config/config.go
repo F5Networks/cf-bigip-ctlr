@@ -69,6 +69,7 @@ type BigIPConfig struct {
 	Profiles          []string `yaml:"profiles" json:"-"`
 	HealthMonitors    []string `yaml:"health_monitors" json:"-"`
 	DriverCmd         string   `yaml:"driver_path" json:"-"`
+	Tier2IPRange      string   `yaml:"tier2_ip_range" json:"-"`
 }
 
 var defaultBigIPConfig = BigIPConfig{

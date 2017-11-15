@@ -14,24 +14,20 @@
  * limitations under the License.
  */
 
-package f5router
+package bigipResources
 
-import (
-	"regexp"
+//ForwardToVIPiRule forwards traffic from a tier1 vip to a tier2
+const (
+	// HTTPForwardingiRuleName on BIG-IP
+	HTTPForwardingiRuleName = "forward-to-vip"
+	// ForwardToVIPiRule irule used to forward to the tier2 vips
+	ForwardToVIPiRule = `
+when HTTP_REQUEST {
+  if {[info exists target_vip] && [string length $target_vip] != 0} {
+    if { [catch { virtual $target_vip } ] } {
+      log local0. "ERROR: Attempting to assign traffic to non-existant virtual $target_vip"
+      reject
+    }
+  }
+}`
 )
-
-func splitIPWithRouteDomain(address string) (ip string, rd string) {
-	// Split the address into the ip and routeDomain (optional) parts
-	//     address is of the form: <ipv4_or_ipv6>[%<routeDomainID>]
-	idRdRegex := regexp.MustCompile(`^([^%]*)%(\d+)$`)
-
-	match := idRdRegex.FindStringSubmatch(address)
-	if match != nil {
-		ip = match[1]
-		rd = match[2]
-	} else {
-		ip = address
-		rd = ""
-	}
-	return
-}

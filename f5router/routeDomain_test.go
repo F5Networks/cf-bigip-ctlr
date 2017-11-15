@@ -22,7 +22,7 @@ import (
 )
 
 var _ = Describe("Route Domain", func() {
-	It("split_ip_with_route_domain", func() {
+	It("splitIPWithRouteDomain", func() {
 		type testDataType struct {
 			address    string
 			expectedIP string
@@ -53,7 +53,7 @@ var _ = Describe("Route Domain", func() {
 		}
 
 		for _, td := range testData {
-			ip, rd := split_ip_with_route_domain(td.address)
+			ip, rd := splitIPWithRouteDomain(td.address)
 			Expect(ip).To(Equal(td.expectedIP))
 			Expect(rd).To(Equal(td.expectedRD))
 		}

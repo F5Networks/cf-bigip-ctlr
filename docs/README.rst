@@ -70,9 +70,9 @@ To do so, create the desired objects on the BIG-IP manually *before* adding them
 - health monitors
 
 .. danger::
- 
+
    The |cfctlr| monitors the BIG-IP partition it manages for configuration changes. If it discovers changes, the Controller reapplies its own configuration to the BIG-IP system.
-   
+
    F5 does not recommend making configuration changes to objects in any partition managed by the |cfctlr| via any other means (for example, the configuration utility, TMOS, or by syncing configuration with another device or service group). Doing so may result in disruption of service or unexpected behavior.
 
 .. _cfctlr-configuration:
@@ -114,6 +114,8 @@ Define the parameters in the ``env`` section of your `application manifest </con
 |    | verify_interval                     | integer | Optional | 30             | In seconds; interval at which to verify the BIG-IP configuration.               |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | external_addr [#ext_addr]_          | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
++----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+|    | tier2_ip_range                      | string  | Required | n/a            | IP range assigned to the tier2 vips in CIDR notation.                           |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | ssl_profiles                        | array   | Optional | n/a            | List of BIG-IP SSL policies to attach to the HTTPS routing virtual server.      |                |
 |    |                                     |         |          |                | [#ssl]_                                                                         |                |
