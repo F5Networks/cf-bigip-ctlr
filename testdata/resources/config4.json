@@ -115,6 +115,10 @@
         }],
         "monitors": ["/Common/tcp_half_open"],
         "description": "route-port: 6050, router-group: default-tcp"
+      }],
+      "internalDataGroups": [{
+        "name": "cf-ctlr-data-group",
+        "records": null
       }]
     }
   }

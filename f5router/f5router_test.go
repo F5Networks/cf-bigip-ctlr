@@ -18,6 +18,8 @@ package f5router
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"os"
 	"sort"
 	"sync"
@@ -31,7 +33,9 @@ import (
 	"code.cloudfoundry.org/routing-api/models"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	. "github.com/onsi/gomega/gbytes"
+	"github.com/onsi/gomega/ghttp"
 )
 
 var _ = Describe("F5Router", func() {
@@ -136,6 +140,11 @@ var _ = Describe("F5Router", func() {
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
+			c.BigIP.Tier2IPRange = "10.0.0.1/32"
+			r, err = NewF5Router(logger, c, mw)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+
 			c.BigIP.ExternalAddr = "127.0.0.1"
 			r, err = NewF5Router(logger, c, mw)
 			Expect(r).NotTo(BeNil())
@@ -171,6 +180,7 @@ var _ = Describe("F5Router", func() {
 		)
 
 		registerRoutes := func() {
+			// This should produce 10 tier2 vips, pools and rules
 			rp := []routePair{
 				routePair{"foo.cf.com", fooEndpoint},
 				routePair{"bar.cf.com", barEndpoint},
@@ -345,6 +355,79 @@ var _ = Describe("F5Router", func() {
 
 			matchConfig(mw, expectedConfigs[3])
 		})
+		Context("fake BIG-IP provides a response", func() {
+			var server *ghttp.Server
+			var fakeDataGroup *bigipResources.InternalDataGroup
+
+			BeforeEach(func() {
+				server = ghttp.NewServer()
+				fakeDataGroup = createFakeDataGroup()
+				server.AppendHandlers(ghttp.RespondWithJSONEncoded(http.StatusOK, fakeDataGroup))
+			})
+
+			AfterEach(func() {
+				//shut down the server between tests
+				server.Close()
+			})
+			It("should be able to use a pre-existing datagroup", func() {
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				// Update the config
+				c.BigIP.URL = server.URL()
+
+				router, err = NewF5Router(logger, c, mw)
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+				// Verify we got the data back from the "BIG-IP"
+				Eventually(logger).Should(Say("add-ports-to-used-ports.*60000"))
+				Eventually(ready).Should(BeClosed())
+
+				registerRoutes()
+
+				var virtuals []*bigipResources.Virtual
+
+				// Wait for all routes to be registered
+				Eventually(func() int {
+					if _, ok := mw.getInput().Resources["cf"]; ok {
+						virtuals = mw.getInput().Resources["cf"].Virtuals
+						return len(virtuals)
+					}
+					return 0
+				}).Should(Equal(11))
+
+				// Dests we know should exist on two virtuals
+				idDests := []string{"/cf/10.0.0.1:50000", "/cf/10.0.0.1:60000"}
+				var dests []string
+				for _, virtual := range virtuals {
+					if virtual.Destination == idDests[0] || virtual.Destination == idDests[1] {
+						dests = append(dests, virtual.Destination)
+					}
+				}
+				// Marshall the virtuals for ease of printing in the error
+				data, _ := json.Marshal(virtuals)
+				Expect(dests).To(ConsistOf(idDests), "Not all datagroup destinations were assigned, virtuals: %s", data)
+
+				// Verify none of the virtuals ended up with the bunk dest addrs put in the data group
+				badDests := []string{"/cf/10.0.0.1:70000", "/cf/10.1.1.1:10019"}
+				for _, virtual := range virtuals {
+					Expect(virtual.Destination).NotTo(SatisfyAny(
+						Equal(badDests[0]),
+						Equal(badDests[1]),
+					))
+				}
+
+			})
+
+		})
 
 		Context("fail cases", func() {
 			It("should error when not passing a URI for route update", func() {
@@ -352,7 +435,7 @@ var _ = Describe("F5Router", func() {
 				Expect(updateErr).To(MatchError("uri length of zero is not allowed"))
 			})
 
-			It("should error on invalid policy format", func() {
+			It("should error when a policy name is not formatted correctly", func() {
 				done := make(chan struct{})
 				os := make(chan os.Signal)
 				ready := make(chan struct{})
@@ -374,17 +457,44 @@ var _ = Describe("F5Router", func() {
 				Eventually(logger).Should(Say("f5router-skipping-name"))
 			})
 
+			It("should error when exceeding the ip range", func() {
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				router, err = NewF5Router(logger, c, mw)
+				// Set the current port to the max
+				router.tier2VSInfo.holderPort = 65535
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+				Eventually(ready).Should(BeClosed())
+
+				registerRoutes()
+
+				Eventually(logger).Should(Say("Ran out of available IP addresses."))
+				// Verify the config, we should only see one 2nd tier vip, pool and rule
+				matchConfig(mw, expectedConfigs[6])
+
+			})
+
 		})
 		Context("tcp routing", func() {
 			registerTCP := func() {
 				ups := []tcpPair{
-					{6010, bigipResources.Member{"10.0.0.1", 5000, "user-enabled"}},
-					{6010, bigipResources.Member{"10.0.0.1", 5001, "user-enabled"}},
-					{6010, bigipResources.Member{"10.0.0.1", 5002, "user-enabled"}},
-					{6020, bigipResources.Member{"10.0.0.1", 6000, "user-enabled"}},
-					{6030, bigipResources.Member{"10.0.0.1", 7000, "user-enabled"}},
-					{6040, bigipResources.Member{"10.0.0.1", 8000, "user-enabled"}},
-					{6050, bigipResources.Member{"10.0.0.1", 9000, "user-enabled"}},
+					{port: 6010, member: bigipResources.Member{Address: "10.0.0.1", Port: 5000, Session: "user-enabled"}},
+					{port: 6010, member: bigipResources.Member{Address: "10.0.0.1", Port: 5001, Session: "user-enabled"}},
+					{port: 6010, member: bigipResources.Member{Address: "10.0.0.1", Port: 5002, Session: "user-enabled"}},
+					{port: 6020, member: bigipResources.Member{Address: "10.0.0.1", Port: 6000, Session: "user-enabled"}},
+					{port: 6030, member: bigipResources.Member{Address: "10.0.0.1", Port: 7000, Session: "user-enabled"}},
+					{port: 6040, member: bigipResources.Member{Address: "10.0.0.1", Port: 8000, Session: "user-enabled"}},
+					{port: 6050, member: bigipResources.Member{Address: "10.0.0.1", Port: 9000, Session: "user-enabled"}},
 				}
 				for _, pair := range ups {
 					up, _ := NewTCPUpdate(c, logger, routeUpdate.Add, pair.port, pair.member)
@@ -419,19 +529,19 @@ var _ = Describe("F5Router", func() {
 				registerTCP()
 				matchConfig(mw, expectedConfigs[4])
 				// add a pool member to existing pool
-				member := bigipResources.Member{"10.0.0.1", 6001, "user-enabled"}
+				member := bigipResources.Member{Address: "10.0.0.1", Port: 6001, Session: "user-enabled"}
 				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6020, member)
 				router.UpdateRoute(ad)
 				// add a new pool - new pool and vs created
-				member = bigipResources.Member{"10.0.0.1", 6000, "user-enabled"}
+				member = bigipResources.Member{Address: "10.0.0.1", Port: 6000, Session: "user-enabled"}
 				ad2, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6060, member)
 				router.UpdateRoute(ad2)
 				// remove a pool member with other members left
-				member = bigipResources.Member{"10.0.0.1", 5000, "user-enabled"}
+				member = bigipResources.Member{Address: "10.0.0.1", Port: 5000, Session: "user-enabled"}
 				rmEP, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6010, member)
 				router.UpdateRoute(rmEP)
 				// remove a pool member and none are left - pool and vs is deleted
-				member = bigipResources.Member{"10.0.0.1", 9000, "user-enabled"}
+				member = bigipResources.Member{Address: "10.0.0.1", Port: 9000, Session: "user-enabled"}
 				rmEP2, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6050, member)
 				router.UpdateRoute(rmEP2)
 
@@ -442,7 +552,7 @@ var _ = Describe("F5Router", func() {
 				registerTCP()
 				matchConfig(mw, expectedConfigs[4])
 
-				member := bigipResources.Member{"10.0.0.1", 5000, "user-enabled"}
+				member := bigipResources.Member{Address: "10.0.0.1", Port: 5000, Session: "user-enabled"}
 				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6010, member)
 				router.UpdateRoute(ad)
 				router.UpdateRoute(ad)
@@ -522,6 +632,7 @@ func makeConfig() *config.Config {
 	c.BigIP.Pass = "pass"
 	c.BigIP.Partitions = []string{"cf"}
 	c.BigIP.ExternalAddr = "127.0.0.1"
+	c.BigIP.Tier2IPRange = "10.0.0.1/32"
 
 	return c
 }
@@ -556,32 +667,125 @@ func matchConfig(mw *MockWriter, expected []byte) {
 		return mw.getInput().BigIP
 	}).Should(Equal(matcher.BigIP))
 
-	EventuallyWithOffset(1, func() []*bigipResources.Virtual {
-		if _, ok := mw.getInput().Resources["cf"]; ok {
-			return mw.getInput().Resources["cf"].Virtuals
-		} else {
+	matchVirtuals(mw, matcher)
+
+	matchPools(mw, matcher)
+
+	matchPolicies(mw, matcher)
+
+	matchMonitors(mw, matcher)
+
+	matchInternalDataGroups(mw, matcher)
+}
+
+func matchVirtuals(mw *MockWriter, matcher configMatcher) {
+	for _, virtual := range matcher.Resources["cf"].Virtuals {
+		EventuallyWithOffset(2, func() []*bigipResources.Virtual {
+			if _, ok := mw.getInput().Resources["cf"]; ok {
+				return mw.getInput().Resources["cf"].Virtuals
+			}
 			return nil
-		}
-	}).Should(ConsistOf(matcher.Resources["cf"].Virtuals))
-	EventuallyWithOffset(1, func() []*bigipResources.Pool {
-		if _, ok := mw.getInput().Resources["cf"]; ok {
-			return mw.getInput().Resources["cf"].Pools
-		} else {
+		}).Should(ContainElement(virtual))
+	}
+	EventuallyWithOffset(2, func() int {
+		return len(mw.getInput().Resources["cf"].Virtuals)
+	}).Should(Equal(len(matcher.Resources["cf"].Virtuals)),
+		fmt.Sprintf("Expected %v \n to match \n %v",
+			format.Object(mw.getInput().Resources["cf"].Virtuals, 1),
+			format.Object(matcher.Resources["cf"].Virtuals, 1),
+		),
+	)
+}
+
+func matchPools(mw *MockWriter, matcher configMatcher) {
+	for _, pool := range matcher.Resources["cf"].Pools {
+		EventuallyWithOffset(2, func() []*bigipResources.Pool {
+			if _, ok := mw.getInput().Resources["cf"]; ok {
+				return mw.getInput().Resources["cf"].Pools
+			}
 			return nil
-		}
-	}).Should(ConsistOf(matcher.Resources["cf"].Pools))
-	EventuallyWithOffset(1, func() []*bigipResources.Monitor {
-		if _, ok := mw.getInput().Resources["cf"]; ok {
-			return mw.getInput().Resources["cf"].Monitors
-		} else {
+		}).Should(ContainElement(pool))
+	}
+	EventuallyWithOffset(2, func() int {
+		return len(mw.getInput().Resources["cf"].Pools)
+	}).Should(Equal(len(matcher.Resources["cf"].Pools)),
+		fmt.Sprintf("Expected %v \n to match \n %v",
+			format.Object(mw.getInput().Resources["cf"].Pools, 1),
+			format.Object(matcher.Resources["cf"].Pools, 1),
+		),
+	)
+}
+
+func matchPolicies(mw *MockWriter, matcher configMatcher) {
+	for _, policy := range matcher.Resources["cf"].Policies {
+		EventuallyWithOffset(2, func() []*bigipResources.Policy {
+			if _, ok := mw.getInput().Resources["cf"]; ok {
+				return mw.getInput().Resources["cf"].Policies
+			}
 			return nil
-		}
-	}).Should(ConsistOf(matcher.Resources["cf"].Monitors))
-	EventuallyWithOffset(1, func() []*bigipResources.Policy {
-		if _, ok := mw.getInput().Resources["cf"]; ok {
-			return mw.getInput().Resources["cf"].Policies
-		} else {
+		}).Should(ContainElement(policy))
+	}
+	EventuallyWithOffset(2, func() int {
+		return len(mw.getInput().Resources["cf"].Policies)
+	}).Should(Equal(len(matcher.Resources["cf"].Policies)),
+		fmt.Sprintf("Expected %v \n to match \n %v",
+			format.Object(mw.getInput().Resources["cf"].Policies, 1),
+			format.Object(matcher.Resources["cf"].Policies, 1),
+		),
+	)
+}
+
+func matchMonitors(mw *MockWriter, matcher configMatcher) {
+	for _, monitor := range matcher.Resources["cf"].Monitors {
+		EventuallyWithOffset(2, func() []*bigipResources.Monitor {
+			if _, ok := mw.getInput().Resources["cf"]; ok {
+				return mw.getInput().Resources["cf"].Monitors
+			}
 			return nil
-		}
-	}).Should(ConsistOf(matcher.Resources["cf"].Policies))
+		}).Should(ContainElement(monitor))
+	}
+	EventuallyWithOffset(2, func() int {
+		return len(mw.getInput().Resources["cf"].Monitors)
+	}).Should(Equal(len(matcher.Resources["cf"].Monitors)),
+		fmt.Sprintf("Expected %v \n to match \n %v",
+			format.Object(mw.getInput().Resources["cf"].Monitors, 1),
+			format.Object(matcher.Resources["cf"].Monitors, 1),
+		),
+	)
+}
+
+func matchInternalDataGroups(mw *MockWriter, matcher configMatcher) {
+	for _, monitor := range matcher.Resources["cf"].InternalDataGroups[0].Records {
+		EventuallyWithOffset(2, func() []*bigipResources.InternalDataGroupRecord {
+			if _, ok := mw.getInput().Resources["cf"]; ok {
+				return mw.getInput().Resources["cf"].InternalDataGroups[0].Records
+			}
+			return nil
+		}).Should(ContainElement(monitor))
+	}
+	EventuallyWithOffset(2, func() int {
+		return len(mw.getInput().Resources["cf"].InternalDataGroups[0].Records)
+	}).Should(Equal(len(matcher.Resources["cf"].InternalDataGroups[0].Records)),
+		fmt.Sprintf("Expected %v \n to match \n %v",
+			format.Object(mw.getInput().Resources["cf"].InternalDataGroups[0].Records, 1),
+			format.Object(matcher.Resources["cf"].InternalDataGroups[0].Records, 1),
+		),
+	)
+}
+
+func createFakeDataGroup() *bigipResources.InternalDataGroup {
+	fake := &bigipResources.InternalDataGroup{
+		Name: "Fake Data",
+		Records: []*bigipResources.InternalDataGroupRecord{
+			// Invalid ip, outside the range so should not be used
+			&bigipResources.InternalDataGroupRecord{Name: "cf-foo-e500900501f76ce8", Data: "eyJiaW5kQWRkciI6IjEwLjEuMS4xIiwicG9ydCI6MTAwMTl9"},
+			// Invalid port, outside the range so should not be used
+			&bigipResources.InternalDataGroupRecord{Name: "cf-bar-d21aa8a505891ac9", Data: "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6NzAwMDB9"},
+			// Valid IP, port 50000
+			&bigipResources.InternalDataGroupRecord{Name: "cf-baz-9a96ddcfe07bb46e", Data: "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6NTAwMDB9"},
+			// Valid IP, port 60000
+			&bigipResources.InternalDataGroupRecord{Name: "cf-baz-beac6f8bec5a4446", Data: "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6NjAwMDB9"},
+		},
+	}
+	return fake
 }

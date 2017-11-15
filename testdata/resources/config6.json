@@ -1,0 +1,100 @@
+{
+  "bigip": {
+    "url": "http://example.com",
+    "username": "admin",
+    "password": "pass",
+    "partitions": ["cf"]
+  },
+  "global": {
+    "log-level": "debug",
+    "verify-interval": 30
+  },
+  "resources": {
+    "cf": {
+      "virtualServers": [{
+        "name": "cf-foo-e500900501f76ce8",
+        "pool": "cf-foo-e500900501f76ce8",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:65535",
+        "source": "10.0.0.1/32",
+        "profiles": [{
+          "name": "http",
+          "partition": "Common"
+        }],
+        "rules": ["jsessionid-persistence"],
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
+      }, {
+        "name": "routing-vip-http",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/127.0.0.1:80",
+        "policies": [{
+          "name": "cf-routing-policy",
+          "partition": "cf"
+        }],
+        "profiles": [{
+          "name": "http",
+          "partition": "Common"
+        }],
+        "rules": ["forward-to-vip"],
+        "sourceAddressTranslation": {
+          "type": "automap"
+        }
+      }],
+      "pools": [{
+        "name": "cf-foo-e500900501f76ce8",
+        "loadBalancingMode": "round-robin",
+        "members": [{
+          "address": "127.0.0.1",
+          "port": 80,
+          "session": "user-enabled"
+        }],
+        "monitors": ["/Common/tcp_half_open"],
+        "description": "route: foo.cf.com - App GUID: 1"
+      }],
+      "l7Policies": [{
+        "controls": ["forwarding"],
+        "legacy": true,
+        "name": "cf-routing-policy",
+        "requires": ["http"],
+        "rules": [{
+          "actions": [{
+            "name": "0",
+            "request": true,
+            "expression": "cf-foo-e500900501f76ce8",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
+          }],
+          "conditions": [{
+            "equals": true,
+            "host": true,
+            "httpHost": true,
+            "name": "0",
+            "index": 0,
+            "request": true,
+            "values": ["foo.cf.com"]
+          }],
+          "name": "cf-foo-e500900501f76ce8",
+          "ordinal": 0,
+          "description": "route: foo.cf.com - App GUID: 1"
+        }],
+        "strategy": "/Common/first-match"
+      }],
+      "iRules": [{
+        "name": "forward-to-vip",
+        "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] \u0026\u0026 [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existant virtual $target_vip\"\n      reject\n    }\n  }\n}"
+      }],
+      "internalDataGroups": [{
+        "name": "cf-ctlr-data-group",
+        "records": [{
+          "name": "cf-foo-e500900501f76ce8",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6NjU1MzV9"
+        }]
+      }]
+    }
+  }
+}
