@@ -102,7 +102,7 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | url                                 | string  | Required | n/a            | BIG-IP admin IP address                                                         |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | user                                | string  | Required | n/a            | BIG-IP iControl REST username                                                   |                |
+|    | user                                | string  | Required | n/a            | BIG-IP iControl REST username [#username]_                                      |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | pass                                | string  | Required | n/a            | BIG-IP iControl REST password                                                   |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
@@ -205,6 +205,7 @@ Define the parameters in the ``env`` section of your `application manifest </con
 | tcp_router_group                         | string  | Optional | default-tcp    | Name of TCP router group                                                        |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 
+.. [#username] The controller requires the BIG-IP user account to have a defined role of ``Administrator``, ``Resource Administrator``, or ``Manager``. See `BIG-IP User Roles <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-user-account-administration-13-0-0/3.html>`_ for further details.
 .. [#ext_addr] The controller supports BIG-IP `route domain`_ specific addresses.
 .. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
 
