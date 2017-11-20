@@ -7,14 +7,17 @@ package common_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	. "github.com/F5Networks/cf-bigip-ctlr/common"
 	"github.com/F5Networks/cf-bigip-ctlr/common/health"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/handlers"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
@@ -56,6 +59,7 @@ var _ = Describe("Component", func() {
 			},
 		}
 		component = &VcapComponent{
+			Config: config.DefaultConfig(),
 			Varz:   varz,
 			Health: hc,
 		}
@@ -75,18 +79,18 @@ var _ = Describe("Component", func() {
 		}
 		serveComponent(component)
 
-		req := buildGetRequest(component, path)
-		code, _, _ := doGetRequest(req)
+		req := buildRequest(component, path, "GET", nil)
+		code, _, _ := doRequest(req)
 		Expect(code).To(Equal(401))
 
-		req = buildGetRequest(component, path)
+		req = buildRequest(component, path, "GET", nil)
 		req.SetBasicAuth("username", "incorrect-password")
-		code, _, _ = doGetRequest(req)
+		code, _, _ = doRequest(req)
 		Expect(code).To(Equal(401))
 
-		req = buildGetRequest(component, path)
+		req = buildRequest(component, path, "GET", nil)
 		req.SetBasicAuth("incorrect-username", "password")
-		code, _, _ = doGetRequest(req)
+		code, _, _ = doRequest(req)
 		Expect(code).To(Equal(401))
 	})
 
@@ -101,19 +105,19 @@ var _ = Describe("Component", func() {
 		serveComponent(component)
 
 		//access path1
-		req := buildGetRequest(component, path1)
+		req := buildRequest(component, path1, "GET", nil)
 		req.SetBasicAuth("username", "password")
 
-		code, header, body := doGetRequest(req)
+		code, header, body := doRequest(req)
 		Expect(code).To(Equal(200))
 		Expect(header.Get("Content-Type")).To(Equal("application/json"))
 		Expect(body).To(Equal(`{"key":"value1"}` + "\n"))
 
 		//access path2
-		req = buildGetRequest(component, path2)
+		req = buildRequest(component, path2, "GET", nil)
 		req.SetBasicAuth("username", "password")
 
-		code, header, body = doGetRequest(req)
+		code, header, body = doRequest(req)
 		Expect(code).To(Equal(200))
 		Expect(header.Get("Content-Type")).To(Equal("application/json"))
 		Expect(body).To(Equal(`{"key":"value2"}` + "\n"))
@@ -127,23 +131,121 @@ var _ = Describe("Component", func() {
 		}
 		serveComponent(component)
 
-		req := buildGetRequest(component, path)
+		req := buildRequest(component, path, "GET", nil)
 		req.SetBasicAuth("username", "password")
 
-		code, header, body := doGetRequest(req)
+		code, header, body := doRequest(req)
 		Expect(code).To(Equal(200))
 		Expect(header.Get("Content-Type")).To(Equal("application/json"))
 		Expect(body).To(Equal(`{"key":"value"}` + "\n"))
 	})
 
-	It("returns 404 for non existent paths", func() {
+	It("allows authorized access to broker catalog", func() {
+		path := "/v2/catalog"
+
 		serveComponent(component)
 
-		req := buildGetRequest(component, "/non-existent-path")
+		req := buildRequest(component, path, "GET", nil)
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{"services":[{"id":"","name":"","description":"","bindable":true,"tags":["f5"],"plan_updateable":false,"plans":[],"metadata":{"providerDisplayName":"F5 Service Broker"}}]}` + "\n"))
+	})
+
+	It("allows authorized access to broker provision", func() {
+		path := "/v2/service_instances/test_instance"
+
+		serveComponent(component)
+
+		req := buildRequest(component, path, "PUT", strings.NewReader(`{}`))
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(201))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{}` + "\n"))
+	})
+
+	It("allows authorized access to broker deprovision", func() {
+		path := "/v2/service_instances/test_instance"
+
+		serveComponent(component)
+
+		req := buildRequest(component, path, "DELETE", nil)
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{}` + "\n"))
+	})
+
+	It("allows authorized access to broker update", func() {
+		path := "/v2/service_instances/test_instance"
+
+		serveComponent(component)
+
+		req := buildRequest(component, path, "PATCH", strings.NewReader(`{}`))
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{}` + "\n"))
+	})
+
+	It("allows authorized access to broker last operation", func() {
+		path := "/v2/service_instances/test_instance/last_operation"
+
+		serveComponent(component)
+
+		req := buildRequest(component, path, "GET", nil)
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{"state":""}` + "\n"))
+	})
+
+	It("allows authorized access to broker bind", func() {
+		path := "/v2/service_instances/test_instance/service_bindings/test_bind"
+
+		serveComponent(component)
+
+		req := buildRequest(component, path, "PUT", strings.NewReader(`{}`))
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(201))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{"credentials":null}` + "\n"))
+	})
+
+	It("allows authorized access to broker unbind", func() {
+		path := "/v2/service_instances/test_instance/service_bindings/test_bind"
+
+		serveComponent(component)
+
+		req := buildRequest(component, path, "DELETE", nil)
+		req.SetBasicAuth("", "")
+
+		code, header, body := doRequest(req)
+		Expect(code).To(Equal(200))
+		Expect(header.Get("Content-Type")).To(Equal("application/json"))
+		Expect(body).To(Equal(`{}` + "\n"))
+	})
+
+	It("returns 401 for non existent paths", func() {
+		serveComponent(component)
+
+		req := buildRequest(component, "/non-existent-path", "GET", nil)
 		req.SetBasicAuth("username", "password")
 
-		code, _, _ := doGetRequest(req)
-		Expect(code).To(Equal(404))
+		code, _, _ := doRequest(req)
+		Expect(code).To(Equal(401))
 	})
 
 	It("returns 200 for good health checks", func() {
@@ -153,9 +255,9 @@ var _ = Describe("Component", func() {
 		time.Sleep(2 * time.Second)
 		atomic.StoreInt32(&heartbeatOK, 1)
 
-		req := buildGetRequest(component, "/health")
+		req := buildRequest(component, "/health", "GET", nil)
 
-		code, _, _ := doGetRequest(req)
+		code, _, _ := doRequest(req)
 		Expect(code).To(Equal(200))
 	})
 
@@ -165,9 +267,9 @@ var _ = Describe("Component", func() {
 
 		time.Sleep(2 * time.Second)
 
-		req := buildGetRequest(component, "/health")
+		req := buildRequest(component, "/health", "GET", nil)
 
-		code, _, _ := doGetRequest(req)
+		code, _, _ := doRequest(req)
 		Expect(code).To(Equal(503))
 	})
 
@@ -327,13 +429,13 @@ func serveComponent(component *VcapComponent) {
 	Expect(true).ToNot(BeTrue(), "Could not connect to vcap.Component")
 }
 
-func buildGetRequest(component *VcapComponent, path string) *http.Request {
-	req, err := http.NewRequest("GET", "http://"+component.Varz.Host+path, nil)
+func buildRequest(component *VcapComponent, path string, method string, body io.Reader) *http.Request {
+	req, err := http.NewRequest(method, "http://"+component.Varz.Host+path, body)
 	Expect(err).ToNot(HaveOccurred())
 	return req
 }
 
-func doGetRequest(req *http.Request) (int, http.Header, string) {
+func doRequest(req *http.Request) (int, http.Header, string) {
 	var client http.Client
 	var resp *http.Response
 	var err error
