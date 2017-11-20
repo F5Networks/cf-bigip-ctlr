@@ -15,11 +15,15 @@ import (
 	"syscall"
 	"time"
 
+	"code.cloudfoundry.org/lager"
 	"github.com/F5Networks/cf-bigip-ctlr/common/health"
 	. "github.com/F5Networks/cf-bigip-ctlr/common/http"
 	"github.com/F5Networks/cf-bigip-ctlr/common/schema"
 	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
+	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
+	"github.com/pivotal-cf/brokerapi"
 
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
@@ -212,6 +216,22 @@ func (c *VcapComponent) Stop() {
 
 func (c *VcapComponent) ListenAndServe() {
 	hs := http.NewServeMux()
+
+	broker := c.Config.(*config.Config).Broker
+	serviceBroker := &servicebroker.ServiceBroker{&broker}
+	brokerLogger := lager.NewLogger("f5-service-broker")
+	brokerCredentials := brokerapi.BrokerCredentials{
+		Username: c.Varz.Credentials[0],
+		Password: c.Varz.Credentials[1],
+	}
+	// FIXME (rtalley): Currently the cf-brokerapi package only supports lager
+	// as its logging utility. There is an open issue:
+	// https://github.com/pivotal-cf/brokerapi/issues/46 to allow different
+	// loggers to be used. When this issue is closes the our logger.Logger
+	// should be used as the broker logger.
+	brokerLogger.Info("starting-service-broker")
+	brokerAPI := brokerapi.New(serviceBroker, brokerLogger, brokerCredentials)
+	hs.Handle("/", brokerAPI)
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		c.Health.ServeHTTP(w, req)
