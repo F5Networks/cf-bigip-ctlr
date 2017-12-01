@@ -14,6 +14,7 @@ mkdir -p $BUILDDIR
 
 export BUILDDIR=$BUILDDIR
 
+flake8 ./build-tools/version-tool
 (cd python && flake8 . --exclude src,lib,go,bin,docs,cmd)
 (cd python && pytest . -slvv --ignore=src/ -p no:cacheprovider --cov)
 

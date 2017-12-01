@@ -27,9 +27,11 @@ RUN_ARGS=( \
   -v $PWD:/build/$srcdir:ro
   --workdir  /build/$srcdir
   -e GOPATH=/build
-  -e CLEAN_BUILD="${CLEAN_BUILD}"
-  -e IMG_TAG="${IMG_TAG}"
-  -e BUILD_IMG_TAG="${BUILD_IMG_TAG}"
+  -e CLEAN_BUILD
+  -e IMG_TAG
+  -e BUILD_IMG_TAG
+  -e BUILD_VERSION
+  -e BUILD_INFO
   -e LOCAL_USER_ID=$(id -u)
   -e BUILDDIR=/build/out
   -e BUILD_VARIANT="${BUILD_VARIANT}"
