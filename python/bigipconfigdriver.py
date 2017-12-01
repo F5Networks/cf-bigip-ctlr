@@ -673,6 +673,17 @@ def _handle_openshift_sdn_config(config):
                               '"openshift-sdn:vxlan-node-ips" section')
 
 
+def _set_user_agent(bigip):
+    try:
+        with open('VERSION_BUILD.json', 'r') as version_file:
+            data = json.load(version_file)
+            bigip.icrs.append_user_agent(
+                "k8s-bigip-ctlr-" + data['version'] + '-' + data['build'])
+    except Exception as e:
+        bigip.icrs.append_user_agent("k8s-bigip-ctlr-VERSION-UNKNOWN")
+        log.error("Could not set iControl REST User-Agent: %s", e)
+
+
 def main():
     try:
         args = _handle_args()
@@ -692,6 +703,9 @@ def main():
             config['bigip']['password'],
             port,
             "tmos")
+
+        # Read version and build info, set user-agent for ICR session
+        _set_user_agent(bigip)
 
         managers = []
         for partition in config['bigip']['partitions']:

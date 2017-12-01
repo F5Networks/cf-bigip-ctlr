@@ -42,15 +42,26 @@ import (
 	"github.com/uber-go/zap"
 )
 
-var pythonBaseDir string
-
-var configFile string
+var (
+	// To be set by build
+	version       string
+	buildInfo     string
+	pythonBaseDir string
+	configFile    string
+)
 
 func main() {
+	versionFlag := flag.Bool("version", false, "Print version and exit")
+
 	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
 	if !ok {
 		flag.StringVar(&configFile, "c", "", "Configuration File")
-		flag.Parse()
+	}
+	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("Version: %s\nBuild: %s\n", version, buildInfo)
+		os.Exit(0)
 	}
 
 	c := config.DefaultConfig()
@@ -72,7 +83,10 @@ func main() {
 	}
 	logger, minLagerLogLevel := createLogger(prefix, c.Logging.Level)
 
-	logger.Info("starting")
+	logger.Info("starting",
+		zap.String("version", version),
+		zap.String("buildInfo", buildInfo),
+	)
 
 	err := dropsonde.Initialize(c.Logging.MetronAddress, c.Logging.JobName)
 	if err != nil {
