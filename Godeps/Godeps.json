@@ -20,11 +20,15 @@
 		},
 		{
 			"ImportPath": "code.cloudfoundry.org/lager",
-			"Rev": "6cfe365fb6bb84343f0034b4a53cd250d173b61f"
+			"Rev": "0bfa98e49e7a976af91e918d47978f07c00b081f"
+		},
+		{
+			"ImportPath": "code.cloudfoundry.org/lager/lagerctx",
+			"Rev": "0bfa98e49e7a976af91e918d47978f07c00b081f"
 		},
 		{
 			"ImportPath": "code.cloudfoundry.org/lager/lagertest",
-			"Rev": "6cfe365fb6bb84343f0034b4a53cd250d173b61f"
+			"Rev": "0bfa98e49e7a976af91e918d47978f07c00b081f"
 		},
 		{
 			"ImportPath": "code.cloudfoundry.org/localip",
@@ -172,6 +176,11 @@
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
 			"Rev": "1f49d83d9aa00e6ce4fc8258c71cc7786aec968a"
+		},
+		{
+			"ImportPath": "github.com/gorilla/mux",
+			"Comment": "v1.6.0-1-g2d5fef0",
+			"Rev": "2d5fef06b891c971b14aa6f71ca5ab6c03a36e0e"
 		},
 		{
 			"ImportPath": "github.com/juju/ratelimit",
@@ -344,6 +353,14 @@
 			"ImportPath": "github.com/onsi/gomega/types",
 			"Comment": "v1.0-120-gb48c9a8",
 			"Rev": "b48c9a8b2644326d0a44eaaacc8d83e35174a05d"
+		},
+		{
+			"ImportPath": "github.com/pivotal-cf/brokerapi",
+			"Rev": "61af3c362c579b641bbffd7cb6355e5c4bfa5eda"
+		},
+		{
+			"ImportPath": "github.com/pivotal-cf/brokerapi/auth",
+			"Rev": "61af3c362c579b641bbffd7cb6355e5c4bfa5eda"
 		},
 		{
 			"ImportPath": "github.com/pmezard/go-difflib/difflib",

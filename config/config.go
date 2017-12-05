@@ -48,6 +48,31 @@ const (
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 
+// ServiceBrokerConfig configuration parameters
+type ServiceBrokerConfig struct {
+	ID               string
+	Name             string
+	Description      string
+	DisplayName      string
+	LongDescription  string
+	DocumentationURL string
+	SupportURL       string
+	ImageURL         string
+	ProviderName     string
+}
+
+var defaultServiceBrokerConfig = ServiceBrokerConfig{
+	ID:               "",
+	Name:             "",
+	Description:      "",
+	DisplayName:      "",
+	LongDescription:  "",
+	DocumentationURL: "",
+	SupportURL:       "",
+	ImageURL:         "",
+	ProviderName:     "F5 Service Broker",
+}
+
 type StatusConfig struct {
 	Host string `yaml:"host"`
 	Port uint16 `yaml:"port"`
@@ -147,24 +172,25 @@ var defaultLoggingConfig = LoggingConfig{
 }
 
 type Config struct {
-	BigIP                    BigIPConfig   `yaml:"bigip"`
-	Status                   StatusConfig  `yaml:"status"`
-	Nats                     []NatsConfig  `yaml:"nats"`
-	Logging                  LoggingConfig `yaml:"logging"`
-	Port                     uint16        `yaml:"port"`
-	Index                    uint          `yaml:"index"`
-	Zone                     string        `yaml:"zone"`
-	GoMaxProcs               int           `yaml:"go_max_procs,omitempty"`
-	Tracing                  Tracing       `yaml:"tracing"`
-	TraceKey                 string        `yaml:"trace_key"`
-	AccessLog                AccessLog     `yaml:"access_log"`
-	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`
-	DebugAddr                string        `yaml:"debug_addr"`
-	EnablePROXY              bool          `yaml:"enable_proxy"`
-	EnableSSL                bool          `yaml:"enable_ssl"`
-	SSLPort                  uint16        `yaml:"ssl_port"`
-	SSLCertPath              string        `yaml:"ssl_cert_path"`
-	SSLKeyPath               string        `yaml:"ssl_key_path"`
+	BigIP                    BigIPConfig         `yaml:"bigip"`
+	Status                   StatusConfig        `yaml:"status"`
+	Broker                   ServiceBrokerConfig `yaml:"broker"`
+	Nats                     []NatsConfig        `yaml:"nats"`
+	Logging                  LoggingConfig       `yaml:"logging"`
+	Port                     uint16              `yaml:"port"`
+	Index                    uint                `yaml:"index"`
+	Zone                     string              `yaml:"zone"`
+	GoMaxProcs               int                 `yaml:"go_max_procs,omitempty"`
+	Tracing                  Tracing             `yaml:"tracing"`
+	TraceKey                 string              `yaml:"trace_key"`
+	AccessLog                AccessLog           `yaml:"access_log"`
+	EnableAccessLogStreaming bool                `yaml:"enable_access_log_streaming"`
+	DebugAddr                string              `yaml:"debug_addr"`
+	EnablePROXY              bool                `yaml:"enable_proxy"`
+	EnableSSL                bool                `yaml:"enable_ssl"`
+	SSLPort                  uint16              `yaml:"ssl_port"`
+	SSLCertPath              string              `yaml:"ssl_cert_path"`
+	SSLKeyPath               string              `yaml:"ssl_key_path"`
 	SSLCertificate           tls.Certificate
 	SkipSSLValidation        bool `yaml:"skip_ssl_validation"`
 	ForceForwardedProtoHttps bool `yaml:"force_forwarded_proto_https"`
@@ -218,6 +244,7 @@ type Config struct {
 
 var defaultConfig = Config{
 	BigIP:   defaultBigIPConfig,
+	Broker:  defaultServiceBrokerConfig,
 	Status:  defaultStatusConfig,
 	Nats:    []NatsConfig{defaultNatsConfig},
 	Logging: defaultLoggingConfig,
