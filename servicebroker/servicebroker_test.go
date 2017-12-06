@@ -19,6 +19,7 @@ package servicebroker
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -44,7 +45,7 @@ var _ = Describe("ServiceBroker", func() {
 			"http://image.com",
 			"F5 Service Broker",
 		}
-		broker = ServiceBroker{&cfg}
+		broker = ServiceBroker{Config: &cfg}
 		ctx = context.Background()
 	})
 

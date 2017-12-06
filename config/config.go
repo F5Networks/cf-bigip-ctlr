@@ -63,8 +63,8 @@ type ServiceBrokerConfig struct {
 
 var defaultServiceBrokerConfig = ServiceBrokerConfig{
 	ID:               "",
-	Name:             "",
-	Description:      "",
+	Name:             "f5bigipbroker",
+	Description:      "Bind F5 services to your routes",
 	DisplayName:      "",
 	LongDescription:  "",
 	DocumentationURL: "",
@@ -209,6 +209,7 @@ type Config struct {
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 	RouteMode                       string        `yaml:"route_mode"`
 	RoutingMode                     RoutingMode
+	BrokerMode                      bool
 
 	DrainWait          time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout       time.Duration `yaml:"drain_timeout,omitempty"`
@@ -368,6 +369,12 @@ func (c *Config) Process() {
 	if (c.RoutingMode == TCP) && !c.RoutingApiEnabled() {
 		errMsg := fmt.Sprintf("Routing API must be enable for TCP only route mode")
 		panic(errMsg)
+	}
+
+	if c.Status.User == "" || c.Status.Pass == "" {
+		c.BrokerMode = false
+	} else {
+		c.BrokerMode = true
 	}
 }
 
