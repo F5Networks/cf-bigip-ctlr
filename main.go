@@ -49,7 +49,7 @@ var configFile string
 func main() {
 	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
 	if !ok {
-		flag.StringVar(&configFile, "c", "", "Configuration File")
+		flag.StringVar(&configFile, "c", "", "Configuration File - deprecated")
 		flag.Parse()
 	}
 

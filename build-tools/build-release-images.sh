@@ -19,6 +19,7 @@ cp $CURDIR/../_docker_workspace/out/$RELEASE_PLATFORM/bin/* $WKDIR/
 mkdir -p $WKDIR/python
 cp python/*.py $WKDIR/python/
 cp python/cf-runtime-requirements.txt $WKDIR/
+cp schema/cf-schema_v*.json $WKDIR/
 
 echo "Docker build context:"
 ls -la $WKDIR

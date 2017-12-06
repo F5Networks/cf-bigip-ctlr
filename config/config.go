@@ -63,14 +63,14 @@ type ServiceBrokerConfig struct {
 
 var defaultServiceBrokerConfig = ServiceBrokerConfig{
 	ID:               "",
-	Name:             "",
-	Description:      "",
-	DisplayName:      "",
-	LongDescription:  "",
-	DocumentationURL: "",
-	SupportURL:       "",
-	ImageURL:         "",
-	ProviderName:     "F5 Service Broker",
+	Name:             "f5servicebroker",
+	Description:      "Bind F5 services to your routes",
+	DisplayName:      "F5 Service Broker",
+	LongDescription:  "Bind F5 services to your routes",
+	DocumentationURL: "http://clouddocs.f5.com/containers/v2/cloudfoundry/",
+	SupportURL:       "http://clouddocs.f5.com/containers/v2/cloudfoundry/",
+	ImageURL:         "https://cdn.f5.com/websites/support/assets/images/logo.svg",
+	ProviderName:     "F5 Networks",
 }
 
 type StatusConfig struct {
@@ -209,6 +209,7 @@ type Config struct {
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 	RouteMode                       string        `yaml:"route_mode"`
 	RoutingMode                     RoutingMode
+	BrokerMode                      bool
 
 	DrainWait          time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout       time.Duration `yaml:"drain_timeout,omitempty"`
@@ -368,6 +369,12 @@ func (c *Config) Process() {
 	if (c.RoutingMode == TCP) && !c.RoutingApiEnabled() {
 		errMsg := fmt.Sprintf("Routing API must be enable for TCP only route mode")
 		panic(errMsg)
+	}
+
+	if c.Status.User == "" || c.Status.Pass == "" {
+		c.BrokerMode = false
+	} else {
+		c.BrokerMode = true
 	}
 }
 
