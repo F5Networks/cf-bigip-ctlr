@@ -151,7 +151,7 @@ func (c *VcapComponent) Start() error {
 	}
 
 	if c.Varz.Credentials == nil || len(c.Varz.Credentials) != 2 {
-		log.Warn("status user and/or pass not provided, controller will not run" +
+		c.Logger.Warn("status user and/or pass not provided, controller will not run" +
 			"with broker features. If broker features are required please specify user" +
 			"and pass and restart controller.")
 		user, err := uuid.GenerateUUID()

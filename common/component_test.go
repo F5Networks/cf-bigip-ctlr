@@ -440,6 +440,15 @@ var _ = Describe("Component", func() {
 			err = mbusClient.PublishRequest("vcap.component.discover", "reply", []byte("hi"))
 			Expect(err).ToNot(HaveOccurred())
 		})
+		It("logs when not able to run in service broker mode", func() {
+			component.Varz.Credentials = []string{}
+			component.Varz.Type = "TestType"
+			component.Logger = logger
+
+			err := component.Start()
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(logger).Should(gbytes.Say("status user and/or pass not provided"))
+		})
 	})
 })
 
