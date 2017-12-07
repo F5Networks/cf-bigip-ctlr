@@ -14,70 +14,72 @@
  * limitations under the License.
  */
 
-package servicebroker
+package servicebroker_test
 
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pivotal-cf/brokerapi"
 )
 
 var _ = Describe("ServiceBroker", func() {
-	var instanceID string
-	var cfg config.ServiceBrokerConfig
-	var broker ServiceBroker
-	var ctx context.Context
+	var (
+		instanceID string
+		cfg        *config.Config
+		broker     *servicebroker.ServiceBroker
+		ctx        context.Context
+		logger     *test_util.TestZapLogger
+		err        error
+	)
 
 	BeforeEach(func() {
 		instanceID = "test-instance"
-		cfg = config.ServiceBrokerConfig{
-			"test-broker-id",
-			"test-broker",
-			"service broker for test",
-			"f5-service-broker",
-			"service broker to be used for testing",
-			"http://documentation.com",
-			"http://support.com",
-			"http://image.com",
-			"F5 Service Broker",
-		}
-		broker = ServiceBroker{Config: &cfg}
+		logger = test_util.NewTestZapLogger("schema-test")
 		ctx = context.Background()
+		cfg = config.DefaultConfig()
+		cfg.BrokerMode = true
+		cfg.Status.User = "username"
+		cfg.Status.Pass = "password"
+
+		broker, err = servicebroker.NewServiceBroker(cfg, logger)
+		Expect(err).To(BeNil())
+	})
+
+	AfterEach(func() {
+		if nil != logger {
+			logger.Close()
+		}
 	})
 
 	It("should return services", func() {
 		service := broker.Services(ctx)[0]
 
-		Expect(service.ID).To(Equal(cfg.ID))
-		Expect(service.Name).To(Equal(cfg.Name))
-		Expect(service.Description).To(Equal(cfg.Description))
-		Expect(service.Bindable).Should(BeTrue())
+		Expect(service.ID).To(Equal(cfg.Broker.ID))
+		Expect(service.Name).To(Equal(cfg.Broker.Name))
+		Expect(service.Description).To(Equal(cfg.Broker.Description))
+		Expect(service.Bindable).Should(BeFalse())
 		Expect(service.Tags).Should(ConsistOf("f5"))
 		Expect(service.PlanUpdatable).Should(BeFalse())
 		Expect(service.Plans).Should(BeEmpty())
-		Expect(service.Requires).Should(BeNil())
+		Expect(service.Requires).Should(Equal([]brokerapi.RequiredPermission{"route_forwarding"}))
 		Expect(service.DashboardClient).Should(BeNil())
-		Expect(service.Metadata.DisplayName).To(Equal(cfg.DisplayName))
-		Expect(service.Metadata.ImageUrl).To(Equal(cfg.ImageURL))
-		Expect(service.Metadata.LongDescription).To(Equal(cfg.LongDescription))
-		Expect(service.Metadata.ProviderDisplayName).To(Equal(cfg.ProviderName))
-		Expect(service.Metadata.DocumentationUrl).To(Equal(cfg.DocumentationURL))
-		Expect(service.Metadata.SupportUrl).To(Equal(cfg.SupportURL))
-		Expect(service.Metadata.Shareable).Should(BeNil())
 	})
 
 	It("should return a provisioned service", func() {
 		details := brokerapi.ProvisionDetails{
-			"serviceID",
-			"planID",
-			"organizationGUID",
-			"spaceGUID",
-			json.RawMessage(`{"context: true"}`),
-			json.RawMessage(`{"parameters: [1,2,3]"}`),
+			ServiceID:        "serviceID",
+			PlanID:           "planID",
+			OrganizationGUID: "organizationGUID",
+			SpaceGUID:        "spaceGUID",
+			RawContext:       json.RawMessage(`{"context: true"}`),
+			RawParameters:    json.RawMessage(`{"parameters: [1,2,3]"}`),
 		}
 		spec, err := broker.Provision(ctx, instanceID, details, true)
 
@@ -87,8 +89,8 @@ var _ = Describe("ServiceBroker", func() {
 
 	It("should return a deprovisioned service", func() {
 		details := brokerapi.DeprovisionDetails{
-			"planID",
-			"serviceID",
+			PlanID:    "planID",
+			ServiceID: "serviceID",
 		}
 		spec, err := broker.Deprovision(ctx, instanceID, details, false)
 
@@ -98,17 +100,17 @@ var _ = Describe("ServiceBroker", func() {
 
 	It("should return a service binding", func() {
 		bindSource := brokerapi.BindResource{
-			"appGUID",
-			"/route",
-			"credentialClientID",
+			AppGuid:            "appGUID",
+			Route:              "/route",
+			CredentialClientID: "credentialClientID",
 		}
 		details := brokerapi.BindDetails{
-			"appGUID",
-			"planID",
-			"serviceID",
-			&bindSource,
-			json.RawMessage(`{"context": false}`),
-			json.RawMessage(`{"parameters: [a,b,c]"}`),
+			AppGUID:       "appGUID",
+			PlanID:        "planID",
+			ServiceID:     "serviceID",
+			BindResource:  &bindSource,
+			RawContext:    json.RawMessage(`{"context": false}`),
+			RawParameters: json.RawMessage(`{"parameters: [a,b,c]"}`),
 		}
 		binding, err := broker.Bind(ctx, instanceID, "bindingID", details)
 
@@ -118,8 +120,8 @@ var _ = Describe("ServiceBroker", func() {
 
 	It("should unbind a service", func() {
 		details := brokerapi.UnbindDetails{
-			"planID",
-			"serviceID",
+			PlanID:    "planID",
+			ServiceID: "serviceID",
 		}
 		err := broker.Unbind(ctx, instanceID, "bindingID", details)
 
@@ -135,20 +137,45 @@ var _ = Describe("ServiceBroker", func() {
 
 	It("should return an updated service", func() {
 		previousValues := brokerapi.PreviousValues{
-			"planID",
-			"serviceID",
-			"orgID",
-			"spaceID",
+			PlanID:    "planID",
+			ServiceID: "serviceID",
+			OrgID:     "orgID",
+			SpaceID:   "spaceID",
 		}
 		details := brokerapi.UpdateDetails{
-			"serviceID",
-			"planID",
-			json.RawMessage(`{"parameters": [1,2,3]}`),
-			previousValues,
+			ServiceID:      "serviceID",
+			PlanID:         "planID",
+			RawParameters:  json.RawMessage(`{"parameters": [1,2,3]}`),
+			PreviousValues: previousValues,
 		}
 		spec, err := broker.Update(ctx, instanceID, details, true)
 
 		Expect(spec).To(Equal(brokerapi.UpdateServiceSpec{}))
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	Context("process plans", func() {
+		BeforeEach(func() {
+			os.Setenv("TEST_MODE", "true")
+		})
+
+		AfterEach(func() {
+			os.Unsetenv("SERVICE_BROKER_CONFIG")
+			os.Unsetenv("TEST_MODE")
+		})
+
+		It("errors when env variable is not set", func() {
+			err := broker.ProcessPlans()
+			Expect(err).To(MatchError("SERVICE_BROKER_CONFIG not found in environment"))
+		})
+
+		It("returns plans when the plan is valid", func() {
+			os.Setenv("SERVICE_BROKER_CONFIG", `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":["potato"]}}]}`)
+
+			err := broker.ProcessPlans()
+			Expect(err).To(BeNil())
+			service := broker.Services(ctx)[0]
+			Expect(len(service.Plans)).To(Equal(1))
+		})
 	})
 })

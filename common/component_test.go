@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -42,9 +43,12 @@ var _ = Describe("Component", func() {
 		varz        *health.Varz
 		heartbeatOK int32
 		logger      *test_util.TestZapLogger
+		conf        *config.Config
 	)
 
 	BeforeEach(func() {
+		os.Setenv("SERVICE_BROKER_CONFIG", `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":["potato"]}}]}`)
+		os.Setenv("TEST_MODE", "true")
 		port, err := localip.LocalPort()
 		Expect(err).ToNot(HaveOccurred())
 
@@ -54,14 +58,19 @@ var _ = Describe("Component", func() {
 
 		varz = &health.Varz{
 			GenericVarz: health.GenericVarz{
-				Host: fmt.Sprintf("127.0.0.1:%d", port),
+				Host:        fmt.Sprintf("127.0.0.1:%d", port),
 				Credentials: []string{"username", "password"},
 			},
 		}
+		conf = config.DefaultConfig()
+		conf.BrokerMode = true
+		conf.Status.User = "username"
+		conf.Status.Pass = "password"
 		component = &VcapComponent{
-			Config: config.DefaultConfig(),
+			Config: conf,
 			Varz:   varz,
 			Health: hc,
+			Logger: logger,
 		}
 	})
 
@@ -69,6 +78,8 @@ var _ = Describe("Component", func() {
 		if nil != logger {
 			logger.Close()
 		}
+		os.Unsetenv("SERVICE_BROKER_CONFIG")
+		os.Unsetenv("TEST_MODE")
 	})
 
 	It("prevents unauthorized access", func() {
@@ -185,7 +196,7 @@ var _ = Describe("Component", func() {
 		code, header, body := doRequest(req)
 		Expect(code).To(Equal(200))
 		Expect(header.Get("Content-Type")).To(Equal("application/json"))
-		Expect(body).To(Equal(`{"services":[{"id":"","name":"","description":"","bindable":true,"tags":["f5"],"plan_updateable":false,"plans":[],"metadata":{"providerDisplayName":"F5 Service Broker"}}]}` + "\n"))
+		Expect(body).To(ContainSubstring("f5servicebroker"))
 	})
 
 	It("allows authorized access to broker provision", func() {

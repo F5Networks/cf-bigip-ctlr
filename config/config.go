@@ -63,14 +63,14 @@ type ServiceBrokerConfig struct {
 
 var defaultServiceBrokerConfig = ServiceBrokerConfig{
 	ID:               "",
-	Name:             "f5bigipbroker",
+	Name:             "f5servicebroker",
 	Description:      "Bind F5 services to your routes",
-	DisplayName:      "",
-	LongDescription:  "",
-	DocumentationURL: "",
-	SupportURL:       "",
-	ImageURL:         "",
-	ProviderName:     "F5 Service Broker",
+	DisplayName:      "F5 Service Broker",
+	LongDescription:  "Bind F5 services to your routes",
+	DocumentationURL: "http://clouddocs.f5.com/containers/v2/cloudfoundry/",
+	SupportURL:       "http://clouddocs.f5.com/containers/v2/cloudfoundry/",
+	ImageURL:         "https://cdn.f5.com/websites/support/assets/images/logo.svg",
+	ProviderName:     "F5 Networks",
 }
 
 type StatusConfig struct {

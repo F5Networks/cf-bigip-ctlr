@@ -109,7 +109,7 @@ func NewServiceBroker(c *config.Config, logger cfLogger.Logger) (*ServiceBroker,
 //ProcessPlans pulls plans from the env and validates them against the schema
 func (broker *ServiceBroker) ProcessPlans() error {
 	val, ok := os.LookupEnv("SERVICE_BROKER_CONFIG")
-	if !ok {
+	if !ok || len(val) == 0 {
 		return errors.New("SERVICE_BROKER_CONFIG not found in environment")
 	}
 	broker.logger.Debug("process-plans-config", zap.String("SERVICE_BROKER_CONFIG", val))

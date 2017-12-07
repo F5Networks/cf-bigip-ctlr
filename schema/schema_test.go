@@ -15,3 +15,49 @@
  */
 
 package schema_test
+
+import (
+	"os"
+
+	"github.com/F5Networks/cf-bigip-ctlr/schema"
+	"github.com/F5Networks/cf-bigip-ctlr/test_util"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+var _ = Describe("Schema", func() {
+	var (
+		logger        *test_util.TestZapLogger
+		validConfig   string
+		invalidConfig string
+	)
+
+	BeforeEach(func() {
+		os.Setenv("TEST_MODE", "true")
+		logger = test_util.NewTestZapLogger("schema-test")
+
+		validConfig = `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":["potato"]}}]}`
+		invalidConfig = `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":[]}}]}`
+	})
+
+	AfterEach(func() {
+		if nil != logger {
+			logger.Close()
+		}
+		os.Unsetenv("SERVICE_BROKER_CONFIG")
+		os.Unsetenv("TEST_MODE")
+	})
+
+	It("validates a valid config", func() {
+		val, err := schema.VerifySchema(validConfig, logger)
+		Expect(val).To(BeTrue())
+		Expect(err).To(BeNil())
+	})
+
+	It("fails against an invalid config", func() {
+		val, err := schema.VerifySchema(invalidConfig, logger)
+		Expect(val).To(BeFalse())
+		Expect(err).To(BeNil())
+	})
+
+})

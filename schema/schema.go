@@ -33,14 +33,15 @@ var schemaVersions = []string{
 // of the schema. Matching against an older version casuses a warning
 func VerifySchema(data string, logger logger.Logger) (bool, error) {
 	logger.Session("verify-schema")
-	folderPath, err := os.Getwd()
-	if nil != err {
-		return false, err
-	}
+
 	// check the json against all versions of the schema starting with the latest
 	for i, schema := range schemaVersions {
-		schemaLocation := "file://" + folderPath + "/src/f5/schemas/" + schema
-		schemaLoader := gojsonschema.NewReferenceLoader(schemaLocation)
+		schemaLocation, err := getSchemaLocation()
+		if nil != err {
+			return false, err
+		}
+		schemaPath := schemaLocation + schema
+		schemaLoader := gojsonschema.NewReferenceLoader(schemaPath)
 		documentLoader := gojsonschema.NewStringLoader(data)
 		result, err := gojsonschema.Validate(schemaLoader, documentLoader)
 		if err != nil {
@@ -64,4 +65,18 @@ func VerifySchema(data string, logger logger.Logger) (bool, error) {
 		)
 	}
 	return false, nil
+}
+
+func getSchemaLocation() (string, error) {
+	folderPath, err := os.Getwd()
+	if nil != err {
+		return "", err
+	}
+	// if we are in TEST_MODE ie running unit tests, we need to walk up the tree
+	// otherwise we are in the prod container and schema lives off the working dir
+	value := os.Getenv("TEST_MODE")
+	if len(value) == 0 {
+		return "file://" + folderPath + "/schema/", nil
+	}
+	return "file://" + folderPath + "/../schema/", nil
 }

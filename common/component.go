@@ -220,13 +220,13 @@ func (c *VcapComponent) ListenAndServe() {
 
 	mainConfig := c.Config.(*config.Config)
 	if mainConfig.BrokerMode {
-		sb, err := servicebroker.NewServiceBroker(mainConfig, log)
+		sb, err := servicebroker.NewServiceBroker(mainConfig, c.Logger)
 		if nil != err {
-			log.Warn("create-new-broker-error", zap.Error(err))
+			c.Logger.Warn("create-new-broker-error", zap.Error(err))
 		}
 		err = sb.ProcessPlans()
 		if nil != err {
-			log.Warn("process-broker-plan-error", zap.Error(err))
+			c.Logger.Warn("process-broker-plan-error", zap.Error(err))
 		} else {
 			hs.Handle("/", sb.Handler)
 		}

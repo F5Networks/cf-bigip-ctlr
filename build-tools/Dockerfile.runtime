@@ -10,7 +10,7 @@ WORKDIR $APPPATH
 COPY cf-bigip-ctlr $APPPATH/bin
 COPY python/ $APPPATH/python
 COPY cf-runtime-requirements.txt /tmp/cf-runtime-requirements.txt
-COPY cf-schema_v*.json $APPPATH/src/f5/schemas/
+COPY cf-schema_v*.json $APPPATH/schema/
 
 RUN apk --no-cache --update add --virtual pip-install-deps git && \
     pip install -r /tmp/cf-runtime-requirements.txt && \
