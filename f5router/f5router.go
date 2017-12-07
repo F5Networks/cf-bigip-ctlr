@@ -35,7 +35,7 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/bigipResources"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
-
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker/planResources"
 	"github.com/uber-go/zap"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -51,6 +51,12 @@ const (
 	InternalDataGroupName = "cf-ctlr-data-group"
 )
 
+// concurrent safe map of service broker plans
+type mutexPlansMap struct {
+	lock  sync.Mutex
+	plans map[string]planResources.Plan
+}
+
 // tier2VSInfo holds info related to the tier2 vips
 type tier2VSInfo struct {
 	// map of ip/ports that are currently in use
@@ -65,22 +71,33 @@ type tier2VSInfo struct {
 	ipNet *net.IPNet
 }
 
+// Router interface for the F5Router
+//go:generate counterfeiter -o fakes/fake_router.go . Router
+type Router interface {
+	AddPlans(plans map[string]planResources.Plan)
+	VerifyPlanExists(planID string) error
+	UpdateRoute(ru routeUpdate.RouteUpdate)
+}
+
 // F5Router controller of BigIP configuration objects
 type F5Router struct {
-	c                 *config.Config
-	logger            logger.Logger
-	r                 bigipResources.RuleMap
-	wildcards         bigipResources.RuleMap
-	queue             workqueue.RateLimitingInterface
-	writer            Writer
-	routeVSHTTP       *bigipResources.Virtual
-	routeVSHTTPS      *bigipResources.Virtual
-	virtualResources  map[string]*bigipResources.Virtual
-	poolResources     map[string]*bigipResources.Pool
-	ruleResources     map[string]*bigipResources.IRule
-	internalDataGroup map[string]*bigipResources.InternalDataGroupRecord
-	tier2VSInfo       tier2VSInfo
-	firstSyncDone     bool
+	c                    *config.Config
+	logger               logger.Logger
+	r                    bigipResources.RuleMap
+	wildcards            bigipResources.RuleMap
+	queue                workqueue.RateLimitingInterface
+	writer               Writer
+	routeVSHTTP          *bigipResources.Virtual
+	routeVSHTTPS         *bigipResources.Virtual
+	virtualResources     map[string]*bigipResources.Virtual
+	poolResources        map[string]*bigipResources.Pool
+	ruleResources        map[string]*bigipResources.IRule
+	monitorResources     map[string][]*bigipResources.Monitor
+	internalDataGroup    map[string]*bigipResources.InternalDataGroupRecord
+	tier2VSInfo          tier2VSInfo
+	firstSyncDone        bool
+	unmappedResourcesMap map[string]bigipResources.Resources
+	plansMap             mutexPlansMap
 }
 
 func verifyRouteURI(ru updateHTTP) error {
@@ -129,6 +146,41 @@ func makeDescription(uri string, appID string) string {
 	return s
 }
 
+func generateProfileList(names []string, context string) ([]*bigipResources.ProfileRef, error) {
+	var refs []*bigipResources.ProfileRef
+	nameRefs, err := generateNameList(names)
+	for _, ref := range nameRefs {
+		refs = append(refs, &bigipResources.ProfileRef{
+			Name:      ref.Name,
+			Partition: ref.Partition,
+			Context:   context,
+		})
+	}
+	return refs, err
+}
+
+func generateNameList(names []string) ([]*bigipResources.NameRef, error) {
+	var refs []*bigipResources.NameRef
+	var skipped []string
+	for i := range names {
+		p := strings.TrimPrefix(names[i], "/")
+		parts := strings.Split(p, "/")
+		if 2 == len(parts) {
+			refs = append(refs, &bigipResources.NameRef{
+				Name:      parts[1],
+				Partition: parts[0],
+			})
+		} else {
+			skipped = append(skipped, p)
+		}
+	}
+	if len(skipped) != 0 {
+		return refs, fmt.Errorf("skipped names: %v need format /[partition]/[name]", skipped)
+	}
+
+	return refs, nil
+}
+
 // NewF5Router create the F5Router route controller
 func NewF5Router(
 	logger logger.Logger,
@@ -136,16 +188,19 @@ func NewF5Router(
 	writer Writer,
 ) (*F5Router, error) {
 	r := F5Router{
-		c:                c,
-		logger:           logger,
-		r:                make(bigipResources.RuleMap),
-		wildcards:        make(bigipResources.RuleMap),
-		queue:            workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		writer:           writer,
-		virtualResources: make(map[string]*bigipResources.Virtual),
-		poolResources:    make(map[string]*bigipResources.Pool),
-		ruleResources:    make(map[string]*bigipResources.IRule),
-		tier2VSInfo:      tier2VSInfo{usedPorts: make(map[string]*bigipResources.VirtualAddress), holderPort: 10000},
+		c:                    c,
+		logger:               logger,
+		r:                    make(bigipResources.RuleMap),
+		wildcards:            make(bigipResources.RuleMap),
+		queue:                workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		writer:               writer,
+		virtualResources:     make(map[string]*bigipResources.Virtual),
+		poolResources:        make(map[string]*bigipResources.Pool),
+		ruleResources:        make(map[string]*bigipResources.IRule),
+		monitorResources:     make(map[string][]*bigipResources.Monitor),
+		unmappedResourcesMap: make(map[string]bigipResources.Resources),
+		plansMap:             mutexPlansMap{plans: make(map[string]planResources.Plan)},
+		tier2VSInfo:          tier2VSInfo{usedPorts: make(map[string]*bigipResources.VirtualAddress), holderPort: 10000},
 	}
 
 	err := r.validateConfig()
@@ -168,6 +223,28 @@ func NewF5Router(
 	}
 
 	return &r, nil
+}
+
+// AddPlans adds service broker provided plans to the router
+func (r *F5Router) AddPlans(plans map[string]planResources.Plan) {
+	r.plansMap.lock.Lock()
+	r.plansMap.plans = plans
+	r.plansMap.lock.Unlock()
+}
+
+// VerifyPlanExists verifies that the plan exists for the router
+func (r *F5Router) VerifyPlanExists(planID string) error {
+	if planID == "" {
+		return errors.New("planID not included")
+	}
+
+	r.plansMap.lock.Lock()
+	defer r.plansMap.lock.Unlock()
+	if _, ok := r.plansMap.plans[planID]; !ok {
+		return errors.New("plan for planID: " + planID + " not found")
+	}
+
+	return nil
 }
 
 // Run start the F5Router controller
@@ -269,8 +346,18 @@ func (r *F5Router) initiRule(name string, code string) {
 }
 
 func (r *F5Router) createHTTPVirtuals() error {
-	plcs := r.generatePolicyList()
-	prfls := r.generateProfileList(r.c.BigIP.Profiles, "all")
+	plcs, err := generateNameList(r.c.BigIP.Policies)
+	if err != nil {
+		r.logger.Warn("f5router-skipping-policy-names", zap.Error(err))
+	}
+	plcs = append(plcs, &bigipResources.NameRef{
+		Name:      CFRoutingPolicyName,
+		Partition: r.c.BigIP.Partitions[0], // FIXME handle multiple partitions
+	})
+	prfls, err := generateProfileList(r.c.BigIP.Profiles, "all")
+	if err != nil {
+		r.logger.Warn("f5router-skipping-profile-names", zap.Error(err))
+	}
 	iRulePath, err := joinBigipPath(r.c.BigIP.Partitions[0], bigipResources.HTTPForwardingiRuleName)
 	if nil != err {
 		return err
@@ -304,7 +391,10 @@ func (r *F5Router) createHTTPVirtuals() error {
 	}
 
 	if 0 != len(r.c.BigIP.SSLProfiles) {
-		sslProfiles := r.generateProfileList(r.c.BigIP.SSLProfiles, "clientside")
+		sslProfiles, err := generateProfileList(r.c.BigIP.SSLProfiles, "clientside")
+		if err != nil {
+			r.logger.Warn("f5router-skipping-sslProfile-names", zap.Error(err))
+		}
 		prfls = append(prfls, sslProfiles...)
 
 		va := &bigipResources.VirtualAddress{
@@ -360,51 +450,6 @@ func (r *F5Router) runWorker(done chan<- struct{}) {
 	close(done)
 }
 
-func (r *F5Router) generateProfileList(names []string, context string) []*bigipResources.ProfileRef {
-	var refs []*bigipResources.ProfileRef
-	nameRefs := r.generateNameList(names)
-	for _, ref := range nameRefs {
-		refs = append(refs, &bigipResources.ProfileRef{
-			Name:      ref.Name,
-			Partition: ref.Partition,
-			Context:   context,
-		})
-	}
-	return refs
-}
-
-func (r *F5Router) generateNameList(names []string) []*bigipResources.NameRef {
-	var refs []*bigipResources.NameRef
-	for i := range names {
-		p := strings.TrimPrefix(names[i], "/")
-		parts := strings.Split(p, "/")
-		if 2 == len(parts) {
-			refs = append(refs, &bigipResources.NameRef{
-				Name:      parts[1],
-				Partition: parts[0],
-			})
-		} else {
-			r.logger.Warn("f5router-skipping-name",
-				zap.String("parse-error",
-					fmt.Sprintf("skipping name %s, need format /[partition]/[name]",
-						p)),
-			)
-		}
-	}
-
-	return refs
-}
-
-func (r *F5Router) generatePolicyList() []*bigipResources.NameRef {
-	var n []*bigipResources.NameRef
-	n = append(n, r.generateNameList(r.c.BigIP.Policies)...)
-	n = append(n, &bigipResources.NameRef{
-		Name:      CFRoutingPolicyName,
-		Partition: r.c.BigIP.Partitions[0], // FIXME handle multiple partitions
-	})
-	return n
-}
-
 func (r *F5Router) createPolicies(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	if len(r.wildcards) != 0 || len(r.r) != 0 {
@@ -435,6 +480,25 @@ func (r *F5Router) createiRules(pm bigipResources.PartitionMap, partition string
 
 	for _, rule := range r.ruleResources {
 		pm[partition].IRules = append(pm[partition].IRules, rule)
+	}
+}
+
+func (r *F5Router) createMonitors(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for _, monitors := range r.monitorResources {
+		for _, monitor := range monitors {
+			var found bool
+			for _, addedMonitor := range pm[partition].Monitors {
+				if addedMonitor.Name == monitor.Name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				pm[partition].Monitors = append(pm[partition].Monitors, monitor)
+			}
+		}
 	}
 }
 
@@ -477,6 +541,9 @@ func (r *F5Router) createResources() bigipResources.PartitionMap {
 	go r.createiRules(pm, partition, &wg)
 
 	wg.Add(1)
+	go r.createMonitors(pm, partition, &wg)
+
+	wg.Add(1)
 	go r.createInternalDataGroup(pm, partition, &wg)
 
 	wg.Wait()
@@ -501,6 +568,10 @@ func (r *F5Router) process() bool {
 			r.processRouteAdd(ru)
 		} else if ru.Op() == routeUpdate.Remove {
 			r.processRouteRemove(ru)
+		} else if ru.Op() == routeUpdate.Bind {
+			r.processRouteBind(ru)
+		} else if ru.Op() == routeUpdate.Unbind {
+			r.processRouteUnbind(ru)
 		}
 	case updateTCP:
 		if ru.Op() == routeUpdate.Add {
@@ -557,18 +628,18 @@ func (r *F5Router) process() bool {
 
 // makePool create Pool-Only configuration item
 func makePool(
-	c *config.Config,
 	name string,
 	descrip string,
-	members ...bigipResources.Member,
+	members []bigipResources.Member,
+	balanceMode string,
+	hmNames []string,
 ) *bigipResources.Pool {
 
-	prefixHealthMonitors := fixupNames(c.BigIP.HealthMonitors)
 	return &bigipResources.Pool{
 		Name:         name,
-		Balance:      c.BigIP.LoadBalancingMode,
+		Balance:      balanceMode,
 		Members:      members,
-		MonitorNames: prefixHealthMonitors,
+		MonitorNames: hmNames,
 		Description:  descrip,
 	}
 }
@@ -961,10 +1032,14 @@ func (r *F5Router) processRouteAdd(ru updateHTTP) {
 		return
 	}
 
+	// Create default resources and update them if resource updates exist for this route
 	rs, err := ru.CreateResources(r.c)
 	if nil != err {
 		r.logger.Error("process-HTTP-route-add-error-create-resources", zap.Error(err))
 		return
+	}
+	if resources, ok := r.unmappedResourcesMap[ru.Name()]; ok {
+		rs = ru.UpdateResources(rs, resources)
 	}
 
 	err = r.assignVSPort(rs.Virtuals[0])
@@ -975,9 +1050,109 @@ func (r *F5Router) processRouteAdd(ru updateHTTP) {
 			zap.Error(err))
 		return
 	}
+
+	if len(rs.Monitors) != 0 {
+		r.addMonitors(rs.Pools[0].Name, rs.Monitors)
+	}
 	r.addPool(rs.Pools[0])
 	r.addVirtual(rs.Virtuals[0])
 	r.addRule(ru)
+}
+
+func (r *F5Router) processRouteBind(ru updateHTTP) {
+	name := ru.Name()
+	planID := ru.PlanID()
+	existingPool := r.poolResources[name]
+	existingVirtual := r.virtualResources[name]
+	r.plansMap.lock.Lock()
+	defer r.plansMap.lock.Unlock()
+
+	// There is a mapped route (with an endpoint) that will be updated
+	if (existingPool != nil) && (existingVirtual != nil) {
+		var rs bigipResources.Resources
+
+		// Get copy of members before they are removed
+		members := make([]bigipResources.Member, len(existingPool.Members))
+		copy(members, existingPool.Members)
+		r.removePool(existingPool)
+		r.removeVirtual(name)
+
+		// Bind updates to this mapped route
+		rs = bigipResources.Resources{
+			Virtuals: []*bigipResources.Virtual{existingVirtual},
+			Pools:    []*bigipResources.Pool{existingPool},
+		}
+
+		if plan, ok := r.plansMap.plans[planID]; ok {
+			if len(plan.Pool.HealthMonitors) != 0 {
+				r.removeMonitors(existingPool.Name)
+			}
+			planResources := ru.CreatePlanResources(r.c, plan)
+			rs = ru.UpdateResources(rs, planResources)
+		} else {
+			r.logger.Warn("process-HTTP-route-update-bind-error",
+				zap.String("Update-Mapped-Route-Error",
+					fmt.Sprintf("could not find plan %s for route %s keeping defaults", planID, ru.Route())))
+		}
+
+		// Members are not updated and should be added back
+		rs.Pools[0].Members = members
+		if len(rs.Monitors) != 0 {
+			r.addMonitors(rs.Pools[0].Name, rs.Monitors)
+		}
+		r.addPool(rs.Pools[0])
+		r.addVirtual(rs.Virtuals[0])
+	} else {
+		// Bind updates to this unmapped route
+		if plan, ok := r.plansMap.plans[planID]; ok {
+			planResources := ru.CreatePlanResources(r.c, plan)
+			r.unmappedResourcesMap[name] = planResources
+		} else {
+			r.logger.Warn("process-HTTP-route-update-bind-error",
+				zap.String("Update-Unmapped-Route-Error",
+					fmt.Sprintf("could not find plan %s for unmapped route noop", planID)))
+		}
+	}
+}
+
+func (r *F5Router) processRouteUnbind(ru updateHTTP) {
+	name := ru.Name()
+	existingPool := r.poolResources[name]
+	existingVirtual := r.virtualResources[name]
+
+	// There is a mapped route (with an endpoint) that will be updated
+	if (existingPool != nil) && (existingVirtual != nil) {
+		var rs bigipResources.Resources
+		var err error
+
+		// Get copy of members before they are removed
+		members := make([]bigipResources.Member, len(existingPool.Members))
+		copy(members, existingPool.Members)
+		r.removePool(existingPool)
+		r.removeVirtual(name)
+
+		// Unbind updates to this mapped route
+		r.removeMonitors(existingPool.Name)
+		rs, err = ru.CreateBrokerDefaultResources(
+			r.c,
+			existingPool.Description,
+			existingVirtual.Destination,
+			members[0].Address,
+			members[0].Port,
+		)
+		if nil != err {
+			r.logger.Error("process-HTTP-route-update-unbind-error", zap.Error(err))
+			return
+		}
+
+		// Members are not updated and should be added back
+		rs.Pools[0].Members = members
+		r.addPool(rs.Pools[0])
+		r.addVirtual(rs.Virtuals[0])
+	} else {
+		// Unbind updates to this unmapped route
+		delete(r.unmappedResourcesMap, name)
+	}
 }
 
 func (r *F5Router) processRouteRemove(ru updateHTTP) {
@@ -996,6 +1171,8 @@ func (r *F5Router) processRouteRemove(ru updateHTTP) {
 	}
 	poolRemoved := r.removePool(rs.Pools[0])
 	if poolRemoved {
+		// delete the health monitors associated with this pool
+		r.removeMonitors(rs.Pools[0].Name)
 		// delete the rule for the vip
 		r.removeRule(ru)
 		// delete the tier2 vip
@@ -1042,6 +1219,14 @@ func (r *F5Router) processTCPRouteRemove(ru updateTCP) {
 	if poolRemoved {
 		r.removeVirtual(rs.Virtuals[0].VirtualServerName)
 	}
+}
+
+func (r *F5Router) addMonitors(poolName string, monitors []*bigipResources.Monitor) {
+	r.monitorResources[poolName] = monitors
+}
+
+func (r *F5Router) removeMonitors(poolName string) {
+	delete(r.monitorResources, poolName)
 }
 
 func (r *F5Router) addPool(pool *bigipResources.Pool) {
@@ -1146,5 +1331,6 @@ func (r *F5Router) UpdateRoute(ru routeUpdate.RouteUpdate) {
 		zap.String("route-type", ru.Protocol()),
 		zap.String("route", ru.Route()),
 	)
+	// WARNING: This only accepts hashable types!
 	r.queue.Add(ru)
 }

@@ -70,7 +70,8 @@ func (tu updateTCP) CreateResources(c *config.Config) (bigipResources.Resources,
 
 	// FIXME need to handle multiple tcp router groups
 	poolDescrip := fmt.Sprintf("route-port: %d, router-group: %s", tu.routePort, c.TCPRouterGroupName)
-	pool := makePool(c, tu.name, poolDescrip, tu.member)
+	pool := makePool(tu.name, poolDescrip, []bigipResources.Member{tu.member}, c.BigIP.LoadBalancingMode,
+		fixupNames(c.BigIP.HealthMonitors))
 	rs.Pools = append(rs.Pools, pool)
 
 	profile := []*bigipResources.ProfileRef{

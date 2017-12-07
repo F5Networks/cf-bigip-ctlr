@@ -98,7 +98,7 @@ type (
 	Monitor struct {
 		Name     string `json:"name"`
 		Interval int    `json:"interval,omitempty"`
-		Protocol string `json:"protocol"`
+		Type     string `json:"type"`
 		Send     string `json:"send,omitempty"`
 		Timeout  int    `json:"timeout,omitempty"`
 	}
