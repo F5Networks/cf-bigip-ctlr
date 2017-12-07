@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"runtime"
@@ -24,6 +25,7 @@ import (
 	rregistry "github.com/F5Networks/cf-bigip-ctlr/registry"
 	"github.com/F5Networks/cf-bigip-ctlr/routefetcher"
 	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
 	rvarz "github.com/F5Networks/cf-bigip-ctlr/varz"
 
 	"code.cloudfoundry.org/clock"
@@ -164,6 +166,21 @@ func main() {
 		logger.Session("python-driver"),
 	)
 
+	var brokerHandler http.Handler
+	if c.BrokerMode {
+		sb, err := servicebroker.NewServiceBroker(c, logger, f5Router)
+		if nil != err {
+			logger.Warn("create-new-broker-error", zap.Error(err))
+		} else {
+			err = sb.ProcessPlans()
+			if nil != err {
+				logger.Warn("process-broker-plan-error", zap.Error(err))
+			} else {
+				brokerHandler = sb.Handler
+			}
+		}
+	}
+
 	var members grouper.Members
 
 	// registry is for http routing routes - if not in tcp only mode
@@ -208,6 +225,7 @@ func main() {
 		registry,
 		routingTable,
 		varz,
+		brokerHandler,
 	)
 	if nil != err {
 		logger.Fatal("failed-starting-controller", zap.Error(err))

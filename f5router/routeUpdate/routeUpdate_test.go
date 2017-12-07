@@ -28,7 +28,9 @@ var _ = Describe("routeUpdate", func() {
 	It("knows how to tell you about an operation", func() {
 		Expect(Add.String()).To(Equal("Add"))
 		Expect(Remove.String()).To(Equal("Remove"))
-		op = 3
+		Expect(Bind.String()).To(Equal("Bind"))
+		Expect(Unbind.String()).To(Equal("Unbind"))
+		op = 4
 		Expect(op.String()).To(Equal("Unknown"))
 	})
 })

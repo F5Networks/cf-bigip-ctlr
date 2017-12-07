@@ -28,6 +28,7 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/bigipResources"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/route"
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker/planResources"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 
 	"code.cloudfoundry.org/routing-api/models"
@@ -152,6 +153,221 @@ var _ = Describe("F5Router", func() {
 		})
 	})
 
+	Describe("httpUpdate", func() {
+		var httpUpdate updateHTTP
+		Context("UpdateResources", func() {
+			var oldResources bigipResources.Resources
+			var newResources bigipResources.Resources
+
+			BeforeEach(func() {
+				httpUpdate = updateHTTP{}
+				policies := []*bigipResources.NameRef{&bigipResources.NameRef{
+					Name:      "test-policy",
+					Partition: "test",
+				}}
+				profiles := []*bigipResources.ProfileRef{&bigipResources.ProfileRef{
+					Name:      "test-profile",
+					Partition: "test",
+					Context:   "all",
+				}}
+				oldResources.Virtuals = []*bigipResources.Virtual{&bigipResources.Virtual{
+					VirtualServerName: "test-route-virtual",
+					PoolName:          "test-route-pool",
+					Profiles:          profiles,
+					Policies:          policies,
+				}}
+				oldResources.Pools = []*bigipResources.Pool{&bigipResources.Pool{
+					Name:         "test-route-pool",
+					Balance:      "round-robin",
+					MonitorNames: []string{"monitor1", "monitor2"},
+				}}
+				oldResources.Monitors = []*bigipResources.Monitor{&bigipResources.Monitor{
+					Name: "test-route-monitor",
+					Type: "http",
+				}}
+				newResources = bigipResources.Resources{}
+			})
+
+			It("should not update", func() {
+				updatedResources := httpUpdate.UpdateResources(oldResources, newResources)
+				Expect(updatedResources).To(Equal(oldResources))
+			})
+
+			It("should update virtuals profiles and policies only", func() {
+				newPolicies := []*bigipResources.NameRef{&bigipResources.NameRef{
+					Name:      "new-test-policy",
+					Partition: "test",
+				}}
+				newProfiles := []*bigipResources.ProfileRef{&bigipResources.ProfileRef{
+					Name:      "new-test-profile",
+					Partition: "test",
+					Context:   "clientside",
+				}}
+				newResources.Virtuals = []*bigipResources.Virtual{&bigipResources.Virtual{
+					VirtualServerName: "update-route-virtual",
+					PoolName:          "update-route-pool",
+					Profiles:          newProfiles,
+					Policies:          newPolicies,
+				}}
+				updatedResources := httpUpdate.UpdateResources(oldResources, newResources)
+
+				Expect(len(updatedResources.Virtuals)).To(Equal(1))
+				Expect(updatedResources.Virtuals[0].VirtualServerName).To(Equal(oldResources.Virtuals[0].VirtualServerName))
+				Expect(updatedResources.Virtuals[0].PoolName).To(Equal(oldResources.Virtuals[0].PoolName))
+				Expect(updatedResources.Virtuals[0].Profiles).To(Equal(newProfiles))
+				Expect(updatedResources.Virtuals[0].Policies).To(Equal(newPolicies))
+				Expect(len(updatedResources.Virtuals[0].Profiles)).To(Equal(1))
+				Expect(len(updatedResources.Virtuals[0].Policies)).To(Equal(1))
+
+				Expect(len(updatedResources.Pools)).To(Equal(1))
+				Expect(len(updatedResources.Monitors)).To(Equal(1))
+				Expect(updatedResources.Pools[0]).To(Equal(oldResources.Pools[0]))
+				Expect(updatedResources.Monitors[0]).To(Equal(oldResources.Monitors[0]))
+			})
+
+			It("should update pools balance and monitor names only", func() {
+				newResources.Pools = []*bigipResources.Pool{&bigipResources.Pool{
+					Name:         "update-route-pool",
+					Balance:      "fastest-node",
+					MonitorNames: []string{"monitor3"},
+				}}
+				updatedResources := httpUpdate.UpdateResources(oldResources, newResources)
+
+				Expect(len(updatedResources.Pools)).To(Equal(1))
+				Expect(updatedResources.Pools[0].Name).To(Equal(oldResources.Pools[0].Name))
+				Expect(updatedResources.Pools[0].Balance).To(Equal(newResources.Pools[0].Balance))
+				Expect(updatedResources.Pools[0].MonitorNames).To(Equal(newResources.Pools[0].MonitorNames))
+				Expect(len(updatedResources.Pools[0].MonitorNames)).To(Equal(1))
+
+				Expect(len(updatedResources.Virtuals)).To(Equal(1))
+				Expect(len(updatedResources.Monitors)).To(Equal(1))
+				Expect(updatedResources.Virtuals[0]).To(Equal(oldResources.Virtuals[0]))
+				Expect(updatedResources.Monitors[0]).To(Equal(oldResources.Monitors[0]))
+			})
+
+			It("should update monitors", func() {
+				newResources.Monitors = []*bigipResources.Monitor{&bigipResources.Monitor{
+					Name: "update-route-monitor",
+					Type: "tcp",
+				}}
+				updatedResources := httpUpdate.UpdateResources(oldResources, newResources)
+
+				Expect(len(updatedResources.Virtuals)).To(Equal(1))
+				Expect(len(updatedResources.Pools)).To(Equal(1))
+				Expect(len(updatedResources.Monitors)).To(Equal(1))
+				Expect(updatedResources.Virtuals[0]).To(Equal(oldResources.Virtuals[0]))
+				Expect(updatedResources.Pools[0]).To(Equal(oldResources.Pools[0]))
+				Expect(updatedResources.Monitors[0]).To(Equal(newResources.Monitors[0]))
+			})
+		})
+
+		Context("CreatePlanResources", func() {
+			var plan planResources.Plan
+			var logger *test_util.TestZapLogger
+			var c *config.Config
+
+			BeforeEach(func() {
+				logger := test_util.NewTestZapLogger("create-plan-resources-test")
+				httpUpdate = updateHTTP{logger: logger}
+				plan = planResources.Plan{
+					Name: "test-plan",
+				}
+				c = config.DefaultConfig()
+				c.BigIP.Partitions = []string{"test"}
+			})
+
+			AfterEach(func() {
+				if nil != logger {
+					logger.Close()
+				}
+			})
+
+			It("should create virtual resources from plan", func() {
+				plan.VirtualServer = planResources.VirtualType{
+					Policies:    []string{"/test/policy"},
+					Profiles:    []string{"/test/profile"},
+					SslProfiles: []string{"/test/sslProfile"},
+				}
+				resources := httpUpdate.CreatePlanResources(c, plan)
+
+				Expect(len(resources.Pools)).To(Equal(1))
+				Expect(len(resources.Monitors)).To(Equal(0))
+				Expect(len(resources.Virtuals)).To(Equal(1))
+				Expect(len(resources.Virtuals[0].Policies)).To(Equal(1))
+				Expect(len(resources.Virtuals[0].Profiles)).To(Equal(2))
+
+				Expect(resources.Pools[0]).To(Equal(&bigipResources.Pool{}))
+				Expect(resources.Virtuals[0].Policies).To(Equal([]*bigipResources.NameRef{
+					&bigipResources.NameRef{
+						Name:      "policy",
+						Partition: "test",
+					}}))
+				Expect(resources.Virtuals[0].Profiles[0]).To(Equal(&bigipResources.ProfileRef{
+					Name:      "profile",
+					Partition: "test",
+					Context:   "all",
+				}))
+				Expect(resources.Virtuals[0].Profiles[1]).To(Equal(&bigipResources.ProfileRef{
+					Name:      "sslProfile",
+					Partition: "test",
+					Context:   "serverside",
+				}))
+			})
+
+			It("should not create virtual resources", func() {
+				plan.VirtualServer = planResources.VirtualType{}
+				resources := httpUpdate.CreatePlanResources(c, plan)
+
+				Expect(len(resources.Pools)).To(Equal(1))
+				Expect(len(resources.Virtuals)).To(Equal(1))
+				Expect(len(resources.Monitors)).To(Equal(0))
+
+				Expect(resources.Pools[0]).To(Equal(&bigipResources.Pool{}))
+				Expect(resources.Virtuals[0]).To(Equal(&bigipResources.Virtual{}))
+			})
+
+			It("should create pool resources from plan", func() {
+				monitors := []bigipResources.Monitor{
+					bigipResources.Monitor{
+						Name: "monitor1",
+						Type: "http",
+					},
+					bigipResources.Monitor{
+						Name: "monitor2",
+						Type: "tcp",
+					},
+				}
+				plan.Pool = planResources.PoolType{
+					Balance:        "round-robin",
+					HealthMonitors: monitors,
+				}
+				resources := httpUpdate.CreatePlanResources(c, plan)
+
+				Expect(len(resources.Virtuals)).To(Equal(1))
+				Expect(resources.Virtuals[0]).To(Equal(&bigipResources.Virtual{}))
+				Expect(len(resources.Pools)).To(Equal(1))
+				Expect(len(resources.Monitors)).To(Equal(2))
+				Expect(len(resources.Pools[0].MonitorNames)).To(Equal(2))
+				Expect(resources.Pools[0].Balance).To(Equal("round-robin"))
+				Expect(resources.Pools[0].MonitorNames).To(Equal([]string{"/test/monitor1", "/test/monitor2"}))
+				Expect(*resources.Monitors[0]).To(Equal(monitors[0]))
+				Expect(*resources.Monitors[1]).To(Equal(monitors[1]))
+			})
+
+			It("should not create pool resources", func() {
+				plan.Pool = planResources.PoolType{}
+				resources := httpUpdate.CreatePlanResources(c, plan)
+
+				Expect(len(resources.Virtuals)).To(Equal(1))
+				Expect(len(resources.Pools)).To(Equal(1))
+				Expect(len(resources.Monitors)).To(Equal(0))
+
+				Expect(resources.Pools[0]).To(Equal(&bigipResources.Pool{}))
+				Expect(resources.Virtuals[0]).To(Equal(&bigipResources.Virtual{}))
+			})
+		})
+	})
+
 	Describe("running router", func() {
 		var mw *MockWriter
 		var router *F5Router
@@ -198,7 +414,7 @@ var _ = Describe("F5Router", func() {
 				routePair{"*vic*.cf.com", wild2Endpoint},
 			}
 			for _, pair := range rp {
-				up, _ = NewUpdate(logger, routeUpdate.Add, pair.url, pair.ep)
+				up, _ = NewUpdate(logger, routeUpdate.Add, pair.url, pair.ep, "")
 				router.UpdateRoute(up)
 			}
 		}
@@ -229,7 +445,6 @@ var _ = Describe("F5Router", func() {
 			wildBeginEndpoint = makeEndpoint("127.0.6.4")
 			wild2Endpoint = makeEndpoint("127.0.7.1")
 			quxEndpoint = makeEndpoint("127.0.7.1")
-
 		})
 
 		AfterEach(func() {
@@ -280,35 +495,35 @@ var _ = Describe("F5Router", func() {
 			update++
 
 			// make some changes and update the verification function
-			up, err = NewUpdate(logger, routeUpdate.Remove, "bar.cf.com", barEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "bar.cf.com", barEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Remove, "baz.cf.com/segment1", baz2Segment1Endpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "baz.cf.com/segment1", baz2Segment1Endpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Add, "baz.cf.com", baz2Endpoint)
+			up, err = NewUpdate(logger, routeUpdate.Add, "baz.cf.com", baz2Endpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Remove, "*.foo.cf.com", wildFooEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "*.foo.cf.com", wildFooEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Remove, "ser*.cf.com", wildEndEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "ser*.cf.com", wildEndEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Remove, "ser*es.cf.com", wildMidEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "ser*es.cf.com", wildMidEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Remove, "*vices.cf.com", wildBeginEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "*vices.cf.com", wildBeginEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
-			up, err = NewUpdate(logger, routeUpdate.Remove, "foo.cf.com", fooEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Remove, "foo.cf.com", fooEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
@@ -316,7 +531,7 @@ var _ = Describe("F5Router", func() {
 			matchConfig(mw, expectedConfigs[update])
 			update++
 
-			up, err = NewUpdate(logger, routeUpdate.Add, "qux.cf.com", quxEndpoint)
+			up, err = NewUpdate(logger, routeUpdate.Add, "qux.cf.com", quxEndpoint, "")
 			Expect(err).NotTo(HaveOccurred())
 			router.UpdateRoute(up)
 
@@ -353,7 +568,224 @@ var _ = Describe("F5Router", func() {
 
 			registerRoutes()
 
+			//config3
 			matchConfig(mw, expectedConfigs[3])
+		})
+		Context("service broker route updates", func() {
+			var (
+				regularEndpoint1,
+				regularEndpoint2,
+				brokerEndpoint1,
+				brokerEndpoint2,
+				brokerEndpoint3,
+				brokerEndpoint4,
+				brokerEndpoint5 *route.Endpoint
+			)
+
+			BeforeEach(func() {
+				regularEndpoint1 = makeEndpoint("127.0.0.1")
+				regularEndpoint2 = makeEndpoint("127.0.0.2")
+				brokerEndpoint1 = makeEndpoint("127.0.1.1")
+				brokerEndpoint2 = makeEndpoint("127.0.1.2")
+				brokerEndpoint3 = makeEndpoint("127.0.1.3")
+				brokerEndpoint4 = makeEndpoint("127.0.1.4")
+				brokerEndpoint5 = makeEndpoint("127.0.1.5")
+
+				// Add broker plans to router
+				plans := make(map[string]planResources.Plan)
+
+				// Updates to virtual and pool but no health monitors
+				plans["plan1"] = planResources.Plan{
+					ID: "plan1",
+					Pool: planResources.PoolType{
+						Balance: "ratio-member",
+						HealthMonitors: []bigipResources.Monitor{
+							bigipResources.Monitor{
+								Name: "/Common/existing-bigip-monitor",
+							},
+							bigipResources.Monitor{
+								Name: "plan1-monitor1",
+								Type: "http",
+							},
+						},
+					},
+					VirtualServer: planResources.VirtualType{
+						Policies:    []string{"/test/plan1-policy"},
+						Profiles:    []string{"/test/plan1-profile"},
+						SslProfiles: []string{"/test/plan1-ssl-profile"},
+					},
+				}
+
+				// Updates to pool health monitors only
+				plans["plan2"] = planResources.Plan{
+					ID: "plan2",
+					Pool: planResources.PoolType{
+						HealthMonitors: []bigipResources.Monitor{
+							bigipResources.Monitor{
+								Name: "plan2-monitor1",
+								Type: "http",
+							},
+							bigipResources.Monitor{
+								Name: "plan2-monitor2",
+								Type: "tcp",
+							},
+						},
+					},
+				}
+
+				router.AddPlans(plans)
+
+				err = router.VerifyPlanExists("plan1")
+				Expect(err).NotTo(HaveOccurred())
+				err = router.VerifyPlanExists("plan2")
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("should handle service broker updates", func() {
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+
+				// Add regular route to router
+				up, err := NewUpdate(logger, routeUpdate.Add, "regular.cf.com/1", regularEndpoint1, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				matchConfig(mw, expectedConfigs[7])
+
+				// Add a regular route that will have broker updates bound to it
+				up, err = NewUpdate(logger, routeUpdate.Add, "broker.cf.com/1", brokerEndpoint1, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Remove a regular route that was added before the test
+				up, err = NewUpdate(logger, routeUpdate.Remove, "regular.cf.com/1", regularEndpoint1, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add broker defined updates to a route without endpoint this should not yet create bigip objects
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/2", nil, "plan1")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Same as above except this route will never get an endpoint so these bigip objects will never be created
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/3", nil, "plan1")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add a regular route that will have broker updates bound to it
+				up, err = NewUpdate(logger, routeUpdate.Add, "broker.cf.com/4", brokerEndpoint1, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add a regular route that will have broker updates bound to it
+				up, err = NewUpdate(logger, routeUpdate.Add, "broker.cf.com/5", brokerEndpoint1, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add a regular route that will have broker updates bound to it
+				up, err = NewUpdate(logger, routeUpdate.Add, "broker.cf.com/6", brokerEndpoint1, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				matchConfig(mw, expectedConfigs[8])
+
+				// Add a regular route
+				up, err = NewUpdate(logger, routeUpdate.Add, "regular.cf.com/2", regularEndpoint2, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add broker update to route with existing endpoint
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/1", nil, "plan2")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add broker update to route with existing endpoint
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/4", nil, "plan1")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add broker update to route with existing endpoint
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/5", nil, "plan2")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add broker update to route with existing endpoint
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/6", nil, "plan2")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Double bind update to route with existing endpoint make sure objects are not duplicated
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/4", nil, "plan1")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Double bind update to route with existing endpoint make sure objects are not duplicated
+				up, err = NewUpdate(logger, routeUpdate.Bind, "broker.cf.com/5", nil, "plan2")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Add route with endpoint to a broker updated route
+				up, err = NewUpdate(logger, routeUpdate.Add, "broker.cf.com/2", brokerEndpoint2, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				matchConfig(mw, expectedConfigs[9])
+
+				// Remove a regular route
+				up, err = NewUpdate(logger, routeUpdate.Remove, "regular.cf.com/2", regularEndpoint2, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Remove a broker updated route
+				up, err = NewUpdate(logger, routeUpdate.Remove, "broker.cf.com/2", brokerEndpoint2, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Unbind a broker updated route (reset to config defaults)
+				up, err = NewUpdate(logger, routeUpdate.Unbind, "broker.cf.com/1", nil, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Unbind a broker updated route (reset to config defaults)
+				up, err = NewUpdate(logger, routeUpdate.Unbind, "broker.cf.com/4", nil, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Unbind a broker updated route (reset to config defaults)
+				up, err = NewUpdate(logger, routeUpdate.Unbind, "broker.cf.com/5", nil, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Double unbind update to route with existing endpoint make sure objects are not duplicated
+				up, err = NewUpdate(logger, routeUpdate.Unbind, "broker.cf.com/4", nil, "plan1")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Double unbind update to route with existing endpoint make sure objects are not duplicated
+				up, err = NewUpdate(logger, routeUpdate.Unbind, "broker.cf.com/5", nil, "plan2")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				// Unbind a broker updated route without an endpoint (noop since its bigip objects are never created)
+				up, err = NewUpdate(logger, routeUpdate.Unbind, "broker.cf.com/3", nil, "")
+				Expect(err).NotTo(HaveOccurred())
+				router.UpdateRoute(up)
+
+				matchConfig(mw, expectedConfigs[10])
+
+				os <- MockSignal(123)
+				Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
+			})
 		})
 		Context("fake BIG-IP provides a response", func() {
 			var server *ghttp.Server
@@ -431,7 +863,7 @@ var _ = Describe("F5Router", func() {
 
 		Context("fail cases", func() {
 			It("should error when not passing a URI for route update", func() {
-				_, updateErr := NewUpdate(logger, routeUpdate.Add, "", fooEndpoint)
+				_, updateErr := NewUpdate(logger, routeUpdate.Add, "", fooEndpoint, "")
 				Expect(updateErr).To(MatchError("uri length of zero is not allowed"))
 			})
 
@@ -454,7 +886,7 @@ var _ = Describe("F5Router", func() {
 				}()
 				Eventually(ready).Should(BeClosed())
 
-				Eventually(logger).Should(Say("f5router-skipping-name"))
+				Eventually(logger).Should(Say("skipping-policy-names"))
 			})
 
 			It("should error when exceeding the ip range", func() {
@@ -676,6 +1108,8 @@ func matchConfig(mw *MockWriter, expected []byte) {
 	matchMonitors(mw, matcher)
 
 	matchInternalDataGroups(mw, matcher)
+
+	matchIRules(mw, matcher)
 }
 
 func matchVirtuals(mw *MockWriter, matcher configMatcher) {
@@ -769,6 +1203,25 @@ func matchInternalDataGroups(mw *MockWriter, matcher configMatcher) {
 		fmt.Sprintf("Expected %v \n to match \n %v",
 			format.Object(mw.getInput().Resources["cf"].InternalDataGroups[0].Records, 1),
 			format.Object(matcher.Resources["cf"].InternalDataGroups[0].Records, 1),
+		),
+	)
+}
+
+func matchIRules(mw *MockWriter, matcher configMatcher) {
+	for _, iRule := range matcher.Resources["cf"].IRules {
+		EventuallyWithOffset(2, func() []*bigipResources.IRule {
+			if _, ok := mw.getInput().Resources["cf"]; ok {
+				return mw.getInput().Resources["cf"].IRules
+			}
+			return nil
+		}).Should(ContainElement(iRule))
+	}
+	EventuallyWithOffset(2, func() int {
+		return len(mw.getInput().Resources["cf"].IRules)
+	}).Should(Equal(len(matcher.Resources["cf"].IRules)),
+		fmt.Sprintf("Expected %v \n to match \n %v",
+			format.Object(mw.getInput().Resources["cf"].IRules, 1),
+			format.Object(matcher.Resources["cf"].IRules, 1),
 		),
 	)
 }

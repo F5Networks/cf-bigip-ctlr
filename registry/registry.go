@@ -366,7 +366,7 @@ func (r *RouteRegistry) updateRouter(
 	uri route.Uri,
 	endpoint *route.Endpoint,
 ) {
-	update, err := f5router.NewUpdate(r.logger, updateType, uri, endpoint)
+	update, err := f5router.NewUpdate(r.logger, updateType, uri, endpoint, "")
 	if nil != err {
 		r.logger.Warn("f5router-skipping-update",
 			zap.Error(err),

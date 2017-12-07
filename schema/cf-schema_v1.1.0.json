@@ -99,11 +99,11 @@
         "properties": {
           "name": { "type": "string", "minLength": 1 },
           "interval": { "type": "integer", "minimum": 1, "maximum": 86400 },
-          "protocol": { "type": "string", "enum": ["http", "tcp"] },
+          "type": { "type": "string", "enum": ["http", "tcp"] },
           "send": { "type": "string", "minLength": 1 },
           "timeout": { "type": "integer", "minimum": 1, "maximum": 86400 }
         },
-        "required": ["name", "protocol"],
+        "required": ["name", "type"],
         "additionalProperties": false
       }]
     }

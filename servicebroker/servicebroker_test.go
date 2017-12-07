@@ -19,9 +19,12 @@ package servicebroker_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	fakeF5router "github.com/F5Networks/cf-bigip-ctlr/f5router/fakes"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 	. "github.com/onsi/ginkgo"
@@ -37,6 +40,7 @@ var _ = Describe("ServiceBroker", func() {
 		ctx        context.Context
 		logger     *test_util.TestZapLogger
 		err        error
+		router     *fakeF5router.FakeRouter
 	)
 
 	BeforeEach(func() {
@@ -47,8 +51,9 @@ var _ = Describe("ServiceBroker", func() {
 		cfg.BrokerMode = true
 		cfg.Status.User = "username"
 		cfg.Status.Pass = "password"
+		router = &fakeF5router.FakeRouter{}
 
-		broker, err = servicebroker.NewServiceBroker(cfg, logger)
+		broker, err = servicebroker.NewServiceBroker(cfg, logger, router)
 		Expect(err).To(BeNil())
 	})
 
@@ -81,10 +86,27 @@ var _ = Describe("ServiceBroker", func() {
 			RawContext:       json.RawMessage(`{"context: true"}`),
 			RawParameters:    json.RawMessage(`{"parameters: [1,2,3]"}`),
 		}
+		router.VerifyPlanExistsReturns(nil)
 		spec, err := broker.Provision(ctx, instanceID, details, true)
 
 		Expect(spec).To(Equal(brokerapi.ProvisionedServiceSpec{}))
 		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("provision should error if plan not found", func() {
+		details := brokerapi.ProvisionDetails{
+			ServiceID:        "serviceID",
+			PlanID:           "planID",
+			OrganizationGUID: "organizationGUID",
+			SpaceGUID:        "spaceGUID",
+			RawContext:       json.RawMessage(`{"context: true"}`),
+			RawParameters:    json.RawMessage(`{"parameters: [1,2,3]"}`),
+		}
+		router.VerifyPlanExistsReturns(errors.New("test_error"))
+		spec, err := broker.Provision(ctx, instanceID, details, true)
+
+		Expect(spec).To(Equal(brokerapi.ProvisionedServiceSpec{}))
+		Expect(err).To(HaveOccurred())
 	})
 
 	It("should return a deprovisioned service", func() {
@@ -101,7 +123,7 @@ var _ = Describe("ServiceBroker", func() {
 	It("should return a service binding", func() {
 		bindSource := brokerapi.BindResource{
 			AppGuid:            "appGUID",
-			Route:              "/route",
+			Route:              "test.route/path",
 			CredentialClientID: "credentialClientID",
 		}
 		details := brokerapi.BindDetails{
@@ -112,20 +134,125 @@ var _ = Describe("ServiceBroker", func() {
 			RawContext:    json.RawMessage(`{"context": false}`),
 			RawParameters: json.RawMessage(`{"parameters: [a,b,c]"}`),
 		}
+
+		router.VerifyPlanExistsReturns(nil)
 		binding, err := broker.Bind(ctx, instanceID, "bindingID", details)
 
 		Expect(binding).To(Equal(brokerapi.Binding{}))
 		Expect(err).NotTo(HaveOccurred())
+
+		updateHTTP := router.UpdateRouteArgsForCall(0)
+		Expect(updateHTTP.Op()).To(Equal(routeUpdate.Bind))
+		Expect(updateHTTP.Route()).To(Equal("test.route/path"))
+		Expect(updateHTTP.Name()).To(Equal("cf-test-d101b0ff1b32ef04"))
+		Expect(updateHTTP.Protocol()).To(Equal("http"))
 	})
 
-	It("should unbind a service", func() {
-		details := brokerapi.UnbindDetails{
+	It("bind should error if a bind_resource is not given", func() {
+		details := brokerapi.BindDetails{
+			AppGUID:       "appGUID",
+			PlanID:        "planID",
+			ServiceID:     "serviceID",
+			RawContext:    json.RawMessage(`{"context": false}`),
+			RawParameters: json.RawMessage(`{"parameters: [a,b,c]"}`),
+		}
+
+		binding, err := broker.Bind(ctx, instanceID, "bindingID", details)
+
+		Expect(binding).To(Equal(brokerapi.Binding{}))
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("bind should error if a route is not given", func() {
+		bindSource := brokerapi.BindResource{
+			AppGuid:            "appGUID",
+			CredentialClientID: "credentialClientID",
+		}
+		details := brokerapi.BindDetails{
+			AppGUID:       "appGUID",
+			PlanID:        "planID",
+			ServiceID:     "serviceID",
+			BindResource:  &bindSource,
+			RawContext:    json.RawMessage(`{"context": false}`),
+			RawParameters: json.RawMessage(`{"parameters: [a,b,c]"}`),
+		}
+
+		binding, err := broker.Bind(ctx, instanceID, "bindingID", details)
+
+		Expect(binding).To(Equal(brokerapi.Binding{}))
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("bind should error if a plan is not found", func() {
+		bindSource := brokerapi.BindResource{
+			AppGuid:            "appGUID",
+			Route:              "test.route/path",
+			CredentialClientID: "credentialClientID",
+		}
+		details := brokerapi.BindDetails{
+			AppGUID:       "appGUID",
+			PlanID:        "planID",
+			ServiceID:     "serviceID",
+			BindResource:  &bindSource,
+			RawContext:    json.RawMessage(`{"context": false}`),
+			RawParameters: json.RawMessage(`{"parameters: [a,b,c]"}`),
+		}
+
+		router.VerifyPlanExistsReturns(errors.New("test_error"))
+		binding, err := broker.Bind(ctx, instanceID, "bindingID", details)
+
+		Expect(binding).To(Equal(brokerapi.Binding{}))
+		Expect(err).To(HaveOccurred())
+	})
+
+	It("should unbind a bound service", func() {
+		// Bind route that will be unbound in the subsequent Unbind call
+		bindSource := brokerapi.BindResource{
+			AppGuid:            "appGUID",
+			Route:              "test.route/path",
+			CredentialClientID: "credentialClientID",
+		}
+		bindDetails := brokerapi.BindDetails{
+			AppGUID:       "appGUID",
+			PlanID:        "planID",
+			ServiceID:     "serviceID",
+			BindResource:  &bindSource,
+			RawContext:    json.RawMessage(`{"context": false}`),
+			RawParameters: json.RawMessage(`{"parameters: [a,b,c]"}`),
+		}
+
+		router.VerifyPlanExistsReturns(nil)
+		_, err := broker.Bind(ctx, instanceID, "bindingID", bindDetails)
+		updateHTTP := router.UpdateRouteArgsForCall(0)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(updateHTTP.Op()).To(Equal(routeUpdate.Bind))
+		Expect(updateHTTP.Route()).To(Equal("test.route/path"))
+		Expect(updateHTTP.Name()).To(Equal("cf-test-d101b0ff1b32ef04"))
+		Expect(updateHTTP.Protocol()).To(Equal("http"))
+
+		unbindDetails := brokerapi.UnbindDetails{
 			PlanID:    "planID",
 			ServiceID: "serviceID",
 		}
-		err := broker.Unbind(ctx, instanceID, "bindingID", details)
+		err = broker.Unbind(ctx, instanceID, "bindingID", unbindDetails)
 
 		Expect(err).NotTo(HaveOccurred())
+
+		updateHTTP = router.UpdateRouteArgsForCall(1)
+		Expect(updateHTTP.Op()).To(Equal(routeUpdate.Unbind))
+		Expect(updateHTTP.Route()).To(Equal("test.route/path"))
+		Expect(updateHTTP.Name()).To(Equal("cf-test-d101b0ff1b32ef04"))
+		Expect(updateHTTP.Protocol()).To(Equal("http"))
+	})
+
+	It("unbind should error if binding not found", func() {
+		unbindDetails := brokerapi.UnbindDetails{
+			PlanID:    "planID",
+			ServiceID: "serviceID",
+		}
+		err = broker.Unbind(ctx, instanceID, "bindingID", unbindDetails)
+
+		Expect(err).To(HaveOccurred())
 	})
 
 	It("should return a last operation", func() {
@@ -170,7 +297,8 @@ var _ = Describe("ServiceBroker", func() {
 		})
 
 		It("returns plans when the plan is valid", func() {
-			os.Setenv("SERVICE_BROKER_CONFIG", `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":["potato"]}}]}`)
+			os.Setenv("SERVICE_BROKER_CONFIG",
+				`{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":["potato"]}}]}`)
 
 			err := broker.ProcessPlans()
 			Expect(err).To(BeNil())

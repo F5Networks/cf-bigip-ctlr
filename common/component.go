@@ -19,9 +19,7 @@ import (
 	. "github.com/F5Networks/cf-bigip-ctlr/common/http"
 	"github.com/F5Networks/cf-bigip-ctlr/common/schema"
 	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
-	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
-	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
 
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
@@ -119,7 +117,7 @@ func (c *VcapComponent) UpdateVarz() {
 	c.Varz.Uptime = c.Varz.StartTime.Elapsed()
 }
 
-func (c *VcapComponent) Start() error {
+func (c *VcapComponent) Start(brokerHandler http.Handler) error {
 	if c.Varz.Type == "" {
 		err := errors.New("type is required")
 		log.Error("Component type is required", zap.Error(err))
@@ -174,7 +172,7 @@ func (c *VcapComponent) Start() error {
 
 	procStat = NewProcessStatus()
 
-	c.ListenAndServe()
+	c.ListenAndServe(brokerHandler)
 	return nil
 }
 
@@ -215,22 +213,11 @@ func (c *VcapComponent) Stop() {
 	}
 }
 
-func (c *VcapComponent) ListenAndServe() {
+func (c *VcapComponent) ListenAndServe(brokerHandler http.Handler) {
 	hs := http.NewServeMux()
 
-	mainConfig := c.Config.(*config.Config)
-	if mainConfig.BrokerMode {
-		sb, err := servicebroker.NewServiceBroker(mainConfig, c.Logger)
-		if nil != err {
-			c.Logger.Warn("create-new-broker-error", zap.Error(err))
-		} else {
-			err = sb.ProcessPlans()
-			if nil != err {
-				c.Logger.Warn("process-broker-plan-error", zap.Error(err))
-			} else {
-				hs.Handle("/", sb.Handler)
-			}
-		}
+	if brokerHandler != nil {
+		hs.Handle("/", brokerHandler)
 	}
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
