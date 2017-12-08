@@ -23,13 +23,15 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/test_util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 )
 
 var _ = Describe("Schema", func() {
 	var (
-		logger        *test_util.TestZapLogger
-		validConfig   string
-		invalidConfig string
+		logger           *test_util.TestZapLogger
+		validConfig      string
+		validLargeConfig string
+		invalidConfig    string
 	)
 
 	BeforeEach(func() {
@@ -38,6 +40,39 @@ var _ = Describe("Schema", func() {
 
 		validConfig = `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":["potato"]}}]}`
 		invalidConfig = `{"plans":[{"description":"arggg","name":"test","virtualServer":{"policies":[]}}]}`
+		validLargeConfig = `{
+      "plans": [{
+        "description": "arggg",
+        "name": "test",
+        "virtualServer": {
+          "policies": ["potato"]
+        }
+      }, {
+        "name": "test2",
+        "description": "more argggg",
+        "virtualServer": {
+          "policies": ["potato", "eggs"],
+          "profiles": ["bacon"],
+          "sslProfiles": ["foo"]
+        },
+        "pool": {
+          "balance": "ratio-member",
+          "healthMonitors": [{
+            "name": "0",
+            "interval": 1,
+            "protocol": "tcp",
+            "send": "hello",
+            "timeout": 60
+          }]
+        }
+      }, {
+        "name": "test3",
+        "description":"again argg",
+        "pool": {
+          "healthMonitors": [{"name": "/Common/http"}]
+        }
+      }]
+    }`
 	})
 
 	AfterEach(func() {
@@ -54,10 +89,17 @@ var _ = Describe("Schema", func() {
 		Expect(err).To(BeNil())
 	})
 
+	It("validates a large config", func() {
+		val, err := schema.VerifySchema(validLargeConfig, logger)
+		Expect(val).To(BeTrue())
+		Expect(err).To(BeNil())
+	})
+
 	It("fails against an invalid config", func() {
 		val, err := schema.VerifySchema(invalidConfig, logger)
 		Expect(val).To(BeFalse())
 		Expect(err).To(BeNil())
+		Eventually(logger).Should(gbytes.Say("schema-not-valid"))
 	})
 
 })

@@ -17,6 +17,7 @@
 package schema
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
@@ -34,12 +35,13 @@ var schemaVersions = []string{
 func VerifySchema(data string, logger logger.Logger) (bool, error) {
 	logger.Session("verify-schema")
 
+	schemaLocation, err := getSchemaLocation()
+	if nil != err {
+		return false, err
+	}
+
 	// check the json against all versions of the schema starting with the latest
 	for i, schema := range schemaVersions {
-		schemaLocation, err := getSchemaLocation()
-		if nil != err {
-			return false, err
-		}
 		schemaPath := schemaLocation + schema
 		schemaLoader := gojsonschema.NewReferenceLoader(schemaPath)
 		documentLoader := gojsonschema.NewStringLoader(data)
@@ -58,10 +60,12 @@ func VerifySchema(data string, logger logger.Logger) (bool, error) {
 			}
 			return result.Valid(), nil
 		}
+
+		errorString := concatErrors(result)
 		logger.Warn("schema-not-valid",
 			zap.String("current-verion", schemaVersions[0]),
 			zap.String("version-compared-against", schema),
-			zap.Object("errors", result.Errors()),
+			zap.String("errors", errorString),
 		)
 	}
 	return false, nil
@@ -79,4 +83,12 @@ func getSchemaLocation() (string, error) {
 		return "file://" + folderPath + "/schema/", nil
 	}
 	return "file://" + folderPath + "/../schema/", nil
+}
+
+func concatErrors(result *gojsonschema.Result) string {
+	var eString string
+	for _, desc := range result.Errors() {
+		eString = eString + fmt.Sprintf("error: %s", desc)
+	}
+	return eString
 }
