@@ -52,16 +52,15 @@ var (
 
 func main() {
 	versionFlag := flag.Bool("version", false, "Print version and exit")
-
-	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
-	if !ok {
-		flag.StringVar(&configFile, "c", "", "Configuration File")
-	}
-	flag.Parse()
-
 	if *versionFlag {
 		fmt.Printf("Version: %s\nBuild: %s\n", version, buildInfo)
 		os.Exit(0)
+	}
+
+	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
+	if !ok {
+		flag.StringVar(&configFile, "c", "", "Configuration File - deprecated")
+		flag.Parse()
 	}
 
 	c := config.DefaultConfig()

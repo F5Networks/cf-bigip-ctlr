@@ -22,6 +22,8 @@ cp $CURDIR/../_docker_workspace/out/$RELEASE_PLATFORM/bin/* $WKDIR/
 mkdir -p $WKDIR/python
 cp python/*.py $WKDIR/python/
 cp python/cf-runtime-requirements.txt $WKDIR/
+cp schema/cf-schema_v*.json $WKDIR/
+
 echo "{\"version\": \"${VERSION_INFO}\", \"build\": \"${BUILD_INFO}\"}" \
   > $WKDIR/python/VERSION_BUILD.json
 
