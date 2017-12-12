@@ -415,6 +415,18 @@
 			"Rev": "fd69d275caac5d78d793e77ddbe9bd2001d9b88d"
 		},
 		{
+			"ImportPath": "github.com/xeipuuv/gojsonpointer",
+			"Rev": "6fe8760cad3569743d51ddbb243b26f8456742dc"
+		},
+		{
+			"ImportPath": "github.com/xeipuuv/gojsonreference",
+			"Rev": "e02fc20de94c78484cd5ffb007f8af96be030a45"
+		},
+		{
+			"ImportPath": "github.com/xeipuuv/gojsonschema",
+			"Rev": "212d8a0df7acfab8bdd190a7a69f0ab7376edcc8"
+		},
+		{
 			"ImportPath": "golang.org/x/crypto/pbkdf2",
 			"Rev": "b76c864ef1dca1d8f271f917c290cddcce3d9e0d"
 		},

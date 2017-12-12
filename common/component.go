@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"code.cloudfoundry.org/lager"
 	"github.com/F5Networks/cf-bigip-ctlr/common/health"
 	. "github.com/F5Networks/cf-bigip-ctlr/common/http"
 	"github.com/F5Networks/cf-bigip-ctlr/common/schema"
@@ -23,7 +22,6 @@ import (
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
 	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
-	"github.com/pivotal-cf/brokerapi"
 
 	"code.cloudfoundry.org/localip"
 	"github.com/nats-io/nats"
@@ -153,6 +151,9 @@ func (c *VcapComponent) Start() error {
 	}
 
 	if c.Varz.Credentials == nil || len(c.Varz.Credentials) != 2 {
+		c.Logger.Warn("status user and/or pass not provided, controller will not run" +
+			"with broker features. If broker features are required please specify user" +
+			"and pass and restart controller.")
 		user, err := uuid.GenerateUUID()
 		if err != nil {
 			return err
@@ -217,21 +218,20 @@ func (c *VcapComponent) Stop() {
 func (c *VcapComponent) ListenAndServe() {
 	hs := http.NewServeMux()
 
-	broker := c.Config.(*config.Config).Broker
-	serviceBroker := &servicebroker.ServiceBroker{&broker}
-	brokerLogger := lager.NewLogger("f5-service-broker")
-	brokerCredentials := brokerapi.BrokerCredentials{
-		Username: c.Varz.Credentials[0],
-		Password: c.Varz.Credentials[1],
+	mainConfig := c.Config.(*config.Config)
+	if mainConfig.BrokerMode {
+		sb, err := servicebroker.NewServiceBroker(mainConfig, c.Logger)
+		if nil != err {
+			c.Logger.Warn("create-new-broker-error", zap.Error(err))
+		} else {
+			err = sb.ProcessPlans()
+			if nil != err {
+				c.Logger.Warn("process-broker-plan-error", zap.Error(err))
+			} else {
+				hs.Handle("/", sb.Handler)
+			}
+		}
 	}
-	// FIXME (rtalley): Currently the cf-brokerapi package only supports lager
-	// as its logging utility. There is an open issue:
-	// https://github.com/pivotal-cf/brokerapi/issues/46 to allow different
-	// loggers to be used. When this issue is closes the our logger.Logger
-	// should be used as the broker logger.
-	brokerLogger.Info("starting-service-broker")
-	brokerAPI := brokerapi.New(serviceBroker, brokerLogger, brokerCredentials)
-	hs.Handle("/", brokerAPI)
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		c.Health.ServeHTTP(w, req)

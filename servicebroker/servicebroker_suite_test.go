@@ -1,4 +1,4 @@
-package servicebroker
+package servicebroker_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func Testservicebroker(t *testing.T) {
+func TestServiceBroker(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "servicebroker Suite")
+	RunSpecs(t, "ServiceBroker Suite")
 }
