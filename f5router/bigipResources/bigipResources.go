@@ -44,6 +44,13 @@ type (
 		Partition string `json:"partition"`
 	}
 
+	// ProfileRef references to pre-existing profiles
+	ProfileRef struct {
+		Name      string `json:"name"`
+		Partition string `json:"partition"`
+		Context   string `json:"context"` // 'clientside', 'serverside', or 'all'
+	}
+
 	// Configs for each BIG-IP partition
 	PartitionMap map[string]*Resources
 
@@ -66,7 +73,7 @@ type (
 		Destination           string                `json:"destination,omitempty"`
 		SourceAddress         string                `json:"source,omitempty"`
 		Policies              []*NameRef            `json:"policies,omitempty"`
-		Profiles              []*NameRef            `json:"profiles,omitempty"`
+		Profiles              []*ProfileRef         `json:"profiles,omitempty"`
 		IRules                []string              `json:"rules,omitempty"`
 		SourceAddrTranslation SourceAddrTranslation `json:"sourceAddressTranslation,omitempty"`
 	}
