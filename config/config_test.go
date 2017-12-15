@@ -138,7 +138,7 @@ suspend_pruning_if_nats_unavailable: true
 
 		It("sets default logging configs", func() {
 			Expect(config.Logging.Syslog).To(Equal(""))
-			Expect(config.Logging.Level).To(Equal("debug"))
+			Expect(config.Logging.Level).To(Equal("info"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
 		})
 

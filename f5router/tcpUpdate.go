@@ -73,12 +73,25 @@ func (tu updateTCP) CreateResources(c *config.Config) (bigipResources.Resources,
 	pool := makePool(c, tu.name, poolDescrip, tu.member)
 	rs.Pools = append(rs.Pools, pool)
 
+	profile := []*bigipResources.ProfileRef{
+		&bigipResources.ProfileRef{
+			Name:      "tcp",
+			Partition: "Common",
+			Context:   "all",
+		}}
+
+	poolPath, err := joinBigipPath(c.BigIP.Partitions[0], tu.name)
+	if nil != err {
+		return bigipResources.Resources{}, err
+	}
+
 	vs := &bigipResources.Virtual{
 		VirtualServerName:     tu.name,
-		PoolName:              tu.name,
+		PoolName:              poolPath,
 		Mode:                  "tcp",
 		Enabled:               true,
 		Destination:           dest,
+		Profiles:              profile,
 		SourceAddrTranslation: bigipResources.SourceAddrTranslation{Type: "automap"},
 	}
 

@@ -6,23 +6,28 @@
     "partitions": ["cf"]
   },
   "global": {
-    "log-level": "debug",
+    "log-level": "info",
     "verify-interval": 30
   },
   "resources": {
     "cf": {
       "virtualServers": [{
         "name": "cf-foo-e500900501f76ce8",
-        "pool": "cf-foo-e500900501f76ce8",
+        "pool": "/cf/cf-foo-e500900501f76ce8",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:65535",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
@@ -37,9 +42,14 @@
         }],
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["forward-to-vip"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/forward-to-vip"],
         "sourceAddressTranslation": {
           "type": "automap"
         }

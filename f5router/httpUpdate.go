@@ -63,20 +63,35 @@ func NewUpdate(
 func (hu updateHTTP) CreateResources(c *config.Config) (bigipResources.Resources, error) {
 	//  This will create the pool for the http update
 	var iRule []string
-	var profile []*bigipResources.NameRef
 	rs := bigipResources.Resources{}
 
-	if c.SessionPersistence {
-		iRule = append(iRule, bigipResources.JsessionidIRuleName)
-		profile = append(profile, &bigipResources.NameRef{
+	profile := []*bigipResources.ProfileRef{
+		&bigipResources.ProfileRef{
 			Name:      "http",
 			Partition: "Common",
-		})
+			Context:   "all",
+		}, &bigipResources.ProfileRef{
+			Name:      "tcp",
+			Partition: "Common",
+			Context:   "all",
+		}}
+
+	if c.SessionPersistence {
+		jsessionPath, err := joinBigipPath(c.BigIP.Partitions[0], bigipResources.JsessionidIRuleName)
+		if nil != err {
+			return bigipResources.Resources{}, err
+		}
+		iRule = append(iRule, jsessionPath)
+	}
+
+	poolPath, err := joinBigipPath(c.BigIP.Partitions[0], hu.name)
+	if nil != err {
+		return bigipResources.Resources{}, err
 	}
 
 	vs := &bigipResources.Virtual{
 		VirtualServerName:     hu.name,
-		PoolName:              hu.name,
+		PoolName:              poolPath,
 		Mode:                  "tcp",
 		Enabled:               true,
 		Destination:           "",

@@ -6,7 +6,7 @@
     "partitions": ["cf"]
   },
   "global": {
-    "log-level": "debug",
+    "log-level": "info",
     "verify-interval": 30
   },
   "resources": {
@@ -22,159 +22,214 @@
         }],
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["forward-to-vip"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/forward-to-vip"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-cf.com",
-        "pool": "cf-cf.com",
+        "pool": "/cf/cf-cf.com",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10005",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-foo-e500900501f76ce8",
-        "pool": "cf-foo-e500900501f76ce8",
+        "pool": "/cf/cf-foo-e500900501f76ce8",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10000",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-bar-d21aa8a505891ac9",
-        "pool": "cf-bar-d21aa8a505891ac9",
+        "pool": "/cf/cf-bar-d21aa8a505891ac9",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10001",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-baz-9a96ddcfe07bb46e",
-        "pool": "cf-baz-9a96ddcfe07bb46e",
+        "pool": "/cf/cf-baz-9a96ddcfe07bb46e",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10002",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-foo.cf.com",
-        "pool": "cf-foo.cf.com",
+        "pool": "/cf/cf-foo.cf.com",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10006",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-ser_.cf.com",
-        "pool": "cf-ser_.cf.com",
+        "pool": "/cf/cf-ser_.cf.com",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10007",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-ser_es.cf.com",
-        "pool": "cf-ser_es.cf.com",
+        "pool": "/cf/cf-ser_es.cf.com",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10008",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-_vices.cf.com",
-        "pool": "cf-_vices.cf.com",
+        "pool": "/cf/cf-_vices.cf.com",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10009",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-baz-69cf12df3b85f455",
-        "pool": "cf-baz-69cf12df3b85f455",
+        "pool": "/cf/cf-baz-69cf12df3b85f455",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10003",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-baz-beac6f8bec5a4446",
-        "pool": "cf-baz-beac6f8bec5a4446",
+        "pool": "/cf/cf-baz-beac6f8bec5a4446",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/10.0.0.1:10004",
         "source": "10.0.0.1/32",
         "profiles": [{
           "name": "http",
-          "partition": "Common"
-        }],
-        "rules": ["jsessionid-persistence"],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/jsessionid-persistence"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
