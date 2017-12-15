@@ -249,7 +249,12 @@ func (r *F5Router) validateConfig() error {
 	}
 
 	if 0 == len(r.c.BigIP.Profiles) {
-		r.c.BigIP.Profiles = []string{"/Common/http"}
+		r.c.BigIP.Profiles = []string{"/Common/http", "/Common/tcp"}
+	} else {
+		exist := checkForString(r.c.BigIP.Profiles, "/Common/tcp")
+		if !exist {
+			r.c.BigIP.Profiles = append(r.c.BigIP.Profiles, "/Common/tcp")
+		}
 	}
 
 	return nil
@@ -265,8 +270,12 @@ func (r *F5Router) initiRule(name string, code string) {
 
 func (r *F5Router) createHTTPVirtuals() error {
 	plcs := r.generatePolicyList()
-	prfls := r.generateNameList(r.c.BigIP.Profiles)
-	iRule := []string{bigipResources.HTTPForwardingiRuleName}
+	prfls := r.generateProfileList(r.c.BigIP.Profiles, "all")
+	iRulePath, err := joinBigipPath(r.c.BigIP.Partitions[0], bigipResources.HTTPForwardingiRuleName)
+	if nil != err {
+		return err
+	}
+	iRule := []string{iRulePath}
 
 	if r.c.SessionPersistence {
 		r.initiRule(bigipResources.JsessionidIRuleName, bigipResources.JsessionidIRule)
@@ -295,7 +304,7 @@ func (r *F5Router) createHTTPVirtuals() error {
 	}
 
 	if 0 != len(r.c.BigIP.SSLProfiles) {
-		sslProfiles := r.generateNameList(r.c.BigIP.SSLProfiles)
+		sslProfiles := r.generateProfileList(r.c.BigIP.SSLProfiles, "clientside")
 		prfls = append(prfls, sslProfiles...)
 
 		va := &bigipResources.VirtualAddress{
@@ -349,6 +358,19 @@ func (r *F5Router) runWorker(done chan<- struct{}) {
 	}
 	r.logger.Debug("f5router-stopping-worker")
 	close(done)
+}
+
+func (r *F5Router) generateProfileList(names []string, context string) []*bigipResources.ProfileRef {
+	var refs []*bigipResources.ProfileRef
+	nameRefs := r.generateNameList(names)
+	for _, ref := range nameRefs {
+		refs = append(refs, &bigipResources.ProfileRef{
+			Name:      ref.Name,
+			Partition: ref.Partition,
+			Context:   context,
+		})
+	}
+	return refs
 }
 
 func (r *F5Router) generateNameList(names []string) []*bigipResources.NameRef {
@@ -573,6 +595,26 @@ func verifyDestAddress(va *bigipResources.VirtualAddress, partition string) (str
 		return destination, nil
 	}
 	return "", fmt.Errorf("invalid address: %s", va.BindAddr)
+}
+
+// checkForString loops over a slice to see if a string exists in it
+func checkForString(list []string, text string) bool {
+	for _, val := range list {
+		if val == text {
+			return true
+		}
+	}
+	return false
+}
+
+func joinBigipPath(partition, objName string) (string, error) {
+	if objName == "" {
+		return "", errors.New("object name is blank")
+	}
+	if partition == "" {
+		return objName, nil
+	}
+	return fmt.Sprintf("/%s/%s", partition, objName), nil
 }
 
 func fetchExistingDataGroup(c *config.Config) (*bigipResources.InternalDataGroup, error) {
