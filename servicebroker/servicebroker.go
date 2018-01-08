@@ -23,117 +23,31 @@ import (
 	"net/http"
 	"os"
 
-	"code.cloudfoundry.org/lager"
-
 	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
 	"github.com/F5Networks/cf-bigip-ctlr/config"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router"
+	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	cfLogger "github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 	"github.com/F5Networks/cf-bigip-ctlr/schema"
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker/planResources"
 	"github.com/pivotal-cf/brokerapi"
 	"github.com/uber-go/zap"
 )
 
-type (
-	// Plans holds our plans
-	Plans struct {
-		Plans []Plan `json:"plans"`
-	}
-
-	// Plan used for per route config
-	Plan struct {
-		Name          string      `json:"name,omitempty"`
-		Description   string      `json:"description,omitempty"`
-		Pool          PoolType    `json:"pool,omitempty"`
-		VirtualServer VirtualType `json:"virtualServer,omitempty"`
-		ID            string
-	}
-
-	// PoolType holds pool info
-	PoolType struct {
-		Balance        string              `json:"balance,omitempty"`
-		HealthMonitors []HealthMonitorType `json:"healthMonitors,omitempty"`
-	}
-
-	// VirtualType holds virtual info
-	VirtualType struct {
-		Policies    []string `json:"policies,omitempty"`
-		Profiles    []string `json:"profiles,omitempty"`
-		SslProfiles []string `json:"sslProfiles,omitempty"`
-	}
-
-	// HealthMonitorType holds info for health monitors
-	HealthMonitorType struct {
-		Name     string `json:"name,omitempty"`
-		Interval int    `json:"interval,omitempty"`
-		Protocol string `json:"protocol,omitempty"`
-		Send     string `json:"send,omitempty"`
-		Timeout  int    `json:"timeout,omitempty"`
-	}
-)
-
 // ServiceBroker for F5 services
 type ServiceBroker struct {
-	Config  *config.ServiceBrokerConfig
-	logger  cfLogger.Logger
-	Handler http.Handler
-	plans   map[string]Plan
+	Config         *config.ServiceBrokerConfig
+	logger         cfLogger.Logger
+	Handler        http.Handler
+	router         f5router.Router
+	bindIDRouteMap map[string]string
+	plans          map[string]planResources.Plan
 }
 
-// NewServiceBroker returns an http.Handler for a service brokers routes
-func NewServiceBroker(c *config.Config, logger cfLogger.Logger) (*ServiceBroker, error) {
-	serviceBroker := &ServiceBroker{
-		Config: &c.Broker,
-		logger: logger.Session("service-broker"),
-	}
-	// create our unique ID
-	guid, err := uuid.GenerateUUID()
-	if nil != err {
-		return nil, err
-	}
-	serviceBroker.Config.ID = guid
-
-	brokerCredentials := brokerapi.BrokerCredentials{
-		Username: c.Status.User,
-		Password: c.Status.Pass,
-	}
-	// FIXME (rtalley): Currently the cf-brokerapi package only supports lager
-	// as its logging utility. There is an open issue:
-	// https://github.com/pivotal-cf/brokerapi/issues/46 to allow different
-	// loggers to be used. When this issue closes then our logger.Logger
-	// should be used as the broker logger.
-	brokerLogger := lager.NewLogger("f5-service-broker")
-	serviceBroker.Handler = brokerapi.New(serviceBroker, brokerLogger, brokerCredentials)
-	return serviceBroker, nil
-}
-
-//ProcessPlans pulls plans from the env and validates them against the schema
-func (broker *ServiceBroker) ProcessPlans() error {
-	val, ok := os.LookupEnv("SERVICE_BROKER_CONFIG")
-	if !ok || len(val) == 0 {
-		return errors.New("SERVICE_BROKER_CONFIG not found in environment")
-	}
-	broker.logger.Debug("process-plans-config", zap.String("SERVICE_BROKER_CONFIG", val))
-
-	valid, err := schema.VerifySchema(val, broker.logger)
-	if nil != err {
-		return err
-	}
-
-	if !valid {
-		return errors.New("Plans failed schema validation")
-	}
-
-	planMap, err := broker.processPlans(val)
-	if nil != err {
-		return err
-	}
-	broker.plans = planMap
-	return nil
-}
-
-func (broker *ServiceBroker) processPlans(val string) (map[string]Plan, error) {
-	var plans Plans
-	planMap := make(map[string]Plan)
+func (broker *ServiceBroker) processPlans(val string) (map[string]planResources.Plan, error) {
+	var plans planResources.Plans
+	planMap := make(map[string]planResources.Plan)
 
 	err := json.Unmarshal([]byte(val), &plans)
 	if nil != err {
@@ -165,6 +79,61 @@ func (broker *ServiceBroker) prepPlansforAPIResponse() []brokerapi.ServicePlan {
 	return apiPlans
 }
 
+// NewServiceBroker returns an http.Handler for a service brokers routes
+func NewServiceBroker(
+	c *config.Config,
+	logger cfLogger.Logger,
+	router f5router.Router,
+) (*ServiceBroker, error) {
+	serviceBroker := &ServiceBroker{
+		Config:         &c.Broker,
+		logger:         logger.Session("service-broker"),
+		router:         router,
+		bindIDRouteMap: make(map[string]string),
+	}
+	// create our unique ID
+	guid, err := uuid.GenerateUUID()
+	if nil != err {
+		return nil, err
+	}
+	serviceBroker.Config.ID = guid
+
+	brokerCredentials := brokerapi.BrokerCredentials{
+		Username: c.Status.User,
+		Password: c.Status.Pass,
+	}
+
+	serviceBroker.Handler = brokerapi.New(serviceBroker, cfLogger.NewLagerAdapter(logger), brokerCredentials)
+	return serviceBroker, nil
+}
+
+//ProcessPlans pulls plans from the env and validates them against the schema
+func (broker *ServiceBroker) ProcessPlans() error {
+	val, ok := os.LookupEnv("SERVICE_BROKER_CONFIG")
+	if !ok || len(val) == 0 {
+		return errors.New("SERVICE_BROKER_CONFIG not found in environment")
+	}
+	broker.logger.Debug("process-plans-config", zap.String("SERVICE_BROKER_CONFIG", val))
+
+	valid, err := schema.VerifySchema(val, broker.logger)
+	if nil != err {
+		return err
+	}
+
+	if !valid {
+		return errors.New("Plans failed schema validation")
+	}
+
+	planMap, err := broker.processPlans(val)
+	if nil != err {
+		return err
+	}
+	broker.plans = planMap
+	broker.router.AddPlans(planMap)
+
+	return nil
+}
+
 // Services that are available for provisioning
 func (broker *ServiceBroker) Services(ctx context.Context) []brokerapi.Service {
 	plans := broker.prepPlansforAPIResponse()
@@ -184,32 +153,115 @@ func (broker *ServiceBroker) Services(ctx context.Context) []brokerapi.Service {
 	}
 }
 
-// Provision available service
-func (broker *ServiceBroker) Provision(ctx context.Context, instanceID string, details brokerapi.ProvisionDetails, asyncAllowed bool) (brokerapi.ProvisionedServiceSpec, error) {
-	return brokerapi.ProvisionedServiceSpec{}, nil
+// Provision verify that the requested plan exists for the bigip service
+func (broker *ServiceBroker) Provision(
+	ctx context.Context,
+	instanceID string,
+	details brokerapi.ProvisionDetails,
+	asyncAllowed bool,
+) (brokerapi.ProvisionedServiceSpec, error) {
+	spec := brokerapi.ProvisionedServiceSpec{}
+
+	err := broker.router.VerifyPlanExists(details.PlanID)
+	if err != nil {
+		broker.logger.Warn("broker-provision-plan-error", zap.Error(err))
+	}
+
+	return spec, err
 }
 
-// Deprovision service
-func (broker *ServiceBroker) Deprovision(ctx context.Context, instanceID string, details brokerapi.DeprovisionDetails, asyncAllowed bool) (brokerapi.DeprovisionServiceSpec, error) {
+// Deprovision stubbed since the bigip service will not be deprovisioned for now
+func (broker *ServiceBroker) Deprovision(
+	ctx context.Context,
+	instanceID string,
+	details brokerapi.DeprovisionDetails,
+	asyncAllowed bool,
+) (brokerapi.DeprovisionServiceSpec, error) {
 	return brokerapi.DeprovisionServiceSpec{}, nil
 }
 
-// Bind instance to service
-func (broker *ServiceBroker) Bind(ctx context.Context, instanceID string, bindingID string, details brokerapi.BindDetails) (brokerapi.Binding, error) {
-	return brokerapi.Binding{}, nil
+// Bind apply bigip configurations to bigip objects based on requested bind route
+func (broker *ServiceBroker) Bind(
+	ctx context.Context,
+	instanceID string,
+	bindID string,
+	details brokerapi.BindDetails,
+) (brokerapi.Binding, error) {
+	var err error
+	apiErr := false
+	binding := brokerapi.Binding{}
+
+	if details.BindResource == nil {
+		apiErr = true
+	} else if details.BindResource.Route == "" {
+		apiErr = true
+	}
+
+	if apiErr {
+		err = errors.New("only route services bindings are supported")
+		return binding, err
+	}
+
+	err = broker.router.VerifyPlanExists(details.PlanID)
+	if err != nil {
+		return binding, err
+	}
+
+	// Map bindID to route URI then create new route update to give to router
+	routeURI := details.BindResource.Route
+	ru, err := f5router.NewUpdate(broker.logger, routeUpdate.Bind, route.Uri(routeURI), nil, details.PlanID)
+	if err != nil {
+		return binding, err
+	}
+	broker.bindIDRouteMap[bindID] = routeURI
+	broker.router.UpdateRoute(ru)
+
+	return binding, nil
 }
 
-// Unbind instance from service
-func (broker *ServiceBroker) Unbind(ctx context.Context, instanceID string, bindingID string, details brokerapi.UnbindDetails) error {
+// Unbind remove applied bigip configurations and bigip objects based on requested unbind route
+func (broker *ServiceBroker) Unbind(
+	ctx context.Context,
+	instanceID string,
+	bindID string,
+	details brokerapi.UnbindDetails,
+) error {
+	var err error
+	routeURI := broker.bindIDRouteMap[bindID]
+
+	if routeURI == "" {
+		err = errors.New("unbind route not found")
+		return err
+	}
+
+	// Unmap bindID to route URI then create new route update to give to router=
+	ru, err := f5router.NewUpdate(broker.logger, routeUpdate.Unbind, route.Uri(routeURI), nil, "")
+	if err != nil {
+		return err
+	}
+	delete(broker.bindIDRouteMap, bindID)
+	broker.router.UpdateRoute(ru)
+
 	return nil
 }
 
-// LastOperation for provisioning status
-func (broker *ServiceBroker) LastOperation(ctx context.Context, instanceID string, operationData string) (brokerapi.LastOperation, error) {
+// LastOperation stubbed since we do not allow for async operations
+func (broker *ServiceBroker) LastOperation(
+	ctx context.Context,
+	instanceID string,
+	operationData string,
+) (brokerapi.LastOperation, error) {
 	return brokerapi.LastOperation{}, nil
 }
 
-// Update a service
-func (broker *ServiceBroker) Update(ctx context.Context, instanceID string, details brokerapi.UpdateDetails, asyncAllowed bool) (brokerapi.UpdateServiceSpec, error) {
+// Update stubbed since we do not currently have route context to apply these updates
+func (broker *ServiceBroker) Update(
+	ctx context.Context,
+	instanceID string,
+	details brokerapi.UpdateDetails,
+	asyncAllowed bool,
+) (brokerapi.UpdateServiceSpec, error) {
+	broker.logger.Warn("broker-update-warning",
+		zap.String("broker-event-type-not-supported", "update event not supported"))
 	return brokerapi.UpdateServiceSpec{}, nil
 }

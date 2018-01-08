@@ -44,6 +44,10 @@ const (
 	Add Operation = iota
 	// Remove operation
 	Remove
+	// Bind operation
+	Bind
+	// Unbind
+	Unbind
 )
 
 func (op Operation) String() string {
@@ -52,6 +56,10 @@ func (op Operation) String() string {
 		return "Add"
 	case Remove:
 		return "Remove"
+	case Bind:
+		return "Bind"
+	case Unbind:
+		return "Unbind"
 	}
 	return "Unknown"
 }

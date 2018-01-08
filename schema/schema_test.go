@@ -60,7 +60,7 @@ var _ = Describe("Schema", func() {
           "healthMonitors": [{
             "name": "0",
             "interval": 1,
-            "protocol": "tcp",
+            "type": "tcp",
             "send": "hello",
             "timeout": 60
           }]
