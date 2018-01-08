@@ -7,6 +7,21 @@ Release Notes for BIG-IP Controller for Cloud Foundry
 Added Functionality
 ```````````````````
 
+v1.1.0
+------
+
+Added Functionality
+```````````````````
+* Ability to run as a Service Broker with L7 (HTTP) per-route configuration
+
+  * Virtual Server for L7 (HTTP) route can have it's own Policies and Profiles
+  * Pool for L7 (HTTP) route can have it's own balance mode and Health Monitors
+
+* Virtual Server targeting Virtual Server architecture
+
+Limitations
+```````````
+
 v1.0.0
 ------
 
@@ -36,4 +51,3 @@ Limitations
 * SSL profile(s) defined in the application manifest do not attach to the HTTP virtual server.
 * Modification of a Controller-owned policy resulting in a state change may cause traffic flow interruptions. If the modification changes the state to ‘published’, the Controller will delete the policy and recreate it with a ‘legacy’ status.
 * You cannot change the default route domain for a partition managed by an F5 controller after the controller has deployed. To specify a new default route domain, use a different partition.
-

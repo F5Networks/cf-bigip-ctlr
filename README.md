@@ -190,6 +190,31 @@ but not the `nats` section. Set `route_mode` to 'tcp'.
 If both modes are required, the `oauth`, `routing_api`, and `nats` sections are required.
 Set `route_mode` to 'all'.
 
+Service Broker
+--------------
+
+If per route config is required the controller can be ran as a [service broker.](https://docs.cloudfoundry.org/services/overview.html) Running as a service
+broker allows control over which BIG-IP objects are applied to a particular route through the use of plans. For more information see [F5 BIG-IP Controller for Cloud Foundry docs](http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/latest/).
+
+An additional variable of `SERVICE_BROKER_CONFIG` will need to be added under the `env` section.
+
+```
+applications:
+  - name: cf-bigip-ctlr
+    health-check-type: http
+    health-check-http-endpoint: /health
+    env:
+      SERVICE_BROKER_CONFIG: |
+                            plans:
+                              - description: plan for policy A,
+                                name: planA,
+                                virtualServer:
+                                - policies:
+                                  - policyA
+
+
+```
+
 Development
 -----------
 
