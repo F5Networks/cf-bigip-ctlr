@@ -707,6 +707,51 @@ var _ = Describe("Router Integration", func() {
 		})
 
 	})
+
+	Context("service broker", func() {
+		var (
+			config  *config.Config
+			cfgFile string
+		)
+
+		BeforeEach(func() {
+			statusPort := test_util.NextAvailPort()
+
+			cfgFile = filepath.Join(tmpdir, "config.yml")
+			config = createConfig(cfgFile, statusPort, defaultPruneInterval, defaultPruneThreshold, 0, false, natsPort)
+		})
+		It("fails to start when SERVICE_BROKER_CONFIG is missing", func() {
+			config.BrokerMode = true
+			writeConfig(config, cfgFile)
+
+			ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+			session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
+			Expect(err).ToNot(HaveOccurred())
+			defer session.Terminate()
+			Eventually(session, 30*time.Second).Should(Say("process-broker-plan-error"))
+			Eventually(session, 5*time.Second).Should(Exit(1))
+		})
+
+		Context("with SERVICE_BROKER_CONFIG", func() {
+			AfterEach(func() {
+				os.Unsetenv("SERVICE_BROKER_CONFIG")
+			})
+
+			It("fails to start with an invalid plan", func() {
+				os.Setenv("SERVICE_BROKER_CONFIG",
+					`{"plans":[]}`)
+				config.BrokerMode = true
+				writeConfig(config, cfgFile)
+
+				ctlrCmd := exec.Command(ctlrPath, "-c", cfgFile)
+				session, err := Start(ctlrCmd, GinkgoWriter, GinkgoWriter)
+				Expect(err).ToNot(HaveOccurred())
+				defer session.Terminate()
+				Eventually(session, 30*time.Second).Should(Say("Plans failed schema validation"))
+				Eventually(session, 5*time.Second).Should(Exit(1))
+			})
+		})
+	})
 })
 
 func uriAndPort(url string) (string, int) {
