@@ -12,15 +12,20 @@ v1.1.0
 
 Added Functionality
 ```````````````````
-* Ability to run as a Service Broker with L7 (HTTP) per-route configuration
+* L7 (HTTP) per route configuration through Route Services
+* Ability to run as a Service Broker to enable per route configuration
 
-  * Virtual Server for L7 (HTTP) route can have it's own Policies and Profiles
-  * Pool for L7 (HTTP) route can have it's own balance mode and Health Monitors
+  * Virtual Server for L7 (HTTP) route can have its own Policies, Profiles and SSL Profiles
+  * Pool for L7 (HTTP) route can have its own load balancing mode and Health Monitors
 
 * Virtual Server targeting Virtual Server architecture
 
 Limitations
 ```````````
+* Only support Route Service bindings
+* Architected only as a Static, Brokered Service
+* Do not accept any Arbitrary Parameters via `cf create-service|bind-service -c`
+* Do not support `cf update-service`
 
 v1.0.0
 ------
