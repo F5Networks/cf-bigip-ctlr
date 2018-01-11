@@ -176,7 +176,7 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | .. _routing-api-configs:                 |         |          |                |                                                                                 |                |
 |                                          |         |          |                |                                                                                 |                |
-| routing_api                              | object  | Optional | n/a            | Routing API configuratoin                                                       |                |
+| routing_api                              | object  | Optional | n/a            | Routing API configuration                                                       |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | uri                                 | string  | Optional | n/a            | Routing API endpoint                                                            |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
@@ -327,7 +327,7 @@ The Controller supports the following log levels:
 
 * ``info``, ``debug`` - An expected event occurred.
 * ``error`` - An unexpected error occurred.
-* ``fatal`` - A fatal error occured which makes the Controller unable to execute.
+* ``fatal`` - A fatal error occurred which makes the Controller unable to execute.
 
 .. code-block:: text
    :caption: Sample log message

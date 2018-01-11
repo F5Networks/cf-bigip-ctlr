@@ -25,7 +25,7 @@ const (
 when HTTP_REQUEST {
   if {[info exists target_vip] && [string length $target_vip] != 0} {
     if { [catch { virtual $target_vip } ] } {
-      log local0. "ERROR: Attempting to assign traffic to non-existant virtual $target_vip"
+      log local0. "ERROR: Attempting to assign traffic to non-existent virtual $target_vip"
       reject
     }
   }

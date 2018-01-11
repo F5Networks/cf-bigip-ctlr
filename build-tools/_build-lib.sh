@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# This is the common enviromnent for building the runtime image, and the
+# This is the common environment for building the runtime image, and the
 # reusable developer image
 #
 # The build uses two docker container types:
@@ -27,7 +27,7 @@ set -e
 PKGIMPORT="github.com/F5Networks/cf-bigip-ctlr"
 
 
-# Defer calculating build dir until actualy in the build environment
+# Defer calculating build dir until actually in the build environment
 get_builddir() {
 # Ensure PWD starts with GOPATH
   if [ "${PWD##$GOPATH}" == "${PWD}" ]; then

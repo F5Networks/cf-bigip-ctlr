@@ -580,7 +580,7 @@
         },
         {
           "name": "forward-to-vip",
-          "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] && [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existant virtual $target_vip\"\n      reject\n    }\n  }\n}"
+          "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] && [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existent virtual $target_vip\"\n      reject\n    }\n  }\n}"
         }
       ],
       "internalDataGroups": [

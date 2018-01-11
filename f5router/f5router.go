@@ -890,7 +890,7 @@ func (r *F5Router) makeRouteRule(ru updateHTTP) (*bigipResources.Rule, error) {
 
 	var b bytes.Buffer
 	b.WriteRune('/')
-	b.WriteString(r.c.BigIP.Partitions[0]) //FIXME update to use mutliple partitions
+	b.WriteString(r.c.BigIP.Partitions[0]) //FIXME update to use multiple partitions
 	b.WriteRune('/')
 	b.WriteString(ru.Name())
 
