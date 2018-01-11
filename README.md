@@ -194,9 +194,9 @@ Service Broker
 --------------
 
 If per route config is required the controller can be ran as a [service broker.](https://docs.cloudfoundry.org/services/overview.html) Running as a service
-broker allows control over which BIG-IP objects are applied to a particular route through the use of plans. For more information see [F5 BIG-IP Controller for Cloud Foundry docs](http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/latest/).
+broker allows control over which BIG-IP objects are applied to a particular route through plans. For more information see [F5 BIG-IP Controller for Cloud Foundry docs](http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/latest/).
 
-An additional variable of `SERVICE_BROKER_CONFIG` will need to be added under the `env` section.
+`SERVICE_BROKER_CONFIG` will need to be added under the `env` section.
 
 ```
 applications:

@@ -12,8 +12,7 @@ v1.1.0
 
 Added Functionality
 ```````````````````
-* L7 (HTTP) per route configuration through Route Services
-* Ability to run as a Service Broker to enable per route configuration
+* L7 (HTTP) per route configuration through Route Services when controller is run as a Service Broker
 
   * Virtual Server for L7 (HTTP) route can have its own Policies, Profiles and SSL Profiles
   * Pool for L7 (HTTP) route can have its own load balancing mode and Health Monitors
