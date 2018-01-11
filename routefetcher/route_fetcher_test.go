@@ -525,7 +525,7 @@ var _ = Describe("RouteFetcher", func() {
 					routeClient.HandleEvent(event)
 					Expect(registry.UnregisterCallCount()).To(Equal(0))
 					Expect(registry.RegisterCallCount()).To(Equal(0))
-					Eventually(logger).Should(gbytes.Say("recieved-wrong-event-type"))
+					Eventually(logger).Should(gbytes.Say("received-wrong-event-type"))
 				})
 			})
 		})
@@ -871,7 +871,7 @@ var _ = Describe("RouteFetcher", func() {
 				})
 			})
 
-			Context("When the event Action is unkown", func() {
+			Context("When the event Action is unknown", func() {
 				It("logs and does not call the routing table", func() {
 					route := models.NewTcpRouteMapping("fakeRouterGroup", 1001, "1.1.1.1", 2020, 1)
 					event := routing_api.TcpEvent{
@@ -895,7 +895,7 @@ var _ = Describe("RouteFetcher", func() {
 					routeClient.HandleEvent(event)
 					Expect(routeTable.DeleteBackendServerKeyCallCount()).To(Equal(0))
 					Expect(routeTable.UpsertBackendServerKeyCallCount()).To(Equal(0))
-					Eventually(logger).Should(gbytes.Say("recieved-wrong-event-type"))
+					Eventually(logger).Should(gbytes.Say("received-wrong-event-type"))
 				})
 			})
 		})
