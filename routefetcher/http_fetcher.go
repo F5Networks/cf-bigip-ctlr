@@ -53,7 +53,7 @@ func (httpFetcher *HTTPFetcher) ClientProtocol() string {
 func (httpFetcher *HTTPFetcher) HandleEvent(event interface{}) {
 	e, ok := event.(routing_api.Event)
 	if !ok {
-		httpFetcher.logger.Warn("recieved-wrong-event-type",
+		httpFetcher.logger.Warn("received-wrong-event-type",
 			zap.String("event-type", fmt.Sprint(reflect.TypeOf(event))),
 		)
 	}

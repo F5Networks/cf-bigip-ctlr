@@ -223,7 +223,7 @@ message contains an interval that other components should then send
 that clients should send `router.register` messages on this interval. This
 `minimumRegisterIntervalInSeconds` value is configured through the
 `start_response_delay_interval` configuration property. The controller will prune
-routes that it considers to be stale based upon a seperate "staleness" value,
+routes that it considers to be stale based upon a separate "staleness" value,
 `droplet_stale_threshold`, which defaults to 120 seconds. The controller will check
 if routes have become stale on an interval defined by
   `prune_stale_droplets_interval`, which defaults to 30 seconds. All of these

@@ -161,8 +161,9 @@ class IntervalTimer(object):
                 self.stop()
             self._timer = threading.Timer(self._adjust_interval(), self._run)
             # timers can't be stopped, cancel just prevents the callback from
-            # occuring when the timer finally expires.  Make it a daemon allows
-            # cancelled timers to exit eventually without a need for join.
+            # occurring when the timer finally expires.  Making it a daemon
+            # allows cancelled timers to exit eventually without a need for
+            # join.
             self._timer.daemon = True
             self._timer.start()
             self._running = True
