@@ -157,11 +157,11 @@ func main() {
 	if c.BrokerMode {
 		sb, err := servicebroker.NewServiceBroker(c, logger, f5Router)
 		if nil != err {
-			logger.Warn("create-new-broker-error", zap.Error(err))
+			logger.Fatal("create-new-broker-error", zap.Error(err))
 		} else {
 			err = sb.ProcessPlans()
 			if nil != err {
-				logger.Warn("process-broker-plan-error", zap.Error(err))
+				logger.Fatal("process-broker-plan-error", zap.Error(err))
 			} else {
 				brokerHandler = sb.Handler
 			}

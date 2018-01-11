@@ -208,8 +208,8 @@ type Config struct {
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 	RouteMode                       string        `yaml:"route_mode"`
+	BrokerMode                      bool          `yaml:"broker_mode"`
 	RoutingMode                     RoutingMode
-	BrokerMode                      bool
 
 	DrainWait          time.Duration `yaml:"drain_wait,omitempty"`
 	DrainTimeout       time.Duration `yaml:"drain_timeout,omitempty"`
@@ -268,7 +268,8 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
-	RouteMode: HTTP.String(),
+	RouteMode:  HTTP.String(),
+	BrokerMode: false,
 
 	LoadBalance: LOAD_BALANCE_RR,
 
@@ -371,10 +372,8 @@ func (c *Config) Process() {
 		panic(errMsg)
 	}
 
-	if c.Status.User == "" || c.Status.Pass == "" {
-		c.BrokerMode = false
-	} else {
-		c.BrokerMode = true
+	if c.BrokerMode && (c.Status.User == "" || c.Status.Pass == "") {
+		panic("status user and pass must be set to run in service_broker mode")
 	}
 }
 

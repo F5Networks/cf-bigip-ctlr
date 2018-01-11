@@ -194,6 +194,8 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | route_mode                               | string  | Optional | http           | :ref:`Route type <route types>` you want to watch; must be a single value       | http, tcp, all |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+| broker_mode                              | boolean | Optional | false          | Run the controller as a Service Broker                                          |                |
++------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | start_response_delay_interval            | integer | Optional | 5              | In seconds, wait time to achieve steady state from routing message bus          |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_max_retries                | integer | Optional | 3              | Number of retries to fetch auth token                                           |                |
