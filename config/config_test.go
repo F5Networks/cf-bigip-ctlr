@@ -447,6 +447,18 @@ enable_proxy: true
 	})
 
 	Describe("Process", func() {
+		It("panics if user and pass not set with broker_mode enabled", func() {
+			var b = []byte(`
+broker_mode: true
+status:
+  user: ""
+  pass: ""
+`)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.Process).To(Panic())
+		})
+
 		It("converts intervals to durations", func() {
 			var b = []byte(`
 publish_start_message_interval: 1s

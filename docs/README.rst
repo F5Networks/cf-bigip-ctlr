@@ -197,6 +197,8 @@ Define the parameters in the ``env`` section of the `Controller application mani
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | session_persistence                      | boolean | Optional | true           | Enables JSESSIONID cookie session persistence on the BIG-IP device              | true, false    |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
+| broker_mode                              | boolean | Optional | false          | Run the controller as a Service Broker                                          |                |
++------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | start_response_delay_interval            | integer | Optional | 5              | In seconds, wait time to achieve steady state from routing message bus          |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 | token_fetcher_max_retries                | integer | Optional | 3              | Number of retries to fetch auth token                                           |                |
@@ -381,4 +383,3 @@ The Controller supports the following log levels:
 .. [#lb] See "BIG-IP system load balancing methods" in the `BIG-IP Local Traffic Management Basics user guide <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-basics-13-0-0/4.html>`_.
 .. [#extaddr] The controller supports BIG-IP `route domain`_ specific addresses.
 .. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
-
