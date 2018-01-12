@@ -236,6 +236,12 @@ The example |cfctlr| application manifest below defines the following:
 
 .. _route types:
 
+Service Broker
+--------------
+If you need a greater degree of control over the configurations for Routes associated with specific Apps, you can use the |cfctlr| as a Cloud Foundry `Service Broker`_. See `Deploy the BIG-IP Controller for Cloud Foundry with per-Route Virtual Servers </containers/latest/cloudfoundry/cf-per-route-virtuals>`_ for instructions.
+
+`SERVICE_BROKER_CONFIG` will need to be added under the `env` section. See above configuration examples.
+
 Route Types
 -----------
 

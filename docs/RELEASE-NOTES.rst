@@ -12,19 +12,19 @@ v1.1.0
 
 Added Functionality
 ```````````````````
-* L7 (HTTP) per route configuration through Route Services when controller is run as a Service Broker
+* Use the Controller as a Service Broker to apply per-route L7 (HTTP) configurations.
 
-  * Virtual Server for L7 (HTTP) route can have its own Policies, Profiles and SSL Profiles
-  * Pool for L7 (HTTP) route can have its own load balancing mode and Health Monitors
+  * Virtual Server for L7 (HTTP) route can have its own Policies, Profiles and SSL Profiles.
+  * Pool for L7 (HTTP) route can have its own load balancing mode and Health Monitors.
 
-* Virtual Server targeting Virtual Server architecture
+* Adopts a new, two-tier architecture. See the BIG-IP Controller for Cloud Foundry documentation </containers/latest/cloudfoundry/#overview>_ for more information.
 
 Limitations
 ```````````
-* Only support Route Service bindings
-* Architected only as a Static, Brokered Service
-* Do not accept any Arbitrary Parameters via `cf create-service|bind-service -c`
-* Do not support `cf update-service`
+* Architected only as a Static, Brokered Service.
+* Controller doesn't support Service bindings.
+* Controller cannot accept Arbitrary Parameters via `cf create-service|bind-service -c`.
+* Controller doesn't support the use of `cf update-service`.
 
 v1.0.0
 ------
