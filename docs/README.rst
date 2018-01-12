@@ -388,3 +388,80 @@ The Controller supports the following log levels:
 .. |Slack| image:: https://f5cloudsolutions.herokuapp.com/badge.svg
    :target: https://f5cloudsolutions.herokuapp.com
    :alt: Slack
+
+.. _service broker:
+
+Service Broker
+--------------
+If you need a greater degree of control over the configurations for Routes associated with specific Apps, you can use the |cfctlr| as a Cloud Foundry `Service Broker`_. See `Deploy the BIG-IP Controller for Cloud Foundry with per-Route Virtual Servers </containers/latest/cloudfoundry/cf-per-route-virtuals>`_ for instructions.
+
+Add the `SERVICE_BROKER_CONFIG` under the `env` section. See below configuration examples.
+
++--------------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+| Parameter                | Type   | Required | Description                                                                | Allowed Values                     |
++==========================+========+==========+============================================================================+====================================+
+| .. _broker-configs:      |        |          |                                                                            |                                    |
+|                          |        |          |                                                                            |                                    |
+| plans                    | array  | Required | A YAML array defining service broker plans.                                |                                    |
++--------------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | name                | string | Required | The name of the plan.                                                      |                                    |
++----+---------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | description         | string | Required | A short description of the plan.                                           |                                    |
++----+---------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | virtualServer       | object | Optional | A YAML blob defining a virtual server configuration.                       |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | policies       | array  | Optional | An array of strings of BIG-IP device policy names.                         |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | profiles       | array  | Optional |  An array of strings of BIG-IP device profile names.                       |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | sslProfiles    | array  | Optional | An array of strings of BIG-IP device server side SSL profile names.        |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | pool                | object | Optional | A YAML blob defining a pool configuration.                                 |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | balance        | string | Optional | The load balancing mode of the pool.                                       | dynamic-ratio-member,              |
+|    |    |                |        |          |                                                                            | dynamic-ratio-node,                |
+|    |    |                |        |          |                                                                            | fastest-app-response,              |
+|    |    |                |        |          |                                                                            | fastest-node,                      |
+|    |    |                |        |          |                                                                            | least-connections-member,          |
+|    |    |                |        |          |                                                                            | least-connections-node,            |
+|    |    |                |        |          |                                                                            | least-sessions,                    |
+|    |    |                |        |          |                                                                            | observed-member,                   |
+|    |    |                |        |          |                                                                            | observed-node,                     |
+|    |    |                |        |          |                                                                            | predictive-member,                 |
+|    |    |                |        |          |                                                                            | predictive-node,                   |
+|    |    |                |        |          |                                                                            | ratio-least-connections-member,    |
+|    |    |                |        |          |                                                                            | ratio-least-connections-node,      |
+|    |    |                |        |          |                                                                            | ratio-member,                      |
+|    |    |                |        |          |                                                                            | ratio-node,                        |
+|    |    |                |        |          |                                                                            | round-robin,                       |
+|    |    |                |        |          |                                                                            | ratio-session,                     |
+|    |    |                |        |          |                                                                            | weighted-least-connections-member, |
+|    |    |                |        |          |                                                                            | weighted-least-connections-node    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | healthMonitors | array  | Optional | An array of health monitor configuration objects (see below for examples). |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+
+Example Health Monitor Objects:
+
+  There are two cases of health monitor objects that are accepted.
+
+  1) Name of a BIG-IP device health monitor:
+    healthMonitors:
+      - /Common/http.get
+
+  2) Custom health monitor object defined by the following table:
+  +------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+  | Parameter                          | Type    | Required | Default |Description                                | Allowed Values |
+  +====================================+=========+==========+=========+===========================================+================+
+  | .. _custom-health-monitor-configs: |         |          |         |                                           |                |
+  |                                    |         |          |         |                                           |                |
+  | name                               | string  | Required |         | Name of the custom health monitor.        |                |
+  +------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+  | type                               | string  | Required |         | Type of the custom health monitor.        | http, tcp      |
+  +------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+  | interval                           | integer | Optional | 5       | Health monitor probe interval in seconds. | 1 to 86400     |
+  +------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+  | timeout                            | integer | Optional | 16      | Probe timeout in seconds.                 | 1 to 86400     |
+  +------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+  | send                               | string  | Optional |         | Message sent by the health monitor.       |                |
+  +------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
