@@ -35,13 +35,13 @@ Overview
 --------
 
 The |cfctlr| is a Docker container that runs in a `Cloud Foundry`_ cell.
-It emulates the behavior of the Cloud Foundry `Gorouter`_, by:
+It emulates the behavior of the Cloud Foundry `Gorouter`_ as follows:
 
-- subscribing to the Cloud Foundry NATS message bus and routing API;
-- gathering application route information (HTTP and TCP); and
-- configuring routing policy rules on the BIG-IP system.
+- subscribes to the Cloud Foundry NATS message bus and routing API;
+- gathers application route information (HTTP and TCP); and
+- configures routing policy rules on the BIG-IP system.
 
-The |cfctlr| receives route updates and transforms them into BIG-IP policy rules when the following events occur:
+The |cfctlr| receives Route updates and transforms them into BIG-IP policy rules when the following events occur:
 
 - push, delete, and scale applications (with mapped routes to the application);
 - map and unmap routes.
@@ -54,9 +54,10 @@ For example:
 #. Controller updates BIG-IP routing policy directing App requests to the *myApp* pool.
 #. Controller monitors Cloud Foundry routing table and, when it discovers changes, reconfigures the BIG-IP device.
 
-The BIG-IP device handles traffic for every Cloud Foundry mapped route and load balances traffic to each application instance.
-The |cfctlr| can create a total of two (2) BIG-IP virtual servers for HTTP routes: one (1) for HTTP, one (1) for HTTPS.
-The Controller creates an additional virtual server for each TCP route.
+The BIG-IP device handles traffic for every Cloud Foundry-mapped Route and load balances traffic to each Application instance.
+When run in the "global" default mode, the |cfctlr| can create a total of two BIG-IP virtual servers for HTTP Routes: one for HTTP and one for HTTPS. When run as a `Service Broker`_, the |cfctlr| can :ref:`create-per-route-vs`.
+
+The Controller creates a virtual server for each TCP route.
 
 All HTTP traffic goes through either the port 80 or port 443 virtual server.
 The Controller routes TCP traffic through dedicated virtual servers configured to listen on non-HTTP ports.
@@ -102,7 +103,7 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | url                                 | string  | Required | n/a            | BIG-IP admin IP address                                                         |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | user                                | string  | Required | n/a            | BIG-IP iControl REST username                                                   |                |
+|    | user                                | string  | Required | n/a            | BIG-IP iControl REST username [#username]_                                      |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | pass                                | string  | Required | n/a            | BIG-IP iControl REST password                                                   |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
@@ -110,10 +111,11 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | balance                             | string  | Optional | round-robin    | Set the load balancing mode                                                     | Any BIG-IP-    |
 |    |                                     |         |          |                |                                                                                 | supported mode |
+|    |                                     |         |          |                |                                                                                 | [#lb]_         |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | verify_interval                     | integer | Optional | 30             | In seconds; interval at which to verify the BIG-IP configuration.               |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | external_addr [#ext_addr]_          | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
+|    | external_addr [#extaddr]_           | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | tier2_ip_range                      | string  | Required | n/a            | IP range assigned to the tier2 vips in CIDR notation.                           |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
@@ -207,15 +209,110 @@ Define the parameters in the ``env`` section of your `application manifest </con
 | tcp_router_group                         | string  | Optional | default-tcp    | Name of TCP router group                                                        |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 
-.. [#ext_addr] The controller supports BIG-IP `route domain`_ specific addresses.
-.. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
+Routes
+------
 
-\
+.. _route types:
+
+Supported Route Types
+`````````````````````
+
+The |cfctlr| accepts three (3) values for the ``route_type`` configuration parameter.
+Each of the supported ``route_mode`` options have different configuration requirements:
+
+- ``all``: Requires :ref:`nats <nats-configs>`, :ref:`routing_api <routing-api-configs>`, and :ref:`oauth <oauth-configs>`.
+- ``http``: Requires :ref:`nats <nats-configs>`.
+- ``tcp``: Requires :ref:`routing_api <routing-api-configs>` and :ref:`oauth <oauth-configs>`.
+
+When managing HTTP routes, the |cfctlr| will create an HTTP virtual server (virtual address port 80) for routing into `Cloud Foundry`_.
+If you define an SSL profile in the configuration (the ``ssl_profiles`` parameter), the Controller creates an additional HTTPS virtual server (virtual address port 443).
+You can attach multiple certificate/key pairs to the HTTPS virtual server.
+The BIG-IP device uses `TLS Server Name Indication`_ (SNI) to choose the correct certificate to present to the client; SNI allows the `Cloud Foundry`_ instance to support multiple hostnames (foo.mycf.com and bar.mycf.com).
+Some of these cert/key pairs can be wildcard (\*.mycf.com).
+
+
+.. _create-per-route-vs:
+
+Configure Virtual Servers for Individual Routes
+```````````````````````````````````````````````
+
+You can use the |cfctlr| as a Cloud Foundry `Service Broker`_ to apply per-Route configurations to your BIG-IP device(s). See `Deploy the BIG-IP Controller for Cloud Foundry with per-Route Virtual Servers </containers/latest/cloudfoundry/cf-per-route-virtuals>`_ for instructions.
+
+Define the configuration parameters below in the ``SERVICE_BROKER_CONFIG`` section of your Application Manifest. See below for configuration examples.
+
++--------------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+| Parameter                | Type   | Required | Description                                                                | Allowed Values                     |
++==========================+========+==========+============================================================================+====================================+
+| .. _broker-configs:      |        |          |                                                                            |                                    |
+|                          |        |          |                                                                            |                                    |
+| plans                    | array  | Required | A YAML array defining service broker plans.                                |                                    |
++--------------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | name                | string | Required | The name of the plan.                                                      |                                    |
++----+---------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | description         | string | Required | A short description of the plan.                                           |                                    |
++----+---------------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | virtualServer       | object | Optional | A YAML blob defining a virtual server configuration.                       |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | policies       | array  | Optional | An array of strings of BIG-IP device policy names.                         |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | profiles       | array  | Optional |  An array of strings of BIG-IP device profile names.                       |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | sslProfiles    | array  | Optional | An array of strings of BIG-IP device server side SSL profile names.        |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    | pool                | object | Optional | A YAML blob defining a pool configuration.                                 |                                    |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | balance        | string | Optional | The load balancing mode of the pool.                                       | Any BIG-IP-supported mode [#lb]_   |
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+|    |    | healthMonitors | array  | Optional | An array of health monitor configuration objects                           | See :ref:`table <routehmconf>` and |
+|    |    |                |        |          |                                                                            | :ref:`examples <exampleconf>` below|
++----+----+----------------+--------+----------+----------------------------------------------------------------------------+------------------------------------+
+
+Per-Route Health Monitors
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use an existing BIG-IP health monitor, define a new health monitor, or both. Use parameters shown in the table below to define a custom health monitor. See the configuration examples below for usage examples.
+
+.. _custom-health-monitor-configs:
+.. _routehmconf:
+
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+| Parameter                          | Type    | Required | Default |Description                                | Allowed Values |
++====================================+=========+==========+=========+===========================================+================+
+| name                               | string  | Required |         | Name of the custom health monitor.        |                |
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+| type                               | string  | Required |         | Type of the custom health monitor.        | http, tcp      |
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+| interval                           | integer | Optional | 5       | Health monitor probe interval in seconds. | 1 to 86400     |
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+| timeout                            | integer | Optional | 16      | Probe timeout in seconds.                 | 1 to 86400     |
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+| send                               | string  | Optional |         | Message sent by the health monitor.       |                |
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+| recv                               | string  | Optional |         | Response expected by the health monitor.  |                |
++------------------------------------+---------+----------+---------+-------------------------------------------+----------------+
+
+
+.. _health checks:
+
+Cloud Foundry Health Checks
+---------------------------
+
+The |cfctlr| supports native Cloud Foundry health checks for itself and will manage BIG-IP health checks for applications.
+
+To configure Cloud Foundry health checks for the |cfctlr| (this ensures the orchestration system will manage the Controller availability for you), define the ``health-check-type`` and ``health-check-http-endpoint`` settings as follows:
+
+.. code-block:: yaml
+
+   health-check-type: http
+   health-check-http-endpoint: /health
+
+The |cfctlr| will also manage BIG-IP health checking of the managed applications. To use any health monitor(s) that already exists on the BIG-IP system, add the name to the application manifest under ``bigip.health_monitors``. Because these monitors apply to all applications in the system, the |cfctlr| uses the ``/Common/tcp_half_open`` monitor by default.
 
 .. _cfctlr-config-examples:
+.. _exampleconf:
 
 Configuration Examples
-``````````````````````
+----------------------
 
 The example |cfctlr| application manifest below defines the following:
 
@@ -236,42 +333,22 @@ The example |cfctlr| application manifest below defines the following:
 - :fonticon:`fa fa-download` :download:`sample-cf-app-manifest.yml </_static/config_examples/example-manifest.yml>`
 - :fonticon:`fa fa-download` :download:`sample-cf-config-structure.yml </_static/config_examples/config-structure.yml>`
 
-.. _route types:
 
-Route Types
------------
+Controller API Endpoints
+------------------------
 
-The |cfctlr| accepts three (3) values for the ``route_type`` configuration parameter.
-Each of the supported ``route_mode`` options have different configuration requirements:
+You can access health and route information using the |cfctlr| API.
 
-- ``all``: Requires :ref:`nats <nats-configs>`, :ref:`routing_api <routing-api-configs>`, and :ref:`oauth <oauth-configs>`.
-- ``http``: Requires :ref:`nats <nats-configs>`.
-- ``tcp``: Requires :ref:`routing_api <routing-api-configs>` and :ref:`oauth <oauth-configs>`.
+.. important::
 
-When managing HTTP routes, the |cfctlr| will create an HTTP virtual server (virtual address port 80) for routing into `Cloud Foundry`_.
-If you define an SSL profile in the configuration (the ``ssl_profiles`` parameter), the Controller creates an additional HTTPS virtual server (virtual address port 443).
-You can attach multiple certificate/key pairs to the HTTPS virtual server.
-The BIG-IP device uses `TLS Server Name Indication`_ (SNI) to choose the correct certificate to present to the client; SNI allows the `Cloud Foundry`_ instance to support multiple hostnames (foo.mycf.com and bar.mycf.com).
-Some of these cert/key pairs can be wildcard (\*.mycf.com).
+   Use of ``/routes`` requires HTTP basic authentication. You can define a username and password that can access the Controller API in the Application Manifest:
 
-.. _health checks:
+   .. code-block:: yaml
 
-Health Checks
--------------
+      status:
+        password: some_password
+        user: some_user
 
-The |cfctlr| supports native Cloud Foundry health checks for itself and will manage BIG-IP health checks for applications.
-
-To configure Cloud Foundry health checks for the |cfctlr| (this ensures the orchestration system will manage the Controller availability for you), define the ``health-check-type`` and ``health-check-http-endpoint`` settings as follows:
-
-.. code-block:: yaml
-
-   health-check-type: http
-   health-check-http-endpoint: /health
-
-The |cfctlr| will also manage BIG-IP health checking of the managed applications. To use any health monitor(s) that already exists on the BIG-IP system, add the name to the application manifest under ``bigip.health_monitors``. Because these monitors apply to all applications in the system, the |cfctlr| uses the ``/Common/tcp_half_open`` monitor by default.
-
-API Endpoints
--------------
 
 - :code:`/health`: The Controller health endpoint.
 
@@ -306,18 +383,8 @@ API Endpoints
      curl "http://someuser:somepass@10.0.32.15/routes"
      {"api.catwoman.cf-app.com":[{"address":"10.244.0.138:9022","ttl":0,"tags":{"component":"CloudController"}}],"dora-dora.catwoman.cf-app.com":[{"address":"10.244.16.4:60035","ttl":0,"tags":{"component":"route-emitter"}},{"address":"10.244.16.4:60060","ttl":0,"tags":{"component":"route-emitter"}}]}
 
-  .. important::
 
-     Use of ``/routes`` requires HTTP basic authentication.
-     You can find the authentication credentials in the application configuration:
-
-     .. code-block:: yaml
-
-        status:
-           password: some_password
-           user: some_user
-
-.. instrumentation and logging:
+.. _instrumentation and logging:
 
 Instrumentation and Logging
 ---------------------------
@@ -334,7 +401,6 @@ The Controller supports the following log levels:
 
    [2017-02-01 22:54:08+0000] {"log_level":0,"timestamp":1485989648.0895808,"message":"endpoint-registered","source":"vcap.cf-bigip-ctlr.registry","data":{"uri":"0-*.login.bosh-lite.com","backend":"10.123.0.134:8080","modification_tag":{"guid":"","index":0}}}
 
-
 - ``log_level``: message log level
 
   - 0 = info
@@ -346,6 +412,13 @@ The Controller supports the following log levels:
 - ``message``: Content of the log line
 - ``source``: The Controller function that initiated the log message
 - ``data``: Additional information, varies based on the message
+
+.. rubric:: **Footnotes:**
+.. [#username] The controller requires the BIG-IP user account to have a defined role of ``Administrator``, ``Resource Administrator``, or ``Manager``. See `BIG-IP User Roles <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-user-account-administration-13-0-0/3.html>`_ for further details.
+.. [#lb] See BIG-IP system load balancing methods in the `BIG-IP Local Traffic Management Basics user guide <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-basics-13-0-0/4.html>`_.
+.. [#extaddr] The controller supports BIG-IP `route domain`_ specific addresses.
+.. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
+
 
 .. _Cloud Foundry: https://cloudfoundry.org/
 .. _Gorouter: https://github.com/cloudfoundry/gorouter
