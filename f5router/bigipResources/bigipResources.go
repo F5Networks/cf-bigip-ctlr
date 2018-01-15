@@ -100,6 +100,7 @@ type (
 		Interval int    `json:"interval,omitempty"`
 		Type     string `json:"type"`
 		Send     string `json:"send,omitempty"`
+		Recv     string `json:"recv,omitempty"`
 		Timeout  int    `json:"timeout,omitempty"`
 	}
 
