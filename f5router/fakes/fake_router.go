@@ -31,6 +31,29 @@ type FakeRouter struct {
 	updateRouteArgsForCall []struct {
 		ru routeUpdate.RouteUpdate
 	}
+	AddBindIDRouteURIPlanNameMappingStub        func(bindID, routeURI, planID string)
+	addBindIDRouteURIPlanNameMappingMutex       sync.RWMutex
+	addBindIDRouteURIPlanNameMappingArgsForCall []struct {
+		bindID   string
+		routeURI string
+		planID   string
+	}
+	RemoveBindIDRouteURIPlanNameMappingStub        func(bindID string)
+	removeBindIDRouteURIPlanNameMappingMutex       sync.RWMutex
+	removeBindIDRouteURIPlanNameMappingArgsForCall []struct {
+		bindID string
+	}
+	GetRouteURIFromBindIDStub        func(bindID string) string
+	getRouteURIFromBindIDMutex       sync.RWMutex
+	getRouteURIFromBindIDArgsForCall []struct {
+		bindID string
+	}
+	getRouteURIFromBindIDReturns struct {
+		result1 string
+	}
+	getRouteURIFromBindIDReturnsOnCall map[int]struct {
+		result1 string
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -131,6 +154,104 @@ func (fake *FakeRouter) UpdateRouteArgsForCall(i int) routeUpdate.RouteUpdate {
 	return fake.updateRouteArgsForCall[i].ru
 }
 
+func (fake *FakeRouter) AddBindIDRouteURIPlanNameMapping(bindID string, routeURI string, planID string) {
+	fake.addBindIDRouteURIPlanNameMappingMutex.Lock()
+	fake.addBindIDRouteURIPlanNameMappingArgsForCall = append(fake.addBindIDRouteURIPlanNameMappingArgsForCall, struct {
+		bindID   string
+		routeURI string
+		planID   string
+	}{bindID, routeURI, planID})
+	fake.recordInvocation("AddBindIDRouteURIPlanNameMapping", []interface{}{bindID, routeURI, planID})
+	fake.addBindIDRouteURIPlanNameMappingMutex.Unlock()
+	if fake.AddBindIDRouteURIPlanNameMappingStub != nil {
+		fake.AddBindIDRouteURIPlanNameMappingStub(bindID, routeURI, planID)
+	}
+}
+
+func (fake *FakeRouter) AddBindIDRouteURIPlanNameMappingCallCount() int {
+	fake.addBindIDRouteURIPlanNameMappingMutex.RLock()
+	defer fake.addBindIDRouteURIPlanNameMappingMutex.RUnlock()
+	return len(fake.addBindIDRouteURIPlanNameMappingArgsForCall)
+}
+
+func (fake *FakeRouter) AddBindIDRouteURIPlanNameMappingArgsForCall(i int) (string, string, string) {
+	fake.addBindIDRouteURIPlanNameMappingMutex.RLock()
+	defer fake.addBindIDRouteURIPlanNameMappingMutex.RUnlock()
+	return fake.addBindIDRouteURIPlanNameMappingArgsForCall[i].bindID, fake.addBindIDRouteURIPlanNameMappingArgsForCall[i].routeURI, fake.addBindIDRouteURIPlanNameMappingArgsForCall[i].planID
+}
+
+func (fake *FakeRouter) RemoveBindIDRouteURIPlanNameMapping(bindID string) {
+	fake.removeBindIDRouteURIPlanNameMappingMutex.Lock()
+	fake.removeBindIDRouteURIPlanNameMappingArgsForCall = append(fake.removeBindIDRouteURIPlanNameMappingArgsForCall, struct {
+		bindID string
+	}{bindID})
+	fake.recordInvocation("RemoveBindIDRouteURIPlanNameMapping", []interface{}{bindID})
+	fake.removeBindIDRouteURIPlanNameMappingMutex.Unlock()
+	if fake.RemoveBindIDRouteURIPlanNameMappingStub != nil {
+		fake.RemoveBindIDRouteURIPlanNameMappingStub(bindID)
+	}
+}
+
+func (fake *FakeRouter) RemoveBindIDRouteURIPlanNameMappingCallCount() int {
+	fake.removeBindIDRouteURIPlanNameMappingMutex.RLock()
+	defer fake.removeBindIDRouteURIPlanNameMappingMutex.RUnlock()
+	return len(fake.removeBindIDRouteURIPlanNameMappingArgsForCall)
+}
+
+func (fake *FakeRouter) RemoveBindIDRouteURIPlanNameMappingArgsForCall(i int) string {
+	fake.removeBindIDRouteURIPlanNameMappingMutex.RLock()
+	defer fake.removeBindIDRouteURIPlanNameMappingMutex.RUnlock()
+	return fake.removeBindIDRouteURIPlanNameMappingArgsForCall[i].bindID
+}
+
+func (fake *FakeRouter) GetRouteURIFromBindID(bindID string) string {
+	fake.getRouteURIFromBindIDMutex.Lock()
+	ret, specificReturn := fake.getRouteURIFromBindIDReturnsOnCall[len(fake.getRouteURIFromBindIDArgsForCall)]
+	fake.getRouteURIFromBindIDArgsForCall = append(fake.getRouteURIFromBindIDArgsForCall, struct {
+		bindID string
+	}{bindID})
+	fake.recordInvocation("GetRouteURIFromBindID", []interface{}{bindID})
+	fake.getRouteURIFromBindIDMutex.Unlock()
+	if fake.GetRouteURIFromBindIDStub != nil {
+		return fake.GetRouteURIFromBindIDStub(bindID)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.getRouteURIFromBindIDReturns.result1
+}
+
+func (fake *FakeRouter) GetRouteURIFromBindIDCallCount() int {
+	fake.getRouteURIFromBindIDMutex.RLock()
+	defer fake.getRouteURIFromBindIDMutex.RUnlock()
+	return len(fake.getRouteURIFromBindIDArgsForCall)
+}
+
+func (fake *FakeRouter) GetRouteURIFromBindIDArgsForCall(i int) string {
+	fake.getRouteURIFromBindIDMutex.RLock()
+	defer fake.getRouteURIFromBindIDMutex.RUnlock()
+	return fake.getRouteURIFromBindIDArgsForCall[i].bindID
+}
+
+func (fake *FakeRouter) GetRouteURIFromBindIDReturns(result1 string) {
+	fake.GetRouteURIFromBindIDStub = nil
+	fake.getRouteURIFromBindIDReturns = struct {
+		result1 string
+	}{result1}
+}
+
+func (fake *FakeRouter) GetRouteURIFromBindIDReturnsOnCall(i int, result1 string) {
+	fake.GetRouteURIFromBindIDStub = nil
+	if fake.getRouteURIFromBindIDReturnsOnCall == nil {
+		fake.getRouteURIFromBindIDReturnsOnCall = make(map[int]struct {
+			result1 string
+		})
+	}
+	fake.getRouteURIFromBindIDReturnsOnCall[i] = struct {
+		result1 string
+	}{result1}
+}
+
 func (fake *FakeRouter) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -140,6 +261,12 @@ func (fake *FakeRouter) Invocations() map[string][][]interface{} {
 	defer fake.verifyPlanExistsMutex.RUnlock()
 	fake.updateRouteMutex.RLock()
 	defer fake.updateRouteMutex.RUnlock()
+	fake.addBindIDRouteURIPlanNameMappingMutex.RLock()
+	defer fake.addBindIDRouteURIPlanNameMappingMutex.RUnlock()
+	fake.removeBindIDRouteURIPlanNameMappingMutex.RLock()
+	defer fake.removeBindIDRouteURIPlanNameMappingMutex.RUnlock()
+	fake.getRouteURIFromBindIDMutex.RLock()
+	defer fake.getRouteURIFromBindIDMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

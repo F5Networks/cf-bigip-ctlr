@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 
@@ -37,12 +38,11 @@ import (
 
 // ServiceBroker for F5 services
 type ServiceBroker struct {
-	Config         *config.ServiceBrokerConfig
-	logger         cfLogger.Logger
-	Handler        http.Handler
-	router         f5router.Router
-	bindIDRouteMap map[string]string
-	plans          map[string]planResources.Plan
+	Config  *config.ServiceBrokerConfig
+	logger  cfLogger.Logger
+	Handler http.Handler
+	router  f5router.Router
+	plans   map[string]planResources.Plan
 }
 
 func (broker *ServiceBroker) processPlans(val string) (map[string]planResources.Plan, error) {
@@ -86,10 +86,9 @@ func NewServiceBroker(
 	router f5router.Router,
 ) (*ServiceBroker, error) {
 	serviceBroker := &ServiceBroker{
-		Config:         &c.Broker,
-		logger:         logger.Session("service-broker"),
-		router:         router,
-		bindIDRouteMap: make(map[string]string),
+		Config: &c.Broker,
+		logger: logger.Session("service-broker"),
+		router: router,
 	}
 	// create our unique ID
 	guid, err := uuid.GenerateUUID()
@@ -201,6 +200,11 @@ func (broker *ServiceBroker) Bind(
 		err = errors.New("only route services bindings are supported")
 		return binding, err
 	}
+	routeURI := details.BindResource.Route
+
+	if bindID == "" {
+		err = fmt.Errorf("BindID missing for route: %s", routeURI)
+	}
 
 	err = broker.router.VerifyPlanExists(details.PlanID)
 	if err != nil {
@@ -208,12 +212,11 @@ func (broker *ServiceBroker) Bind(
 	}
 
 	// Map bindID to route URI then create new route update to give to router
-	routeURI := details.BindResource.Route
 	ru, err := f5router.NewUpdate(broker.logger, routeUpdate.Bind, route.Uri(routeURI), nil, details.PlanID)
 	if err != nil {
 		return binding, err
 	}
-	broker.bindIDRouteMap[bindID] = routeURI
+	broker.router.AddBindIDRouteURIPlanNameMapping(bindID, routeURI, details.PlanID)
 	broker.router.UpdateRoute(ru)
 
 	return binding, nil
@@ -227,10 +230,10 @@ func (broker *ServiceBroker) Unbind(
 	details brokerapi.UnbindDetails,
 ) error {
 	var err error
-	routeURI := broker.bindIDRouteMap[bindID]
+	routeURI := broker.router.GetRouteURIFromBindID(bindID)
 
 	if routeURI == "" {
-		err = errors.New("unbind route not found")
+		err = fmt.Errorf("unbind route not found for bindID: %s", bindID)
 		return err
 	}
 
@@ -239,7 +242,7 @@ func (broker *ServiceBroker) Unbind(
 	if err != nil {
 		return err
 	}
-	delete(broker.bindIDRouteMap, bindID)
+	broker.router.RemoveBindIDRouteURIPlanNameMapping(bindID)
 	broker.router.UpdateRoute(ru)
 
 	return nil

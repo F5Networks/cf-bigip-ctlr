@@ -29,12 +29,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/F5Networks/cf-bigip-ctlr/bigipclient"
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/bigipResources"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
 	"github.com/F5Networks/cf-bigip-ctlr/logger"
+	"github.com/F5Networks/cf-bigip-ctlr/route"
 	"github.com/F5Networks/cf-bigip-ctlr/servicebroker/planResources"
 	"github.com/uber-go/zap"
 	"k8s.io/client-go/util/workqueue"
@@ -49,12 +51,20 @@ const (
 	CFRoutingPolicyName = "cf-routing-policy"
 	// InternalDataGroupName on BIG-IP
 	InternalDataGroupName = "cf-ctlr-data-group"
+	// BrokerDataGroupName on BIG-IP
+	BrokerDataGroupName = "cf-broker-data-group"
 )
 
 // concurrent safe map of service broker plans
 type mutexPlansMap struct {
 	lock  sync.Mutex
 	plans map[string]planResources.Plan
+}
+
+// concurrent safe map of routeURIs and PlanIDs
+type mutexBindIDRouteURIPlanNameMap struct {
+	lock sync.Mutex
+	data map[string]string
 }
 
 // tier2VSInfo holds info related to the tier2 vips
@@ -77,27 +87,31 @@ type Router interface {
 	AddPlans(plans map[string]planResources.Plan)
 	VerifyPlanExists(planID string) error
 	UpdateRoute(ru routeUpdate.RouteUpdate)
+	AddBindIDRouteURIPlanNameMapping(bindID, routeURI, planID string)
+	RemoveBindIDRouteURIPlanNameMapping(bindID string)
+	GetRouteURIFromBindID(bindID string) string
 }
 
 // F5Router controller of BigIP configuration objects
 type F5Router struct {
-	c                    *config.Config
-	logger               logger.Logger
-	r                    bigipResources.RuleMap
-	wildcards            bigipResources.RuleMap
-	queue                workqueue.RateLimitingInterface
-	writer               Writer
-	routeVSHTTP          *bigipResources.Virtual
-	routeVSHTTPS         *bigipResources.Virtual
-	virtualResources     map[string]*bigipResources.Virtual
-	poolResources        map[string]*bigipResources.Pool
-	ruleResources        map[string]*bigipResources.IRule
-	monitorResources     map[string][]*bigipResources.Monitor
-	internalDataGroup    map[string]*bigipResources.InternalDataGroupRecord
-	tier2VSInfo          tier2VSInfo
-	firstSyncDone        bool
-	unmappedResourcesMap map[string]bigipResources.Resources
-	plansMap             mutexPlansMap
+	c                         *config.Config
+	logger                    logger.Logger
+	r                         bigipResources.RuleMap
+	wildcards                 bigipResources.RuleMap
+	queue                     workqueue.RateLimitingInterface
+	writer                    Writer
+	routeVSHTTP               *bigipResources.Virtual
+	routeVSHTTPS              *bigipResources.Virtual
+	virtualResources          map[string]*bigipResources.Virtual
+	poolResources             map[string]*bigipResources.Pool
+	ruleResources             map[string]*bigipResources.IRule
+	monitorResources          map[string][]*bigipResources.Monitor
+	internalDataGroup         map[string]*bigipResources.InternalDataGroupRecord
+	tier2VSInfo               tier2VSInfo
+	firstSyncDone             bool
+	unmappedResourcesMap      map[string]bigipResources.Resources
+	plansMap                  mutexPlansMap
+	bindIDRouteURIPlanNameMap mutexBindIDRouteURIPlanNameMap
 }
 
 func verifyRouteURI(ru updateHTTP) error {
@@ -188,19 +202,20 @@ func NewF5Router(
 	writer Writer,
 ) (*F5Router, error) {
 	r := F5Router{
-		c:                    c,
-		logger:               logger,
-		r:                    make(bigipResources.RuleMap),
-		wildcards:            make(bigipResources.RuleMap),
-		queue:                workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		writer:               writer,
-		virtualResources:     make(map[string]*bigipResources.Virtual),
-		poolResources:        make(map[string]*bigipResources.Pool),
-		ruleResources:        make(map[string]*bigipResources.IRule),
-		monitorResources:     make(map[string][]*bigipResources.Monitor),
-		unmappedResourcesMap: make(map[string]bigipResources.Resources),
-		plansMap:             mutexPlansMap{plans: make(map[string]planResources.Plan)},
-		tier2VSInfo:          tier2VSInfo{usedPorts: make(map[string]*bigipResources.VirtualAddress), holderPort: 10000},
+		c:                         c,
+		logger:                    logger,
+		r:                         make(bigipResources.RuleMap),
+		wildcards:                 make(bigipResources.RuleMap),
+		queue:                     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		writer:                    writer,
+		virtualResources:          make(map[string]*bigipResources.Virtual),
+		poolResources:             make(map[string]*bigipResources.Pool),
+		ruleResources:             make(map[string]*bigipResources.IRule),
+		monitorResources:          make(map[string][]*bigipResources.Monitor),
+		unmappedResourcesMap:      make(map[string]bigipResources.Resources),
+		plansMap:                  mutexPlansMap{plans: make(map[string]planResources.Plan)},
+		bindIDRouteURIPlanNameMap: mutexBindIDRouteURIPlanNameMap{data: make(map[string]string)},
+		tier2VSInfo:               tier2VSInfo{usedPorts: make(map[string]*bigipResources.VirtualAddress), holderPort: 10000},
 	}
 
 	err := r.validateConfig()
@@ -228,8 +243,8 @@ func NewF5Router(
 // AddPlans adds service broker provided plans to the router
 func (r *F5Router) AddPlans(plans map[string]planResources.Plan) {
 	r.plansMap.lock.Lock()
+	defer r.plansMap.lock.Unlock()
 	r.plansMap.plans = plans
-	r.plansMap.lock.Unlock()
 }
 
 // VerifyPlanExists verifies that the plan exists for the router
@@ -247,6 +262,31 @@ func (r *F5Router) VerifyPlanExists(planID string) error {
 	return nil
 }
 
+// AddBindIDRouteURIPlanNameMapping maps bind ID to a route's URI and plan's ID
+func (r *F5Router) AddBindIDRouteURIPlanNameMapping(bindID, routeURI, planID string) {
+	r.plansMap.lock.Lock()
+	planName := r.plansMap.plans[planID].Name
+	r.plansMap.lock.Unlock()
+
+	r.bindIDRouteURIPlanNameMap.lock.Lock()
+	r.bindIDRouteURIPlanNameMap.data[bindID] = routeURI + "|" + planName
+	r.bindIDRouteURIPlanNameMap.lock.Unlock()
+}
+
+// RemoveBindIDRouteURIPlanNameMapping removes mapping of bind ID to a route's URI and plan's ID
+func (r *F5Router) RemoveBindIDRouteURIPlanNameMapping(bindID string) {
+	r.bindIDRouteURIPlanNameMap.lock.Lock()
+	defer r.bindIDRouteURIPlanNameMap.lock.Unlock()
+	delete(r.bindIDRouteURIPlanNameMap.data, bindID)
+}
+
+// GetRouteURIFromBindID gets the route's URI associated with the bind ID
+func (r *F5Router) GetRouteURIFromBindID(bindID string) string {
+	r.bindIDRouteURIPlanNameMap.lock.Lock()
+	defer r.bindIDRouteURIPlanNameMap.lock.Unlock()
+	return strings.Split(r.bindIDRouteURIPlanNameMap.data[bindID], "|")[0]
+}
+
 // Run start the F5Router controller
 func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	r.logger.Info("f5router-starting")
@@ -254,10 +294,10 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	// See if there is an existing data group on the BIG-IP, this is used to store
 	// our tier2 vip ip:port information so the controller doesn't end up in a bad
 	// state on restart
-	dg, err := fetchExistingDataGroup(r.c)
+	dg, err := r.fetchExistingDataGroup(r.c, InternalDataGroupName)
 	if nil != err {
 		r.logger.Warn(
-			"failed-to-fetch-existing-data-group",
+			"failed-to-fetch-existing-controller-data-group",
 			zap.Error(err),
 		)
 		// We didn't get back a valid data group so it needs to be set to an empty one
@@ -265,6 +305,23 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	} else {
 		// Got a valid data group back so use it
 		r.processCachedDataGroup(dg)
+	}
+
+	// See if there is an existing data group on the BIG-IP that is used to store
+	// bind ID -> route URI : plan ID information so the broker does not end up in
+	// a bad state on restart after a crash
+	if r.c.BrokerMode {
+		dg, err = r.fetchExistingDataGroup(r.c, BrokerDataGroupName)
+		if nil != err {
+			// Did not get back a data group so no-op
+			r.logger.Warn(
+				"failed-to-fetch-existing-broker-data-group",
+				zap.Error(err),
+			)
+		} else {
+			// Got a valid broker data group back so use it
+			r.processBrokerDataGroup(dg)
+		}
 	}
 
 	done := make(chan struct{})
@@ -502,13 +559,20 @@ func (r *F5Router) createMonitors(pm bigipResources.PartitionMap, partition stri
 	}
 }
 
-func (r *F5Router) createInternalDataGroup(pm bigipResources.PartitionMap, partition string, wg *sync.WaitGroup) {
+func (r *F5Router) createInternalDataGroups(
+	dataGroups map[string]map[string]*bigipResources.InternalDataGroupRecord,
+	pm bigipResources.PartitionMap,
+	partition string, wg *sync.WaitGroup,
+) {
 	defer wg.Done()
-	dataGroup := bigipResources.NewInternalDataGroup(InternalDataGroupName)
-	for _, record := range r.internalDataGroup {
-		dataGroup.Records = append(dataGroup.Records, record)
+
+	for name, dataGroup := range dataGroups {
+		internalDataGroup := bigipResources.NewInternalDataGroup(name)
+		for _, record := range dataGroup {
+			internalDataGroup.Records = append(internalDataGroup.Records, record)
+		}
+		pm[partition].InternalDataGroups = append(pm[partition].InternalDataGroups, internalDataGroup)
 	}
-	pm[partition].InternalDataGroups = append(pm[partition].InternalDataGroups, dataGroup)
 }
 
 // Create a partition entry in the map if it doesn't exist
@@ -516,6 +580,23 @@ func initPartitionData(pm bigipResources.PartitionMap, partition string) {
 	if _, ok := pm[partition]; !ok {
 		pm[partition] = &bigipResources.Resources{}
 	}
+}
+
+// Populates a data group from the mutexBindIDRouteURIPlanNameMap
+func populateBrokerDataGroup(brokerData mutexBindIDRouteURIPlanNameMap) map[string]*bigipResources.InternalDataGroupRecord {
+	dg := make(map[string]*bigipResources.InternalDataGroupRecord)
+
+	brokerData.lock.Lock()
+	defer brokerData.lock.Unlock()
+
+	for k, v := range brokerData.data {
+		record := &bigipResources.InternalDataGroupRecord{
+			Name: k,
+			Data: v,
+		}
+		dg[k] = record
+	}
+	return dg
 }
 
 func (r *F5Router) createResources() bigipResources.PartitionMap {
@@ -543,8 +624,15 @@ func (r *F5Router) createResources() bigipResources.PartitionMap {
 	wg.Add(1)
 	go r.createMonitors(pm, partition, &wg)
 
+	dataGroups := make(map[string]map[string]*bigipResources.InternalDataGroupRecord)
+	if r.c.BrokerMode {
+		brokerInternalDataGroup := populateBrokerDataGroup(r.bindIDRouteURIPlanNameMap)
+		dataGroups[BrokerDataGroupName] = brokerInternalDataGroup
+	}
+	dataGroups[InternalDataGroupName] = r.internalDataGroup
+
 	wg.Add(1)
-	go r.createInternalDataGroup(pm, partition, &wg)
+	go r.createInternalDataGroups(dataGroups, pm, partition, &wg)
 
 	wg.Wait()
 
@@ -688,17 +776,63 @@ func joinBigipPath(partition, objName string) (string, error) {
 	return fmt.Sprintf("/%s/%s", partition, objName), nil
 }
 
-func fetchExistingDataGroup(c *config.Config) (*bigipResources.InternalDataGroup, error) {
+type returns struct {
+	data []byte
+	err  error
+}
+
+func (r *F5Router) fetchExistingDataGroup(c *config.Config, name string) (*bigipResources.InternalDataGroup, error) {
 	url := fmt.Sprintf(
 		"%s/mgmt/tm/ltm/data-group/internal/~%s~%s",
-		c.BigIP.URL,
-		c.BigIP.Partitions[0],
-		InternalDataGroupName,
+		r.c.BigIP.URL,
+		r.c.BigIP.Partitions[0],
+		name,
 	)
-	data, err := bigipclient.Get(url, c.BigIP.User, c.BigIP.Pass)
+	data, err := bigipclient.Get(url, r.c.BigIP.User, r.c.BigIP.Pass)
 	if nil != err {
-		return nil, err
+		// Encountered a timeout or temporary connection error so enter retry backoff
+		if err, ok := err.(net.Error); ok && (err.Timeout() || err.Temporary()) {
+			r.logger.Warn("bigip-client-get-error", zap.String("recoverable-error", "Entering retry backoff loop"))
+			done := make(chan returns)
+
+			go func() {
+				interval := 1
+				rvs := returns{}
+
+				for {
+					// Log and set timer for backoff
+					r.logger.Warn("retry-backoff", zap.String("backoff-interval", fmt.Sprintf("Retrying in %d seconds", interval)))
+					timer := time.NewTimer(time.Second * time.Duration(interval))
+					<-timer.C
+
+					// Attempt to connect to the BIG-IP signal channel if there is not a temporary or timeout error
+					rvs.data, rvs.err = bigipclient.Get(url, r.c.BigIP.User, r.c.BigIP.Pass)
+					if doErr, ok := rvs.err.(net.Error); ok && !(doErr.Timeout() || doErr.Temporary()) {
+						rvs.data = nil
+						done <- rvs
+						break
+					}
+
+					// Successfully connected to BIG-IP signal channel with the response
+					if rvs.err == nil {
+						done <- rvs
+						break
+					}
+					interval *= 2
+				}
+			}()
+
+			retVals := <-done
+			close(done)
+			if retVals.err != nil {
+				return nil, retVals.err
+			}
+			data = retVals.data
+		} else {
+			return nil, err
+		}
 	}
+
 	if strings.Contains(string(data), "was not found") {
 		return nil, fmt.Errorf("data group %s not found on the BIG-IP", InternalDataGroupName)
 	}
@@ -817,6 +951,55 @@ func (r *F5Router) incrementHolderIP() error {
 	}
 	r.tier2VSInfo.holderIP = ipCopy
 	return nil
+}
+
+// processBrokerDataGroup uses the cached broker data group off the BIG-IP to populate
+// the bindIDRouteURIPlanNameMap and create orphaned resources for those routes
+func (r *F5Router) processBrokerDataGroup(dg *bigipResources.InternalDataGroup) {
+	newbindIDRouteURIPlanNameMap := make(map[string]string)
+	planNamePlanIDMap := make(map[string]string)
+
+	r.plansMap.lock.Lock()
+	for _, plan := range r.plansMap.plans {
+		planNamePlanIDMap[plan.Name] = plan.ID
+	}
+	r.plansMap.lock.Unlock()
+
+	for _, record := range dg.Records {
+		newbindIDRouteURIPlanNameMap[record.Name] = record.Data
+
+		routeURI, planName, err := record.ReturnRouteURIAndPlanName()
+		if err != nil {
+			r.logger.Warn("process-broker-data-group-get-routeURI-planName-error", zap.Error(err))
+			continue
+		}
+
+		// Plan was not found so foundPlan is unitialized
+		foundPlanID := planNamePlanIDMap[planName]
+		if foundPlanID == "" {
+			r.logger.Warn(
+				"process-broker-data-group-find-plan-error",
+				zap.String("plan-not-found-skipping", fmt.Sprintf("Plan %s not found for route %s", planName, routeURI)),
+			)
+			continue
+		}
+
+		ru, err := NewUpdate(r.logger, routeUpdate.Bind, route.Uri(routeURI), nil, foundPlanID)
+		if err != nil {
+			r.logger.Warn("process-broker-data-group-new-update-error", zap.Error(err))
+			continue
+		}
+		r.UpdateRoute(ru)
+	}
+
+	r.logger.Debug(
+		"process-broker-data-group-processed-data-group",
+		zap.Object("data-group", newbindIDRouteURIPlanNameMap),
+	)
+
+	r.bindIDRouteURIPlanNameMap.lock.Lock()
+	defer r.bindIDRouteURIPlanNameMap.lock.Unlock()
+	r.bindIDRouteURIPlanNameMap.data = newbindIDRouteURIPlanNameMap
 }
 
 // processCachedDataGroup uses the cached data group off the BIG-IP to populate

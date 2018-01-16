@@ -141,6 +141,11 @@ var _ = Describe("ServiceBroker", func() {
 		Expect(binding).To(Equal(brokerapi.Binding{}))
 		Expect(err).NotTo(HaveOccurred())
 
+		bindID, routeURI, planID := router.AddBindIDRouteURIPlanNameMappingArgsForCall(0)
+		Expect(bindID).To(Equal("bindingID"))
+		Expect(routeURI).To(Equal("test.route/path"))
+		Expect(planID).To(Equal("planID"))
+
 		updateHTTP := router.UpdateRouteArgsForCall(0)
 		Expect(updateHTTP.Op()).To(Equal(routeUpdate.Bind))
 		Expect(updateHTTP.Route()).To(Equal("test.route/path"))
@@ -234,9 +239,16 @@ var _ = Describe("ServiceBroker", func() {
 			PlanID:    "planID",
 			ServiceID: "serviceID",
 		}
+		router.GetRouteURIFromBindIDReturns("test.route/path")
 		err = broker.Unbind(ctx, instanceID, "bindingID", unbindDetails)
 
 		Expect(err).NotTo(HaveOccurred())
+
+		routeURI := router.GetRouteURIFromBindIDArgsForCall(0)
+		Expect(routeURI).To(Equal("bindingID"))
+
+		bindID := router.RemoveBindIDRouteURIPlanNameMappingArgsForCall(0)
+		Expect(bindID).To(Equal("bindingID"))
 
 		updateHTTP = router.UpdateRouteArgsForCall(1)
 		Expect(updateHTTP.Op()).To(Equal(routeUpdate.Unbind))
