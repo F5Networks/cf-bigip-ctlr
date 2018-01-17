@@ -29,7 +29,7 @@ Features
 Guides
 ------
 
-See the |cfctlr-long| `user documentation </containers/v1/cloudfoundry/index.html>`_.
+See the |cfctlr-long| `user documentation`_.
 
 Overview
 --------
@@ -81,7 +81,7 @@ Configuration Parameters
 ------------------------
 
 The configuration parameters below customize the |cfctlr| behavior.
-Define the parameters in the ``env`` section of your `application manifest </containers/v1/cloudfoundry/cfctlr-app-install.html>`_ using the environment variable ``BIGIP_CTLR_CFG``.
+Define the parameters in the ``env`` section of the `Controller application manifest`_ using the environment variable ``BIGIP_CTLR_CFG``.
 
 .. tip::
 
@@ -108,12 +108,13 @@ Define the parameters in the ``env`` section of your `application manifest </con
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | partition                           | array   | Required | n/a            | The BIG-IP partition in which to configure objects.                             |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | balance                             | string  | Optional | round-robin    | Set the load balancing mode                                                     | Any BIG-IP-    |
+|    | balance                             | string  | Optional | round-robin    | Set the load balancing mode                                                     | Any BIG-IP     |
 |    |                                     |         |          |                |                                                                                 | supported mode |
+|    |                                     |         |          |                |                                                                                 | [#lb]_         |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | verify_interval                     | integer | Optional | 30             | In seconds; interval at which to verify the BIG-IP configuration.               |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
-|    | external_addr [#ext_addr]_          | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
+|    | external_addr [#extaddr]_           | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                |
 +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 |    | ssl_profiles                        | array   | Optional | n/a            | List of BIG-IP SSL policies to attach to the HTTPS routing virtual server.      |                |
 |    |                                     |         |          |                | [#ssl]_                                                                         |                |
@@ -205,16 +206,43 @@ Define the parameters in the ``env`` section of your `application manifest </con
 | tcp_router_group                         | string  | Optional | default-tcp    | Name of TCP router group                                                        |                |
 +------------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------+
 
-.. [#username] The controller requires the BIG-IP user account to have a defined role of ``Administrator``, ``Resource Administrator``, or ``Manager``. See `BIG-IP User Roles <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-user-account-administration-13-0-0/3.html>`_ for further details.
-.. [#ext_addr] The controller supports BIG-IP `route domain`_ specific addresses.
-.. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
+.. _session persistence:
+
+JSESSIONID Session Persistence
+``````````````````````````````
+
+The |cfctlr| enables session persistence on the BIG-IP device using cookies by default. To turn it off, set the :code:`session_persistence` :ref:`configuration parameter <cfctlr-configuration>` to "false", as shown below.
+
+.. code-block:: yaml
+
+   session_persistence: false
+
+To configure session persistence for the |cfctlr|, set cookies in your application's HTTP response headers as follows:
+
+``Set-Cookie: JSESSIONID=<value>; Max-Age=<age>``
+
+.. note::
+
+   - The cookie name of JSESSIONID is case insensitive so jsessionid and JSessionID are also valid.
+   - The cookie value can be any distinct value (in other words, be sure it's not the same as other cookies set by other responses).
+   - Setting the cookie Max-Age to the following values will result in the following behavior:
 
 \
+
+.. table:: Cookie Max-Age values
+
+   ==== =====================================================
+   Age    Behavior
+   ==== =====================================================
+   < 0     Session persists until client connection closes or one hour elapses.
+   > 0     Session persists until the Max-Age of the cookie.
+   = 0     Delete session persistence record if one exists on the BIG-IP system.
+   ==== =====================================================
 
 .. _cfctlr-config-examples:
 
 Configuration Examples
-``````````````````````
+----------------------
 
 The example |cfctlr| application manifest below defines the following:
 
@@ -252,37 +280,6 @@ If you define an SSL profile in the configuration (the ``ssl_profiles`` paramete
 You can attach multiple certificate/key pairs to the HTTPS virtual server.
 The BIG-IP device uses `TLS Server Name Indication`_ (SNI) to choose the correct certificate to present to the client; SNI allows the `Cloud Foundry`_ instance to support multiple hostnames (foo.mycf.com and bar.mycf.com).
 Some of these cert/key pairs can be wildcard (\*.mycf.com).
-
-.. _session persistence:
-
-JSESSIONID Session Persistence
-------------------------------
-
-The |cfctlr| enables session persistence on the BIG-IP device using cookies by default. To turn it off, set the :code:`session_persistence` :ref:`configuration parameter <cfctlr-configuration>` to "false", as shown below.
-
-.. code-block:: yaml
-
-   session_persistence: false
-
-To configure session persistence for the |cfctlr|, set cookies in your application's HTTP response headers as follows:
-
-``Set-Cookie: JSESSIONID=<value>; Max-Age=<age>``
-
-.. note::
-
-   - The cookie name of JSESSIONID is case insensitive so jsessionid and JSessionID are also valid.
-   - The cookie value can be any distinct value (in other words, be sure it's not the same as other cookies set by other responses).
-   - Setting the cookie Max-Age to the following values will result in the following behavior:
-
-.. table:: Cookie Max-Age values
-
-   ==== =====================================================
-   Age    Behavior
-   ==== =====================================================
-   < 0     Session persists until client connection closes or one hour elapses.
-   > 0     Session persists until the Max-Age of the cookie.
-   = 0     Delete session persistence record if one exists on the BIG-IP system.
-   ==== =====================================================
 
 .. _health checks:
 
@@ -377,14 +374,9 @@ The Controller supports the following log levels:
 - ``source``: The Controller function that initiated the log message
 - ``data``: Additional information, varies based on the message
 
-.. _Cloud Foundry: https://cloudfoundry.org/
-.. _Gorouter: https://github.com/cloudfoundry/gorouter
-.. _TLS Server Name Indication: https://tools.ietf.org/html/rfc6066#section-3
-.. _Deploying with Application Manifests: https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html
-.. _BIG-IP profiles: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0.html
-.. _policies: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-local-traffic-policies-getting-started-13-0-0.html
-.. _BIG-IP SSL profiles: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0/6.html
-.. _route domain: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/tmos-routing-administration-12-0-0/9.html
-.. |Slack| image:: https://f5cloudsolutions.herokuapp.com/badge.svg
-   :target: https://f5cloudsolutions.herokuapp.com
-   :alt: Slack
+.. rubric:: **Footnotes:**
+.. [#username] The controller requires the BIG-IP user account to have a defined role of ``Administrator``, ``Resource Administrator``, or ``Manager``. See `BIG-IP User Roles <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-user-account-administration-13-0-0/3.html>`_ for further details.
+.. [#lb] See "BIG-IP system load balancing methods" in the `BIG-IP Local Traffic Management Basics user guide <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-basics-13-0-0/4.html>`_.
+.. [#extaddr] The controller supports BIG-IP `route domain`_ specific addresses.
+.. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
+
