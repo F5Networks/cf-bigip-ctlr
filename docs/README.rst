@@ -376,7 +376,7 @@ The Controller supports the following log levels:
 
 .. rubric:: **Footnotes:**
 .. [#username] The controller requires the BIG-IP user account to have a defined role of ``Administrator``, ``Resource Administrator``, or ``Manager``. See `BIG-IP User Roles <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-user-account-administration-13-0-0/3.html>`_ for further details.
-.. [#lb] See "BIG-IP system load balancing methods" in the `BIG-IP Local Traffic Management Basics user guide <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-basics-13-0-0/4.html>`_.
+.. [#lb] The Controller supports load balancing algorithms that don't require additional user input. See "BIG-IP system load balancing methods" in the `BIG-IP Local Traffic Management Basics user guide <https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-basics-13-0-0/4.html>`_ for more information.
 .. [#extaddr] The controller supports BIG-IP `route domain`_ specific addresses.
 .. [#ssl] SSL profiles must already exist on the BIG-IP device in a partition accessible by the |cfctlr| (for example, :code:`/Common`).
 
