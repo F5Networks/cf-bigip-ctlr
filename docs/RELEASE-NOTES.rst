@@ -7,6 +7,10 @@ Release Notes for BIG-IP Controller for Cloud Foundry
 Added Functionality
 ```````````````````
 
+Bug Fixes
+`````````
+* Corrected a comparison problem in CCCL that caused unnecessary updates for BIG-IP Virtual Server resources.
+
 v1.0.0
 ------
 
