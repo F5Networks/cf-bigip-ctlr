@@ -41,26 +41,7 @@
       "properties": {
         "balance": {
           "type": "string",
-          "enum": ["dynamic-ratio-member",
-            "dynamic-ratio-node",
-            "fastest-app-response",
-            "fastest-node",
-            "least-connections-member",
-            "least-connections-node",
-            "least-sessions",
-            "observed-member",
-            "observed-node",
-            "predictive-member",
-            "predictive-node",
-            "ratio-least-connections-member",
-            "ratio-least-connections-node",
-            "ratio-member",
-            "ratio-node",
-            "round-robin",
-            "ratio-session",
-            "weighted-least-connections-member",
-            "weighted-least-connections-node"
-          ]
+          "minLength": 1
         },
         "healthMonitors": {
           "type": "array",

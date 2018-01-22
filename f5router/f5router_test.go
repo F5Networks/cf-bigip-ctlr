@@ -491,7 +491,7 @@ var _ = Describe("F5Router", func() {
 
 			registerRoutes()
 			// config0
-			matchConfig(mw, expectedConfigs[update])
+			matchConfig(mw, expectedConfigs[update], false)
 			update++
 
 			// make some changes and update the verification function
@@ -528,7 +528,7 @@ var _ = Describe("F5Router", func() {
 			router.UpdateRoute(up)
 
 			// config1
-			matchConfig(mw, expectedConfigs[update])
+			matchConfig(mw, expectedConfigs[update], false)
 			update++
 
 			up, err = NewUpdate(logger, routeUpdate.Add, "qux.cf.com", quxEndpoint, "")
@@ -536,7 +536,7 @@ var _ = Describe("F5Router", func() {
 			router.UpdateRoute(up)
 
 			// config2
-			matchConfig(mw, expectedConfigs[update])
+			matchConfig(mw, expectedConfigs[update], false)
 
 			os <- MockSignal(123)
 			Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
@@ -569,7 +569,7 @@ var _ = Describe("F5Router", func() {
 			registerRoutes()
 
 			//config3
-			matchConfig(mw, expectedConfigs[3])
+			matchConfig(mw, expectedConfigs[3], false)
 		})
 		Context("service broker route updates", func() {
 			var (
@@ -660,7 +660,7 @@ var _ = Describe("F5Router", func() {
 				Expect(err).NotTo(HaveOccurred())
 				router.UpdateRoute(up)
 
-				matchConfig(mw, expectedConfigs[7])
+				matchConfig(mw, expectedConfigs[7], false)
 
 				// Add a regular route that will have broker updates bound to it
 				up, err = NewUpdate(logger, routeUpdate.Add, "broker.cf.com/1", brokerEndpoint1, "")
@@ -697,7 +697,7 @@ var _ = Describe("F5Router", func() {
 				Expect(err).NotTo(HaveOccurred())
 				router.UpdateRoute(up)
 
-				matchConfig(mw, expectedConfigs[8])
+				matchConfig(mw, expectedConfigs[8], false)
 
 				// Add a regular route
 				up, err = NewUpdate(logger, routeUpdate.Add, "regular.cf.com/2", regularEndpoint2, "")
@@ -739,7 +739,7 @@ var _ = Describe("F5Router", func() {
 				Expect(err).NotTo(HaveOccurred())
 				router.UpdateRoute(up)
 
-				matchConfig(mw, expectedConfigs[9])
+				matchConfig(mw, expectedConfigs[9], false)
 
 				// Remove a regular route
 				up, err = NewUpdate(logger, routeUpdate.Remove, "regular.cf.com/2", regularEndpoint2, "")
@@ -781,7 +781,7 @@ var _ = Describe("F5Router", func() {
 				Expect(err).NotTo(HaveOccurred())
 				router.UpdateRoute(up)
 
-				matchConfig(mw, expectedConfigs[10])
+				matchConfig(mw, expectedConfigs[10], false)
 
 				os <- MockSignal(123)
 				Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
@@ -793,8 +793,6 @@ var _ = Describe("F5Router", func() {
 
 			BeforeEach(func() {
 				server = ghttp.NewServer()
-				fakeDataGroup = createFakeDataGroup()
-				server.AppendHandlers(ghttp.RespondWithJSONEncoded(http.StatusOK, fakeDataGroup))
 			})
 
 			AfterEach(func() {
@@ -802,6 +800,9 @@ var _ = Describe("F5Router", func() {
 				server.Close()
 			})
 			It("should be able to use a pre-existing datagroup", func() {
+				fakeDataGroup = createFakeDataGroup()
+				server.AppendHandlers(ghttp.RespondWithJSONEncoded(http.StatusOK, fakeDataGroup))
+
 				done := make(chan struct{})
 				os := make(chan os.Signal)
 				ready := make(chan struct{})
@@ -856,9 +857,91 @@ var _ = Describe("F5Router", func() {
 						Equal(badDests[1]),
 					))
 				}
-
 			})
+			It("should be able to use a pre-existing broker data group", func() {
+				fakeDataGroup = createFakeBrokerDataGroup()
+				server.AppendHandlers(ghttp.RespondWithJSONEncoded(http.StatusNotFound, "was not found"))
+				server.AppendHandlers(ghttp.RespondWithJSONEncoded(http.StatusOK, fakeDataGroup))
 
+				registerTestRoutes := func() {
+					noPlanEndpoint := makeEndpoint("127.0.0.1")
+					plan1Endpoint := makeEndpoint("127.0.1.1")
+					plan2Endpoint := makeEndpoint("127.0.1.2")
+					bunkPlanEndpoint := makeEndpoint("127.0.1.3")
+
+					pairs := []routePair{
+						routePair{"noPlan.cf.com", noPlanEndpoint},
+						routePair{"plan1.cf.com", plan1Endpoint},
+						routePair{"plan2.cf.com", plan2Endpoint},
+						routePair{"bunkPlan.cf.com", bunkPlanEndpoint},
+					}
+					for _, pair := range pairs {
+						up, _ = NewUpdate(logger, routeUpdate.Add, pair.url, pair.ep, "")
+						router.UpdateRoute(up)
+					}
+				}
+
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				// Update the config
+				c.BigIP.URL = server.URL()
+				c.BrokerMode = true
+
+				router, err = NewF5Router(logger, c, mw)
+
+				// Add broker plans to router
+				plans := make(map[string]planResources.Plan)
+				plans["plan1-GUID"] = planResources.Plan{
+					ID:   "plan1-GUID",
+					Name: "plan1",
+					VirtualServer: planResources.VirtualType{
+						Policies: []string{"/Common/Policy1", "/Common/Policy2"},
+					},
+					Pool: planResources.PoolType{
+						HealthMonitors: []bigipResources.Monitor{
+							bigipResources.Monitor{
+								Name:     "Monitor1",
+								Type:     "http",
+								Interval: 16,
+								Timeout:  5,
+								Send:     "Hello",
+							},
+						},
+					},
+				}
+				plans["plan2-GUID"] = planResources.Plan{
+					ID:   "plan2-GUID",
+					Name: "plan2",
+					VirtualServer: planResources.VirtualType{
+						Profiles:    []string{"/Common/Profile1", "/Common/Profile2"},
+						SslProfiles: []string{"/Common/SSLProfile1", "/Common/SSLProfile2"},
+					},
+					Pool: planResources.PoolType{
+						Balance: "ratio-node",
+					},
+				}
+				router.AddPlans(plans)
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+				Eventually(logger).Should(Say("process-broker-data-group-processed-data-group"))
+				Eventually(ready).Should(BeClosed())
+
+				// Rebuild routes with data group info
+				registerTestRoutes()
+
+				// Skip bigip validation since its URL is determined by the ghttp
+				// server mocking it so it will change
+				matchConfig(mw, expectedConfigs[11], true)
+			})
 		})
 
 		Context("fail cases", func() {
@@ -912,7 +995,7 @@ var _ = Describe("F5Router", func() {
 
 				Eventually(logger).Should(Say("Ran out of available IP addresses."))
 				// Verify the config, we should only see one 2nd tier vip, pool and rule
-				matchConfig(mw, expectedConfigs[6])
+				matchConfig(mw, expectedConfigs[6], false)
 
 			})
 
@@ -954,12 +1037,12 @@ var _ = Describe("F5Router", func() {
 
 			It("should register tcp routes", func() {
 				registerTCP()
-				matchConfig(mw, expectedConfigs[4])
+				matchConfig(mw, expectedConfigs[4], false)
 			})
 
 			It("should update tcp routes", func() {
 				registerTCP()
-				matchConfig(mw, expectedConfigs[4])
+				matchConfig(mw, expectedConfigs[4], false)
 				// add a pool member to existing pool
 				member := bigipResources.Member{Address: "10.0.0.1", Port: 6001, Session: "user-enabled"}
 				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6020, member)
@@ -977,12 +1060,12 @@ var _ = Describe("F5Router", func() {
 				rmEP2, _ := NewTCPUpdate(c, logger, routeUpdate.Remove, 6050, member)
 				router.UpdateRoute(rmEP2)
 
-				matchConfig(mw, expectedConfigs[5])
+				matchConfig(mw, expectedConfigs[5], false)
 			})
 
 			It("should not add the same pool member more than once", func() {
 				registerTCP()
-				matchConfig(mw, expectedConfigs[4])
+				matchConfig(mw, expectedConfigs[4], false)
 
 				member := bigipResources.Member{Address: "10.0.0.1", Port: 5000, Session: "user-enabled"}
 				ad, _ := NewTCPUpdate(c, logger, routeUpdate.Add, 6010, member)
@@ -990,7 +1073,7 @@ var _ = Describe("F5Router", func() {
 				router.UpdateRoute(ad)
 				router.UpdateRoute(ad)
 
-				matchConfig(mw, expectedConfigs[4])
+				matchConfig(mw, expectedConfigs[4], false)
 
 			})
 
@@ -1086,7 +1169,7 @@ func makeEndpoint(addr string) *route.Endpoint {
 	return r
 }
 
-func matchConfig(mw *MockWriter, expected []byte) {
+func matchConfig(mw *MockWriter, expected []byte, skipBigIPValidation bool) {
 	var matcher configMatcher
 	err := json.Unmarshal(expected, &matcher)
 	ExpectWithOffset(1, err).To(BeNil())
@@ -1095,9 +1178,11 @@ func matchConfig(mw *MockWriter, expected []byte) {
 		return mw.getInput().Global
 	}).Should(Equal(matcher.Global))
 
-	EventuallyWithOffset(1, func() config.BigIPConfig {
-		return mw.getInput().BigIP
-	}).Should(Equal(matcher.BigIP))
+	if !skipBigIPValidation {
+		EventuallyWithOffset(1, func() config.BigIPConfig {
+			return mw.getInput().BigIP
+		}).Should(Equal(matcher.BigIP))
+	}
 
 	matchVirtuals(mw, matcher)
 
@@ -1189,21 +1274,29 @@ func matchMonitors(mw *MockWriter, matcher configMatcher) {
 }
 
 func matchInternalDataGroups(mw *MockWriter, matcher configMatcher) {
-	for _, monitor := range matcher.Resources["cf"].InternalDataGroups[0].Records {
-		EventuallyWithOffset(2, func() []*bigipResources.InternalDataGroupRecord {
+	for _, dataGroup := range matcher.Resources["cf"].InternalDataGroups {
+		EventuallyWithOffset(2, func() string {
 			if _, ok := mw.getInput().Resources["cf"]; ok {
-				return mw.getInput().Resources["cf"].InternalDataGroups[0].Records
+				for _, dg := range mw.getInput().Resources["cf"].InternalDataGroups {
+					if dg.Name == dataGroup.Name {
+						matchInternalDataGroupRecords(dg, dataGroup)
+						return dg.Name
+					}
+				}
 			}
-			return nil
-		}).Should(ContainElement(monitor))
+			return ""
+		}).Should(Equal(dataGroup.Name), fmt.Sprintf("Expected %s data group", dataGroup.Name))
 	}
-	EventuallyWithOffset(2, func() int {
-		return len(mw.getInput().Resources["cf"].InternalDataGroups[0].Records)
-	}).Should(Equal(len(matcher.Resources["cf"].InternalDataGroups[0].Records)),
-		fmt.Sprintf("Expected %v \n to match \n %v",
-			format.Object(mw.getInput().Resources["cf"].InternalDataGroups[0].Records, 1),
-			format.Object(matcher.Resources["cf"].InternalDataGroups[0].Records, 1),
-		),
+}
+
+func matchInternalDataGroupRecords(dg, matcherDg *bigipResources.InternalDataGroup) {
+	for _, record := range matcherDg.Records {
+		Expect(dg.Records).Should(ContainElement(record),
+			fmt.Sprintf("%v missing from data group %v", record, dg.Records),
+		)
+	}
+	Expect(len(dg.Records)).Should(Equal(len(matcherDg.Records)),
+		fmt.Sprintf("Expected %v \n to match \n %v", format.Object(dg, 1), format.Object(matcherDg, 1)),
 	)
 }
 
@@ -1241,4 +1334,15 @@ func createFakeDataGroup() *bigipResources.InternalDataGroup {
 		},
 	}
 	return fake
+}
+
+func createFakeBrokerDataGroup() *bigipResources.InternalDataGroup {
+	return &bigipResources.InternalDataGroup{
+		Name: "fake-broker-data",
+		Records: []*bigipResources.InternalDataGroupRecord{
+			&bigipResources.InternalDataGroupRecord{Name: "bindingID1", Data: "plan1.cf.com|plan1"},
+			&bigipResources.InternalDataGroupRecord{Name: "bindingID2", Data: "plan2.cf.com|plan2"},
+			&bigipResources.InternalDataGroupRecord{Name: "bindingID3", Data: "bunkPlan.cf.com|plan3"},
+		},
+	}
 }

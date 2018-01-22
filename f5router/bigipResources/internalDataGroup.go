@@ -19,6 +19,8 @@ package bigipResources
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"strings"
 )
 
 // NewInternalDataGroup returns a new internal data group
@@ -76,4 +78,20 @@ func (idgr *InternalDataGroupRecord) ReturnTier2VirtualAddress() (*VirtualAddres
 		return nil, err
 	}
 	return td, nil
+}
+
+// ReturnRouteURIAndPlanName retuens the data record as a route URI and plan ID
+func (idgr *InternalDataGroupRecord) ReturnRouteURIAndPlanName() (string, string, error) {
+	splits := strings.Split(idgr.Data, "|")
+	if len(splits) != 2 {
+		return "", "", fmt.Errorf("Improperly formatted record: %s", idgr.Data)
+	}
+
+	routeURI := splits[0]
+	planName := splits[1]
+	if routeURI == "" || planName == "" {
+		return "", "", fmt.Errorf("Incorrect data missing routeURI: %s or planName: %s", routeURI, planName)
+	}
+
+	return routeURI, planName, nil
 }

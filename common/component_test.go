@@ -303,6 +303,7 @@ var _ = Describe("Component", func() {
 		req = buildRequest(component, path, "DELETE", nil)
 		req.SetBasicAuth("username", "password")
 
+		router.GetRouteURIFromBindIDReturns("test.route/path")
 		code, header, body = doRequest(req)
 		updateHTTP := router.UpdateRouteArgsForCall(0)
 		Expect(code).To(Equal(200))
@@ -358,7 +359,7 @@ var _ = Describe("Component", func() {
 	Describe("Register", func() {
 		var mbusClient *nats.Conn
 		var natsRunner *test_util.NATSRunner
-		var handler    http.Handler
+		var handler http.Handler
 
 		BeforeEach(func() {
 			natsPort := test_util.NextAvailPort()
