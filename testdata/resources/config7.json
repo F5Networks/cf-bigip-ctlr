@@ -1,0 +1,168 @@
+{
+  "bigip": {
+    "url": "http://example.com",
+    "username": "admin",
+    "password": "pass",
+    "partitions": [
+      "cf"
+    ]
+  },
+  "global": {
+    "log-level": "info",
+    "verify-interval": 30
+  },
+  "resources": {
+    "cf": {
+      "virtualServers": [
+        {
+          "name": "routing-vip-http",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/127.0.0.1:80",
+          "policies": [
+            {
+              "name": "cf-routing-policy",
+              "partition": "cf"
+            }
+          ],
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/forward-to-vip"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-regular-7a2a9964a05f5daa",
+          "pool": "/cf/cf-regular-7a2a9964a05f5daa",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10000",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        }
+      ],
+      "pools": [
+        {
+          "name": "cf-regular-7a2a9964a05f5daa",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.0.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/tcp_half_open"
+          ],
+          "description": "route: regular.cf.com/1 - App GUID: 1"
+        }
+      ],
+      "l7Policies": [
+        {
+          "controls": [
+            "forwarding"
+          ],
+          "legacy": true,
+          "name": "cf-routing-policy",
+          "requires": [
+            "http"
+          ],
+          "rules": [
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-regular-7a2a9964a05f5daa",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "regular.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "1"
+                  ]
+                }
+              ],
+              "name": "cf-regular-7a2a9964a05f5daa",
+              "ordinal": 0,
+              "description": "route: regular.cf.com/1 - App GUID: 1"
+            }
+          ],
+          "strategy": "/Common/first-match"
+        }
+      ],
+      "iRules": [
+        {
+          "name": "jsessionid-persistence",
+          "apiAnonymous": "\nwhen HTTP_RESPONSE {\n  set jsessionid [lsearch -inline -regexp [HTTP::cookie names] (?i)^jsessionid$]\n  set cookieVal [HTTP::cookie value $jsessionid]\n  if { $jsessionid ne \"\" } {\n    set maxAge [HTTP::cookie maxage $jsessionid]\n    if { $maxAge < 0 } {\n      persist add uie $cookieVal 3600\n    } elseif { $maxAge == 0 } {\n      if { [persist lookup uie $cookieVal] } {\n        persist delete uie $cookieVal\n      }\n    } else {\n      persist add uie $cookieVal $maxAge\n    }\n  }\n}\nwhen HTTP_REQUEST {\n  set jsessionid [lsearch -inline -regexp [HTTP::cookie names] (?i)^jsessionid$]\n  set cookieVal [HTTP::cookie value $jsessionid]\n  if { $jsessionid ne \"\" } {\n    set forwardNode [persist lookup uie $cookieVal node]\n    set forwardPort [persist lookup uie $cookieVal port]\n    set forwardIP $forwardNode:$forwardPort\n    if { $forwardNode ne \"\" && $forwardPort ne \"\" } {\n      node $forwardIP\n    } else {\n      log local0. \"Could not find endpoint for persistence record: $cookieVal. \\\n      Check to see if this record still exists (check Statistics -> Module Statistics -> Local \\\n      Traffic -> Persistence Records) or the status of the records endpoint.\"\n    }\n  }\n}"
+        },
+        {
+          "name": "forward-to-vip",
+          "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] && [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existent virtual $target_vip\"\n      reject\n    }\n  }\n}"
+        }
+      ],
+      "internalDataGroups": [
+        {
+          "name": "cf-ctlr-data-group",
+          "records": [
+            {
+              "name": "cf-regular-7a2a9964a05f5daa",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDB9"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

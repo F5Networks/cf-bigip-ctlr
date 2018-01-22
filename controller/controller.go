@@ -19,6 +19,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -56,6 +57,7 @@ func NewController(
 	r *registry.RouteRegistry,
 	routingTable *routingtable.RoutingTable,
 	v varz.Varz,
+	brokerHandler http.Handler,
 ) (*Controller, error) {
 	var host string
 
@@ -100,7 +102,7 @@ func NewController(
 		Logger: logger,
 	}
 
-	if err := component.Start(); err != nil {
+	if err := component.Start(brokerHandler); err != nil {
 		return nil, err
 	}
 

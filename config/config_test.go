@@ -138,7 +138,7 @@ suspend_pruning_if_nats_unavailable: true
 
 		It("sets default logging configs", func() {
 			Expect(config.Logging.Syslog).To(Equal(""))
-			Expect(config.Logging.Level).To(Equal("debug"))
+			Expect(config.Logging.Level).To(Equal("info"))
 			Expect(config.Logging.LoggregatorEnabled).To(Equal(false))
 		})
 
@@ -447,6 +447,18 @@ enable_proxy: true
 	})
 
 	Describe("Process", func() {
+		It("panics if user and pass not set with broker_mode enabled", func() {
+			var b = []byte(`
+broker_mode: true
+status:
+  user: ""
+  pass: ""
+`)
+			err := config.Initialize(b)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.Process).To(Panic())
+		})
+
 		It("converts intervals to durations", func() {
 			var b = []byte(`
 publish_start_message_interval: 1s

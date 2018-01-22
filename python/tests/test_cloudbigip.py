@@ -65,6 +65,8 @@ class CloudTest(unittest.TestCase):
             Mock()
         self.cccl._service_manager._service_deployer.deploy_ltm = \
             Mock(return_value=0)
+        self.cccl._bigip_proxy.get_default_route_domain = \
+            Mock(return_value=0)
 
     def read_test_vectors(self, cloud_state, network_state=None):
         """Read test vectors for the various states."""

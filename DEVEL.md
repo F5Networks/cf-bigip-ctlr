@@ -93,7 +93,7 @@ Travis:
 - Navigate to `travis-ci.org/profile/<_github_user_name>`.
 - Click "Sync account".
 - Click on `cf-bigip-ctlr` fork, then on "settings".
-- Add `DOCKER_U`, `DOCKER_P` and `DOCKER_NAMESPACE` -- this is the user or organization name on Docker Hub, and may be different than `DOCKER_U` in organziations.
+- Add `DOCKER_U`, `DOCKER_P` and `DOCKER_NAMESPACE` -- this is the user or organization name on Docker Hub, and may be different than `DOCKER_U` in organizations.
 
 In Docker Hub:  
 - Add a repo to that account named `cf-bigip-ctlr`.

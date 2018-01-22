@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #
-# This is the common enviromnent for building the runtime image, and the
+# This is the common environment for building the runtime image, and the
 # reusable developer image
 #
 # The build uses two docker container types:

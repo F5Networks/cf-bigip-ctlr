@@ -117,7 +117,7 @@ func (c *VcapComponent) UpdateVarz() {
 	c.Varz.Uptime = c.Varz.StartTime.Elapsed()
 }
 
-func (c *VcapComponent) Start() error {
+func (c *VcapComponent) Start(brokerHandler http.Handler) error {
 	if c.Varz.Type == "" {
 		err := errors.New("type is required")
 		log.Error("Component type is required", zap.Error(err))
@@ -149,6 +149,9 @@ func (c *VcapComponent) Start() error {
 	}
 
 	if c.Varz.Credentials == nil || len(c.Varz.Credentials) != 2 {
+		c.Logger.Warn("status user and/or pass not provided, controller will not run" +
+			"with broker features. If broker features are required please specify user" +
+			"and pass and restart controller.")
 		user, err := uuid.GenerateUUID()
 		if err != nil {
 			return err
@@ -169,7 +172,7 @@ func (c *VcapComponent) Start() error {
 
 	procStat = NewProcessStatus()
 
-	c.ListenAndServe()
+	c.ListenAndServe(brokerHandler)
 	return nil
 }
 
@@ -210,8 +213,12 @@ func (c *VcapComponent) Stop() {
 	}
 }
 
-func (c *VcapComponent) ListenAndServe() {
+func (c *VcapComponent) ListenAndServe(brokerHandler http.Handler) {
 	hs := http.NewServeMux()
+
+	if brokerHandler != nil {
+		hs.Handle("/", brokerHandler)
+	}
 
 	hs.HandleFunc("/health", func(w http.ResponseWriter, req *http.Request) {
 		c.Health.ServeHTTP(w, req)

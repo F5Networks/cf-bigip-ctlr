@@ -44,3 +44,31 @@ applications:
                         uri: http://api.system.pcf.local
                         port: 80
                         auth_disabled: false
+
+                      # Required to run as a Service Broker
+                      status:
+                        user: user
+                        pass: pass
+
+      # Only required if going to push controller as a Service Broker
+      SERVICE_BROKER_CONFIG: |
+                             plans:
+                              - description: plan for policy A,
+                                name: planA,
+                                virtualServer:
+                                  - policies:
+                                    - policyA
+                                  - profiles:
+                                    - profileA
+                                  - sslProfiles:
+                                    - sslProfileA
+                                pool:
+                                  balance: ratio-member
+                                  healthMonitors:
+                                    - name: /Common/http.get
+                                    - name: hm-test
+                                      type: http
+                                      interval: 12
+                                      timeout: 5
+                                      send: hello
+                                      recv: healthy

@@ -48,6 +48,31 @@ const (
 
 var LoadBalancingStrategies = []string{LOAD_BALANCE_RR, LOAD_BALANCE_LC}
 
+// ServiceBrokerConfig configuration parameters
+type ServiceBrokerConfig struct {
+	ID               string
+	Name             string
+	Description      string
+	DisplayName      string
+	LongDescription  string
+	DocumentationURL string
+	SupportURL       string
+	ImageURL         string
+	ProviderName     string
+}
+
+var defaultServiceBrokerConfig = ServiceBrokerConfig{
+	ID:               "",
+	Name:             "f5servicebroker",
+	Description:      "Bind F5 services to your routes",
+	DisplayName:      "F5 Service Broker",
+	LongDescription:  "Bind F5 services to your routes",
+	DocumentationURL: "http://clouddocs.f5.com/containers/v2/cloudfoundry/",
+	SupportURL:       "http://clouddocs.f5.com/containers/v2/cloudfoundry/",
+	ImageURL:         "https://cdn.f5.com/websites/support/assets/images/logo.svg",
+	ProviderName:     "F5 Networks",
+}
+
 type StatusConfig struct {
 	Host string `yaml:"host"`
 	Port uint16 `yaml:"port"`
@@ -69,6 +94,7 @@ type BigIPConfig struct {
 	Profiles          []string `yaml:"profiles" json:"-"`
 	HealthMonitors    []string `yaml:"health_monitors" json:"-"`
 	DriverCmd         string   `yaml:"driver_path" json:"-"`
+	Tier2IPRange      string   `yaml:"tier2_ip_range" json:"-"`
 }
 
 var defaultBigIPConfig = BigIPConfig{
@@ -141,29 +167,30 @@ type Tracing struct {
 }
 
 var defaultLoggingConfig = LoggingConfig{
-	Level:         "debug",
+	Level:         "info",
 	MetronAddress: "localhost:3457",
 }
 
 type Config struct {
-	BigIP                    BigIPConfig   `yaml:"bigip"`
-	Status                   StatusConfig  `yaml:"status"`
-	Nats                     []NatsConfig  `yaml:"nats"`
-	Logging                  LoggingConfig `yaml:"logging"`
-	Port                     uint16        `yaml:"port"`
-	Index                    uint          `yaml:"index"`
-	Zone                     string        `yaml:"zone"`
-	GoMaxProcs               int           `yaml:"go_max_procs,omitempty"`
-	Tracing                  Tracing       `yaml:"tracing"`
-	TraceKey                 string        `yaml:"trace_key"`
-	AccessLog                AccessLog     `yaml:"access_log"`
-	EnableAccessLogStreaming bool          `yaml:"enable_access_log_streaming"`
-	DebugAddr                string        `yaml:"debug_addr"`
-	EnablePROXY              bool          `yaml:"enable_proxy"`
-	EnableSSL                bool          `yaml:"enable_ssl"`
-	SSLPort                  uint16        `yaml:"ssl_port"`
-	SSLCertPath              string        `yaml:"ssl_cert_path"`
-	SSLKeyPath               string        `yaml:"ssl_key_path"`
+	BigIP                    BigIPConfig         `yaml:"bigip"`
+	Status                   StatusConfig        `yaml:"status"`
+	Broker                   ServiceBrokerConfig `yaml:"broker"`
+	Nats                     []NatsConfig        `yaml:"nats"`
+	Logging                  LoggingConfig       `yaml:"logging"`
+	Port                     uint16              `yaml:"port"`
+	Index                    uint                `yaml:"index"`
+	Zone                     string              `yaml:"zone"`
+	GoMaxProcs               int                 `yaml:"go_max_procs,omitempty"`
+	Tracing                  Tracing             `yaml:"tracing"`
+	TraceKey                 string              `yaml:"trace_key"`
+	AccessLog                AccessLog           `yaml:"access_log"`
+	EnableAccessLogStreaming bool                `yaml:"enable_access_log_streaming"`
+	DebugAddr                string              `yaml:"debug_addr"`
+	EnablePROXY              bool                `yaml:"enable_proxy"`
+	EnableSSL                bool                `yaml:"enable_ssl"`
+	SSLPort                  uint16              `yaml:"ssl_port"`
+	SSLCertPath              string              `yaml:"ssl_cert_path"`
+	SSLKeyPath               string              `yaml:"ssl_key_path"`
 	SSLCertificate           tls.Certificate
 	SkipSSLValidation        bool `yaml:"skip_ssl_validation"`
 	ForceForwardedProtoHttps bool `yaml:"force_forwarded_proto_https"`
@@ -181,6 +208,7 @@ type Config struct {
 	EndpointTimeout                 time.Duration `yaml:"endpoint_timeout"`
 	RouteServiceTimeout             time.Duration `yaml:"route_services_timeout"`
 	RouteMode                       string        `yaml:"route_mode"`
+	BrokerMode                      bool          `yaml:"broker_mode"`
 	RoutingMode                     RoutingMode
 
 	DrainWait          time.Duration `yaml:"drain_wait,omitempty"`
@@ -217,6 +245,7 @@ type Config struct {
 
 var defaultConfig = Config{
 	BigIP:   defaultBigIPConfig,
+	Broker:  defaultServiceBrokerConfig,
 	Status:  defaultStatusConfig,
 	Nats:    []NatsConfig{defaultNatsConfig},
 	Logging: defaultLoggingConfig,
@@ -239,7 +268,8 @@ var defaultConfig = Config{
 	TokenFetcherMaxRetries:                    3,
 	TokenFetcherRetryInterval:                 5 * time.Second,
 	TokenFetcherExpirationBufferTimeInSeconds: 30,
-	RouteMode: HTTP.String(),
+	RouteMode:  HTTP.String(),
+	BrokerMode: false,
 
 	LoadBalance: LOAD_BALANCE_RR,
 
@@ -340,6 +370,10 @@ func (c *Config) Process() {
 	if (c.RoutingMode == TCP) && !c.RoutingApiEnabled() {
 		errMsg := fmt.Sprintf("Routing API must be enable for TCP only route mode")
 		panic(errMsg)
+	}
+
+	if c.BrokerMode && (c.Status.User == "" || c.Status.Pass == "") {
+		panic("status user and pass must be set to run in service_broker mode")
 	}
 }
 
