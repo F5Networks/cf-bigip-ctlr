@@ -6,7 +6,7 @@
     "partitions": ["cf"]
   },
   "global": {
-    "log-level": "debug",
+    "log-level": "info",
     "verify-interval": 30
   },
   "resources": {
@@ -28,11 +28,18 @@
         }],
         "profiles": [{
           "name": "http",
-          "partition": "Common"
+          "partition": "Common",
+          "context": "all"
         }, {
           "name": "fakeprofile",
-          "partition": "Common"
-        }],
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }],
+        "rules": ["/cf/forward-to-vip"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
@@ -53,17 +60,215 @@
         }],
         "profiles": [{
           "name": "http",
-          "partition": "Common"
+          "partition": "Common",
+          "context": "all"
         }, {
           "name": "fakeprofile",
-          "partition": "Common"
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
         }, {
           "name": "clientssl",
-          "partition": "Common"
+          "partition": "Common",
+          "context": "clientside"
         }],
+        "rules": ["/cf/forward-to-vip"],
         "sourceAddressTranslation": {
           "type": "automap"
         }
+      }, {
+        "name": "cf-baz-69cf12df3b85f455",
+        "pool": "/cf/cf-baz-69cf12df3b85f455",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10003",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-baz-beac6f8bec5a4446",
+        "pool": "/cf/cf-baz-beac6f8bec5a4446",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10004",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-cf.com",
+        "pool": "/cf/cf-cf.com",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10005",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-foo.cf.com",
+        "pool": "/cf/cf-foo.cf.com",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10006",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-ser_.cf.com",
+        "pool": "/cf/cf-ser_.cf.com",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10007",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-ser_es.cf.com",
+        "pool": "/cf/cf-ser_es.cf.com",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10008",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-baz-9a96ddcfe07bb46e",
+        "pool": "/cf/cf-baz-9a96ddcfe07bb46e",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10002",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-_vices.cf.com",
+        "pool": "/cf/cf-_vices.cf.com",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10009",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-bar-d21aa8a505891ac9",
+        "pool": "/cf/cf-bar-d21aa8a505891ac9",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10001",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
+      }, {
+        "name": "cf-foo-e500900501f76ce8",
+        "pool": "/cf/cf-foo-e500900501f76ce8",
+        "ipProtocol": "tcp",
+        "enabled": true,
+        "destination": "/cf/10.0.0.1:10000",
+        "source": "10.0.0.1/32",
+        "sourceAddressTranslation": {
+          "type": "automap"
+        },
+        "profiles": [{
+          "name": "http",
+          "partition": "Common",
+          "context": "all"
+        }, {
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+          }]
       }],
       "pools": [{
         "name": "cf-ser_.cf.com",
@@ -185,10 +390,12 @@
         "requires": ["http"],
         "rules": [{
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-foo-e500900501f76ce8",
-            "request": true
+            "request": true,
+            "expression": "cf-foo-e500900501f76ce8",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "equals": true,
@@ -204,10 +411,12 @@
           "description": "route: foo.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-baz-beac6f8bec5a4446",
-            "request": true
+            "request": true,
+            "expression": "cf-baz-beac6f8bec5a4446",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "equals": true,
@@ -247,10 +456,12 @@
           "description": "route: baz.cf.com/segment1/segment2/segment3 - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-baz-69cf12df3b85f455",
-            "request": true
+            "request": true,
+            "expression": "cf-baz-69cf12df3b85f455",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "equals": true,
@@ -274,10 +485,12 @@
           "description": "route: baz.cf.com/segment1 - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-baz-9a96ddcfe07bb46e",
-            "request": true
+            "request": true,
+            "expression": "cf-baz-9a96ddcfe07bb46e",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "equals": true,
@@ -293,10 +506,12 @@
           "description": "route: baz.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-bar-d21aa8a505891ac9",
-            "request": true
+            "request": true,
+            "expression": "cf-bar-d21aa8a505891ac9",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "equals": true,
@@ -312,10 +527,12 @@
           "description": "route: bar.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-ser_es.cf.com",
-            "request": true
+            "request": true,
+            "expression": "cf-ser_es.cf.com",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "startsWith": true,
@@ -339,10 +556,12 @@
           "description": "route: ser*es.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-ser_.cf.com",
-            "request": true
+            "request": true,
+            "expression": "cf-ser_.cf.com",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "startsWith": true,
@@ -366,10 +585,12 @@
           "description": "route: ser*.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-_vices.cf.com",
-            "request": true
+            "request": true,
+            "expression": "cf-_vices.cf.com",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "endsWith": true,
@@ -385,10 +606,12 @@
           "description": "route: *vices.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-foo.cf.com",
-            "request": true
+            "request": true,
+            "expression": "cf-foo.cf.com",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "endsWith": true,
@@ -404,10 +627,12 @@
           "description": "route: *.foo.cf.com - App GUID: 1"
         }, {
           "actions": [{
-            "forward": true,
             "name": "0",
-            "pool": "/cf/cf-cf.com",
-            "request": true
+            "request": true,
+            "expression": "cf-cf.com",
+            "tmName": "target_vip",
+            "tcl": true,
+            "setVariable": true
           }],
           "conditions": [{
             "endsWith": true,
@@ -423,6 +648,44 @@
           "description": "route: *.cf.com - App GUID: 1"
         }],
         "strategy": "/Common/first-match"
+      }],
+      "iRules": [{
+        "name": "forward-to-vip",
+        "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] \u0026\u0026 [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existent virtual $target_vip\"\n      reject\n    }\n  }\n}"
+      }],
+      "internalDataGroups": [{
+        "name": "cf-ctlr-data-group",
+        "records": [{
+          "name": "cf-ser_es.cf.com",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDh9"
+        }, {
+          "name": "cf-baz-9a96ddcfe07bb46e",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDJ9"
+        }, {
+          "name": "cf-baz-69cf12df3b85f455",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDN9"
+        }, {
+          "name": "cf-baz-beac6f8bec5a4446",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDR9"
+        }, {
+          "name": "cf-cf.com",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDV9"
+        }, {
+          "name": "cf-foo.cf.com",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDZ9"
+        }, {
+          "name": "cf-ser_.cf.com",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDd9"
+        }, {
+          "name": "cf-_vices.cf.com",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDl9"
+        }, {
+          "name": "cf-foo-e500900501f76ce8",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDB9"
+        }, {
+          "name": "cf-bar-d21aa8a505891ac9",
+          "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDF9"
+        }]
       }]
     }
   }

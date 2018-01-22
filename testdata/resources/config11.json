@@ -1,0 +1,422 @@
+{
+  "bigip": {
+    "url": "http://127.0.0.1:37399",
+    "username": "admin",
+    "password": "pass",
+    "partitions": [
+      "cf"
+    ]
+  },
+  "global": {
+    "log-level": "info",
+    "verify-interval": 30
+  },
+  "resources": {
+    "cf": {
+      "virtualServers": [
+        {
+          "name": "routing-vip-http",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/127.0.0.1:80",
+          "policies": [
+            {
+              "name": "cf-routing-policy",
+              "partition": "cf"
+            }
+          ],
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/forward-to-vip"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-noPlan-2ee66608b4de9648",
+          "pool": "/cf/cf-noPlan-2ee66608b4de9648",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10000",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-plan1-d5f1e1964b75d4eb",
+          "pool": "/cf/cf-plan1-d5f1e1964b75d4eb",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10001",
+          "source": "10.0.0.1/32",
+          "policies": [
+            {
+              "name": "Policy1",
+              "partition": "Common"
+            },
+            {
+              "name": "Policy2",
+              "partition": "Common"
+            }
+          ],
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-plan2-a87ec48a938f8d0f",
+          "pool": "/cf/cf-plan2-a87ec48a938f8d0f",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10002",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "Profile1",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "Profile2",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "SSLProfile1",
+              "partition": "Common",
+              "context": "serverside"
+            },
+            {
+              "name": "SSLProfile2",
+              "partition": "Common",
+              "context": "serverside"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-bunkPlan-576886d8970bb8be",
+          "pool": "/cf/cf-bunkPlan-576886d8970bb8be",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10003",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        }
+      ],
+      "pools": [
+        {
+          "name": "cf-bunkPlan-576886d8970bb8be",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.1.3",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/tcp_half_open"
+          ],
+          "description": "route: bunkPlan.cf.com - App GUID: 1"
+        },
+        {
+          "name": "cf-noPlan-2ee66608b4de9648",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.0.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/tcp_half_open"
+          ],
+          "description": "route: noPlan.cf.com - App GUID: 1"
+        },
+        {
+          "name": "cf-plan1-d5f1e1964b75d4eb",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.1.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/cf/Monitor1"
+          ],
+          "description": "route: plan1.cf.com - App GUID: 1"
+        },
+        {
+          "name": "cf-plan2-a87ec48a938f8d0f",
+          "loadBalancingMode": "ratio-node",
+          "members": [
+            {
+              "address": "127.0.1.2",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/tcp_half_open"
+          ],
+          "description": "route: plan2.cf.com - App GUID: 1"
+        }
+      ],
+      "monitors": [
+        {
+          "name": "Monitor1",
+          "interval": 16,
+          "type": "http",
+          "send": "Hello",
+          "timeout": 5
+        }
+      ],
+      "l7Policies": [
+        {
+          "controls": [
+            "forwarding"
+          ],
+          "legacy": true,
+          "name": "cf-routing-policy",
+          "requires": [
+            "http"
+          ],
+          "rules": [
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-plan2-a87ec48a938f8d0f",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "plan2.cf.com"
+                  ]
+                }
+              ],
+              "name": "cf-plan2-a87ec48a938f8d0f",
+              "ordinal": 0,
+              "description": "route: plan2.cf.com - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-plan1-d5f1e1964b75d4eb",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "plan1.cf.com"
+                  ]
+                }
+              ],
+              "name": "cf-plan1-d5f1e1964b75d4eb",
+              "ordinal": 1,
+              "description": "route: plan1.cf.com - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-noPlan-2ee66608b4de9648",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "noPlan.cf.com"
+                  ]
+                }
+              ],
+              "name": "cf-noPlan-2ee66608b4de9648",
+              "ordinal": 2,
+              "description": "route: noPlan.cf.com - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-bunkPlan-576886d8970bb8be",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "bunkPlan.cf.com"
+                  ]
+                }
+              ],
+              "name": "cf-bunkPlan-576886d8970bb8be",
+              "ordinal": 3,
+              "description": "route: bunkPlan.cf.com - App GUID: 1"
+            }
+          ],
+          "strategy": "/Common/first-match"
+        }
+      ],
+      "iRules": [
+        {
+          "name": "jsessionid-persistence",
+          "apiAnonymous": "\nwhen HTTP_RESPONSE {\n  set jsessionid [lsearch -inline -regexp [HTTP::cookie names] (?i)^jsessionid$]\n  set cookieVal [HTTP::cookie value $jsessionid]\n  if { $jsessionid ne \"\" } {\n    set maxAge [HTTP::cookie maxage $jsessionid]\n    if { $maxAge < 0 } {\n      persist add uie $cookieVal 3600\n    } elseif { $maxAge == 0 } {\n      if { [persist lookup uie $cookieVal] } {\n        persist delete uie $cookieVal\n      }\n    } else {\n      persist add uie $cookieVal $maxAge\n    }\n  }\n}\nwhen HTTP_REQUEST {\n  set jsessionid [lsearch -inline -regexp [HTTP::cookie names] (?i)^jsessionid$]\n  set cookieVal [HTTP::cookie value $jsessionid]\n  if { $jsessionid ne \"\" } {\n    set forwardNode [persist lookup uie $cookieVal node]\n    set forwardPort [persist lookup uie $cookieVal port]\n    set forwardIP $forwardNode:$forwardPort\n    if { $forwardNode ne \"\" && $forwardPort ne \"\" } {\n      node $forwardIP\n    } else {\n      log local0. \"Could not find endpoint for persistence record: $cookieVal. \\\n      Check to see if this record still exists (check Statistics -> Module Statistics -> Local \\\n      Traffic -> Persistence Records) or the status of the records endpoint.\"\n    }\n  }\n}"
+        },
+        {
+          "name": "forward-to-vip",
+          "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] && [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existent virtual $target_vip\"\n      reject\n    }\n  }\n}"
+        }
+      ],
+      "internalDataGroups": [
+        {
+          "name": "cf-ctlr-data-group",
+          "records": [
+            {
+              "name": "cf-plan1-d5f1e1964b75d4eb",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDF9"
+            },
+            {
+              "name": "cf-plan2-a87ec48a938f8d0f",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDJ9"
+            },
+            {
+              "name": "cf-bunkPlan-576886d8970bb8be",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDN9"
+            },
+            {
+              "name": "cf-noPlan-2ee66608b4de9648",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDB9"
+            }
+          ]
+        },
+        {
+          "name": "cf-broker-data-group",
+          "records": [
+            {
+              "name": "bindingID1",
+              "data": "plan1.cf.com|plan1"
+            },
+            {
+              "name": "bindingID2",
+              "data": "plan2.cf.com|plan2"
+            },
+            {
+              "name": "bindingID3",
+              "data": "bunkPlan.cf.com|plan3"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -13,7 +13,7 @@ CURDIR="$(dirname $BASH_SOURCE)"
 # build dependencies and so on.
 #
 # Adding editing tools is discouraged, since the pattern is to edit files
-# outside a conatiner.
+# outside a container.
 #
 # Runtime Dockerfile will add only the runtime dependencies
 

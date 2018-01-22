@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"runtime"
@@ -24,6 +25,7 @@ import (
 	rregistry "github.com/F5Networks/cf-bigip-ctlr/registry"
 	"github.com/F5Networks/cf-bigip-ctlr/routefetcher"
 	"github.com/F5Networks/cf-bigip-ctlr/routingtable"
+	"github.com/F5Networks/cf-bigip-ctlr/servicebroker"
 	rvarz "github.com/F5Networks/cf-bigip-ctlr/varz"
 
 	"code.cloudfoundry.org/clock"
@@ -52,16 +54,15 @@ var (
 
 func main() {
 	versionFlag := flag.Bool("version", false, "Print version and exit")
-
-	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
-	if !ok {
-		flag.StringVar(&configFile, "c", "", "Configuration File")
-	}
-	flag.Parse()
-
 	if *versionFlag {
 		fmt.Printf("Version: %s\nBuild: %s\n", version, buildInfo)
 		os.Exit(0)
+	}
+
+	val, ok := os.LookupEnv("BIGIP_CTLR_CFG")
+	if !ok {
+		flag.StringVar(&configFile, "c", "", "Configuration File - deprecated")
+		flag.Parse()
 	}
 
 	c := config.DefaultConfig()
@@ -165,6 +166,21 @@ func main() {
 		logger.Session("python-driver"),
 	)
 
+	var brokerHandler http.Handler
+	if c.BrokerMode {
+		sb, err := servicebroker.NewServiceBroker(c, logger, f5Router)
+		if nil != err {
+			logger.Fatal("create-new-broker-error", zap.Error(err))
+		} else {
+			err = sb.ProcessPlans()
+			if nil != err {
+				logger.Fatal("process-broker-plan-error", zap.Error(err))
+			} else {
+				brokerHandler = sb.Handler
+			}
+		}
+	}
+
 	var members grouper.Members
 
 	// registry is for http routing routes - if not in tcp only mode
@@ -209,6 +225,7 @@ func main() {
 		registry,
 		routingTable,
 		varz,
+		brokerHandler,
 	)
 	if nil != err {
 		logger.Fatal("failed-starting-controller", zap.Error(err))

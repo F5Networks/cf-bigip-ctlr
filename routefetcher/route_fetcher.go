@@ -153,7 +153,7 @@ func (r *RouteFetcher) subscribeToEvents(token *schema.Token) error {
 	} else if protocol == "tcp" {
 		return r.subscribeToTCP()
 	}
-	return errors.New("Unkown protocol")
+	return errors.New("Unknown protocol")
 }
 
 func (r *RouteFetcher) subscribeToHTTP() error {

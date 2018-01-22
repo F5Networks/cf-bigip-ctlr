@@ -6,53 +6,78 @@
     "partitions": ["cf"]
   },
   "global": {
-    "log-level": "debug",
+    "log-level": "info",
     "verify-interval": 30
   },
   "resources": {
     "cf": {
       "virtualServers": [{
         "name": "cf-tcp-route-default-tcp-6060",
-        "pool": "cf-tcp-route-default-tcp-6060",
+        "pool": "/cf/cf-tcp-route-default-tcp-6060",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/127.0.0.1:6060",
+        "profiles": [{
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+        }],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-tcp-route-default-tcp-6010",
-        "pool": "cf-tcp-route-default-tcp-6010",
+        "pool": "/cf/cf-tcp-route-default-tcp-6010",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/127.0.0.1:6010",
+        "profiles": [{
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+        }],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-tcp-route-default-tcp-6020",
-        "pool": "cf-tcp-route-default-tcp-6020",
+        "pool": "/cf/cf-tcp-route-default-tcp-6020",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/127.0.0.1:6020",
+        "profiles": [{
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+        }],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-tcp-route-default-tcp-6030",
-        "pool": "cf-tcp-route-default-tcp-6030",
+        "pool": "/cf/cf-tcp-route-default-tcp-6030",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/127.0.0.1:6030",
+        "profiles": [{
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+        }],
         "sourceAddressTranslation": {
           "type": "automap"
         }
       }, {
         "name": "cf-tcp-route-default-tcp-6040",
-        "pool": "cf-tcp-route-default-tcp-6040",
+        "pool": "/cf/cf-tcp-route-default-tcp-6040",
         "ipProtocol": "tcp",
         "enabled": true,
         "destination": "/cf/127.0.0.1:6040",
+        "profiles": [{
+          "name": "tcp",
+          "partition": "Common",
+          "context": "all"
+        }],
         "sourceAddressTranslation": {
           "type": "automap"
         }
@@ -115,6 +140,10 @@
         }],
         "monitors": ["/Common/tcp_half_open"],
         "description": "route-port: 6060, router-group: default-tcp"
+      }],
+      "internalDataGroups": [{
+        "name": "cf-ctlr-data-group",
+        "records": null
       }]
     }
   }

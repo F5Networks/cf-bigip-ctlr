@@ -96,7 +96,7 @@ func (tcpFetcher *TCPFetcher) HandleEvent(e interface{}) {
 	logger := tcpFetcher.logger.Session("handle-event")
 	event, ok := e.(routing_api.TcpEvent)
 	if !ok {
-		logger.Warn("recieved-wrong-event-type",
+		logger.Warn("received-wrong-event-type",
 			zap.String("event-type", fmt.Sprint(reflect.TypeOf(event))),
 		)
 	}

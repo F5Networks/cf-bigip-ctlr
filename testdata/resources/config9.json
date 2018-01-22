@@ -1,0 +1,619 @@
+{
+  "bigip": {
+    "url": "http://example.com",
+    "username": "admin",
+    "password": "pass",
+    "partitions": [
+      "cf"
+    ]
+  },
+  "global": {
+    "log-level": "info",
+    "verify-interval": 30
+  },
+  "resources": {
+    "cf": {
+      "virtualServers": [
+        {
+          "name": "cf-regular-1ca5962b215fe503",
+          "pool": "/cf/cf-regular-1ca5962b215fe503",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10004",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-broker-81210ad8ea7ae376",
+          "pool": "/cf/cf-broker-81210ad8ea7ae376",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10005",
+          "source": "10.0.0.1/32",
+          "policies": [
+            {
+              "name": "plan1-policy",
+              "partition": "test"
+            }
+          ],
+          "profiles": [
+            {
+              "name": "plan1-profile",
+              "partition": "test",
+              "context": "all"
+            },
+            {
+              "name": "plan1-ssl-profile",
+              "partition": "test",
+              "context": "serverside"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "routing-vip-http",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/127.0.0.1:80",
+          "policies": [
+            {
+              "name": "cf-routing-policy",
+              "partition": "cf"
+            }
+          ],
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/forward-to-vip"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-broker-94446b32d1326448",
+          "pool": "/cf/cf-broker-94446b32d1326448",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10000",
+          "source": "10.0.0.1/32",
+          "policies": [
+            {
+              "name": "plan1-policy",
+              "partition": "test"
+            }
+          ],
+          "profiles": [
+            {
+              "name": "plan1-profile",
+              "partition": "test",
+              "context": "all"
+            },
+            {
+              "name": "plan1-ssl-profile",
+              "partition": "test",
+              "context": "serverside"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-broker-984ca890e3ed79b5",
+          "pool": "/cf/cf-broker-984ca890e3ed79b5",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10001",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-broker-03cff0fb7b16d6a0",
+          "pool": "/cf/cf-broker-03cff0fb7b16d6a0",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10002",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        },
+        {
+          "name": "cf-broker-d6261204253af0d9",
+          "pool": "/cf/cf-broker-d6261204253af0d9",
+          "ipProtocol": "tcp",
+          "enabled": true,
+          "destination": "/cf/10.0.0.1:10003",
+          "source": "10.0.0.1/32",
+          "profiles": [
+            {
+              "name": "http",
+              "partition": "Common",
+              "context": "all"
+            },
+            {
+              "name": "tcp",
+              "partition": "Common",
+              "context": "all"
+            }
+          ],
+          "rules": [
+            "/cf/jsessionid-persistence"
+          ],
+          "sourceAddressTranslation": {
+            "type": "automap"
+          }
+        }
+      ],
+      "pools": [
+        {
+          "name": "cf-broker-03cff0fb7b16d6a0",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.1.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/cf/plan2-monitor1",
+            "/cf/plan2-monitor2"
+          ],
+          "description": "route: broker.cf.com/5 - App GUID: 1"
+        },
+        {
+          "name": "cf-broker-d6261204253af0d9",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.1.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/cf/plan2-monitor1",
+            "/cf/plan2-monitor2"
+          ],
+          "description": "route: broker.cf.com/6 - App GUID: 1"
+        },
+        {
+          "name": "cf-regular-1ca5962b215fe503",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.0.2",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/tcp_half_open"
+          ],
+          "description": "route: regular.cf.com/2 - App GUID: 1"
+        },
+        {
+          "name": "cf-broker-81210ad8ea7ae376",
+          "loadBalancingMode": "ratio-member",
+          "members": [
+            {
+              "address": "127.0.1.2",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/existing-bigip-monitor",
+            "/cf/plan1-monitor1"
+          ],
+          "description": "route: broker.cf.com/2 - App GUID: 1"
+        },
+        {
+          "name": "cf-broker-94446b32d1326448",
+          "loadBalancingMode": "ratio-member",
+          "members": [
+            {
+              "address": "127.0.1.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/Common/existing-bigip-monitor",
+            "/cf/plan1-monitor1"
+          ],
+          "description": "route: broker.cf.com/4 - App GUID: 1"
+        },
+        {
+          "name": "cf-broker-984ca890e3ed79b5",
+          "loadBalancingMode": "round-robin",
+          "members": [
+            {
+              "address": "127.0.1.1",
+              "port": 80,
+              "session": "user-enabled"
+            }
+          ],
+          "monitors": [
+            "/cf/plan2-monitor1",
+            "/cf/plan2-monitor2"
+          ],
+          "description": "route: broker.cf.com/1 - App GUID: 1"
+        }
+      ],
+      "monitors": [
+        {
+          "name": "plan2-monitor1",
+          "type": "http"
+        },
+        {
+          "name": "plan2-monitor2",
+          "type": "tcp"
+        },
+        {
+          "name": "plan1-monitor1",
+          "type": "http"
+        }
+      ],
+      "l7Policies": [
+        {
+          "controls": [
+            "forwarding"
+          ],
+          "legacy": true,
+          "name": "cf-routing-policy",
+          "requires": [
+            "http"
+          ],
+          "rules": [
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-regular-1ca5962b215fe503",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "regular.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "2"
+                  ]
+                }
+              ],
+              "name": "cf-regular-1ca5962b215fe503",
+              "ordinal": 0,
+              "description": "route: regular.cf.com/2 - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-broker-d6261204253af0d9",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "broker.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "6"
+                  ]
+                }
+              ],
+              "name": "cf-broker-d6261204253af0d9",
+              "ordinal": 1,
+              "description": "route: broker.cf.com/6 - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-broker-03cff0fb7b16d6a0",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "broker.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "5"
+                  ]
+                }
+              ],
+              "name": "cf-broker-03cff0fb7b16d6a0",
+              "ordinal": 2,
+              "description": "route: broker.cf.com/5 - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-broker-94446b32d1326448",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "broker.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "4"
+                  ]
+                }
+              ],
+              "name": "cf-broker-94446b32d1326448",
+              "ordinal": 3,
+              "description": "route: broker.cf.com/4 - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-broker-81210ad8ea7ae376",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "broker.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "2"
+                  ]
+                }
+              ],
+              "name": "cf-broker-81210ad8ea7ae376",
+              "ordinal": 4,
+              "description": "route: broker.cf.com/2 - App GUID: 1"
+            },
+            {
+              "actions": [
+                {
+                  "name": "0",
+                  "request": true,
+                  "expression": "cf-broker-984ca890e3ed79b5",
+                  "tmName": "target_vip",
+                  "tcl": true,
+                  "setVariable": true
+                }
+              ],
+              "conditions": [
+                {
+                  "equals": true,
+                  "host": true,
+                  "httpHost": true,
+                  "name": "0",
+                  "index": 0,
+                  "request": true,
+                  "values": [
+                    "broker.cf.com"
+                  ]
+                },
+                {
+                  "equals": true,
+                  "httpUri": true,
+                  "pathSegment": true,
+                  "name": "1",
+                  "index": 1,
+                  "request": true,
+                  "values": [
+                    "1"
+                  ]
+                }
+              ],
+              "name": "cf-broker-984ca890e3ed79b5",
+              "ordinal": 5,
+              "description": "route: broker.cf.com/1 - App GUID: 1"
+            }
+          ],
+          "strategy": "/Common/first-match"
+        }
+      ],
+      "iRules": [
+        {
+          "name": "jsessionid-persistence",
+          "apiAnonymous": "\nwhen HTTP_RESPONSE {\n  set jsessionid [lsearch -inline -regexp [HTTP::cookie names] (?i)^jsessionid$]\n  set cookieVal [HTTP::cookie value $jsessionid]\n  if { $jsessionid ne \"\" } {\n    set maxAge [HTTP::cookie maxage $jsessionid]\n    if { $maxAge < 0 } {\n      persist add uie $cookieVal 3600\n    } elseif { $maxAge == 0 } {\n      if { [persist lookup uie $cookieVal] } {\n        persist delete uie $cookieVal\n      }\n    } else {\n      persist add uie $cookieVal $maxAge\n    }\n  }\n}\nwhen HTTP_REQUEST {\n  set jsessionid [lsearch -inline -regexp [HTTP::cookie names] (?i)^jsessionid$]\n  set cookieVal [HTTP::cookie value $jsessionid]\n  if { $jsessionid ne \"\" } {\n    set forwardNode [persist lookup uie $cookieVal node]\n    set forwardPort [persist lookup uie $cookieVal port]\n    set forwardIP $forwardNode:$forwardPort\n    if { $forwardNode ne \"\" && $forwardPort ne \"\" } {\n      node $forwardIP\n    } else {\n      log local0. \"Could not find endpoint for persistence record: $cookieVal. \\\n      Check to see if this record still exists (check Statistics -> Module Statistics -> Local \\\n      Traffic -> Persistence Records) or the status of the records endpoint.\"\n    }\n  }\n}"
+        },
+        {
+          "name": "forward-to-vip",
+          "apiAnonymous": "\nwhen HTTP_REQUEST {\n  if {[info exists target_vip] && [string length $target_vip] != 0} {\n    if { [catch { virtual $target_vip } ] } {\n      log local0. \"ERROR: Attempting to assign traffic to non-existent virtual $target_vip\"\n      reject\n    }\n  }\n}"
+        }
+      ],
+      "internalDataGroups": [
+        {
+          "name": "cf-ctlr-data-group",
+          "records": [
+            {
+              "name": "cf-broker-984ca890e3ed79b5",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDF9"
+            },
+            {
+              "name": "cf-broker-03cff0fb7b16d6a0",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDJ9"
+            },
+            {
+              "name": "cf-broker-d6261204253af0d9",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDN9"
+            },
+            {
+              "name": "cf-regular-1ca5962b215fe503",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDR9"
+            },
+            {
+              "name": "cf-broker-81210ad8ea7ae376",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDV9"
+            },
+            {
+              "name": "cf-broker-94446b32d1326448",
+              "data": "eyJiaW5kQWRkciI6IjEwLjAuMC4xIiwicG9ydCI6MTAwMDB9"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

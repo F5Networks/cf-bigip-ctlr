@@ -60,6 +60,7 @@ var _ = Describe("Controller", func() {
 		logger       logger.Logger
 		controller   *Controller
 		statusPort   uint16
+		handler      http.Handler
 	)
 
 	BeforeEach(func() {
@@ -80,7 +81,7 @@ var _ = Describe("Controller", func() {
 		varz = vvarz.NewVarz(registry)
 
 		var err error
-		controller, err = NewController(logger, config, mbusClient, registry, routingTable, varz)
+		controller, err = NewController(logger, config, mbusClient, registry, routingTable, varz, handler)
 
 		Expect(err).ToNot(HaveOccurred())
 
