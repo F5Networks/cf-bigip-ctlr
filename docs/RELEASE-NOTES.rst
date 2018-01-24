@@ -20,6 +20,9 @@ Limitations
 * Controller doesn't support Service bindings.
 * Controller cannot accept Arbitrary Parameters via ``cf create-service|bind-service -c``.
 * Controller doesn't support the use of ``cf update-service``.
+* The BIG-IP data group cf-ctlr-data-group, found in the same partition that the controller manages, needs verification if the controller crashes. There should be a one to one mapping of tier 2 VIPs to data group records with the same name. If the record is missing for a VIP the controller will not rebuild the BIG-IP to the correct state it was in before the crash. This is because the controller crashed before the updated data group got written out. This condition requires manual intervention. Update the data group with the missing VIP's name as key and virtual address and port as data. The data must follow this format: {"bindAddr":"ADDRESS","port":PORT}. Encode the data as base64.
+* JSESSIONID cookie session persistence will not work for BIG-IP v11.6.1 and will cause `Connection Reset by Peer` connection errors. Correct this by disabling session persistence, set session_persistence to false in the controller config.
+
 
 v1.0.0
 ------
