@@ -112,6 +112,7 @@ type F5Router struct {
 	unmappedResourcesMap      map[string]bigipResources.Resources
 	plansMap                  mutexPlansMap
 	bindIDRouteURIPlanNameMap mutexBindIDRouteURIPlanNameMap
+	bigIPClient               bigipclient.Client
 }
 
 func verifyRouteURI(ru updateHTTP) error {
@@ -200,6 +201,7 @@ func NewF5Router(
 	logger logger.Logger,
 	c *config.Config,
 	writer Writer,
+	client bigipclient.Client,
 ) (*F5Router, error) {
 	r := F5Router{
 		c:                         c,
@@ -216,6 +218,7 @@ func NewF5Router(
 		plansMap:                  mutexPlansMap{plans: make(map[string]planResources.Plan)},
 		bindIDRouteURIPlanNameMap: mutexBindIDRouteURIPlanNameMap{data: make(map[string]string)},
 		tier2VSInfo:               tier2VSInfo{usedPorts: make(map[string]*bigipResources.VirtualAddress), holderPort: 10000},
+		bigIPClient:               client,
 	}
 
 	err := r.validateConfig()
@@ -788,11 +791,11 @@ func (r *F5Router) fetchExistingDataGroup(c *config.Config, name string) (*bigip
 		r.c.BigIP.Partitions[0],
 		name,
 	)
-	data, err := bigipclient.Get(url, r.c.BigIP.User, r.c.BigIP.Pass)
+	data, err := r.bigIPClient.Get(url, r.c.BigIP.User, r.c.BigIP.Pass)
 	if nil != err {
 		// Encountered a timeout or temporary connection error so enter retry backoff
 		if err, ok := err.(net.Error); ok && (err.Timeout() || err.Temporary()) {
-			r.logger.Warn("bigip-client-get-error", zap.String("recoverable-error", "Entering retry backoff loop"))
+			r.logger.Warn("bigip-client-get-recoverable-error", zap.Error(err))
 			done := make(chan returns)
 
 			go func() {
@@ -806,7 +809,7 @@ func (r *F5Router) fetchExistingDataGroup(c *config.Config, name string) (*bigip
 					<-timer.C
 
 					// Attempt to connect to the BIG-IP signal channel if there is not a temporary or timeout error
-					rvs.data, rvs.err = bigipclient.Get(url, r.c.BigIP.User, r.c.BigIP.Pass)
+					rvs.data, rvs.err = r.bigIPClient.Get(url, r.c.BigIP.User, r.c.BigIP.Pass)
 					if doErr, ok := rvs.err.(net.Error); ok && !(doErr.Timeout() || doErr.Temporary()) {
 						rvs.data = nil
 						done <- rvs
@@ -819,6 +822,7 @@ func (r *F5Router) fetchExistingDataGroup(c *config.Config, name string) (*bigip
 						break
 					}
 					interval *= 2
+					r.logger.Warn("retry-backoff-encountered-error-retrying", zap.Error(rvs.err))
 				}
 			}()
 
