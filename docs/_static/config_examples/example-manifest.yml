@@ -11,13 +11,19 @@ applications:
                         pass: password
                         partition:
                           - cf
+                        balance: least-connections-node
                         external_addr: 192.168.1.1
+                        tier2_ip_range: 255.255.255.0
                         policies:
                           - /Example/policy
                         profiles:
                           - /Example/profile
                         health_monitors:
                           - /Common/tcp_half_open
+
+                      # Required to run the BIG-IP Controller as a Service
+                      # Broker (introduced in v1.1.0)
+                      broker_mode: true
 
                       logging:
                         level: info
@@ -45,12 +51,13 @@ applications:
                         port: 80
                         auth_disabled: false
 
-                      # Required to run as a Service Broker
+                      # User account for authentication to the Service Broker API
                       status:
                         user: user
                         pass: pass
 
-      # Only required if going to push controller as a Service Broker
+      # Include the section below to use the cf-bigip-ctlr as a Service Broker
+      # THE SETTINGS IN THIS SECTION ARE ROUTE-SPECIFIC
       SERVICE_BROKER_CONFIG: |
                              plans:
                               - description: plan for policy A,
