@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/F5Networks/cf-bigip-ctlr/bigipclient"
 	"github.com/F5Networks/cf-bigip-ctlr/common/uuid"
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/controller"
@@ -139,7 +140,10 @@ func main() {
 	defer func() {
 		writer.Close()
 	}()
-	f5Router, err := f5router.NewF5Router(logger.Session("f5router"), c, writer)
+
+	bigIPClient := bigipclient.DefaultClient()
+
+	f5Router, err := f5router.NewF5Router(logger.Session("f5router"), c, writer, bigIPClient)
 	if nil != err {
 		logger.Fatal("f5router-failed-initialization", zap.Error(err))
 	}
