@@ -104,20 +104,18 @@ rst_epilog = '''
     <a href="http://clouddocs.f5.com/products/connectors/cf-bigip-ctlr/%(url_version)s/_static/ATTRIBUTIONS.html">Attributions</a>
 .. |cfctlr| replace:: :code:`cf-bigip-ctlr`
 .. |cfctlr-long| replace:: F5 BIG-IP Controller for Cloud Foundry
-.. _user documentation: %(base_url)s/containers/latest/cloudfoundry/index.html
-.. _controller application manifest: %(base_url)s/containers/latest/cloudfoundry/cfctlr-app-install.html
-.. _Cloud Foundry: https://cloudfoundry.org/
-.. _Gorouter: https://github.com/cloudfoundry/gorouter
-.. _TLS Server Name Indication: https://tools.ietf.org/html/rfc6066#section-3
-.. _Deploying with Application Manifests: https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html
 .. _BIG-IP profiles: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0.html
 .. _policies: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/bigip-local-traffic-policies-getting-started-13-0-0.html
 .. _BIG-IP SSL profiles: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0/6.html
+.. _controller application manifest: %(base_url)s/containers/latest/cloudfoundry/cfctlr-app-install.html
+.. _Cloud Foundry: https://cloudfoundry.org/
+.. _Deploy the BIG-IP Controller for Cloud Foundry with per-Route Virtual Servers: %(base_url)s/containers/latest/cloudfoundry/cf-per-route-virtuals
+.. _Deploying with Application Manifests: https://docs.cloudfoundry.org/devguide/deploy-apps/manifest.html
+.. _Gorouter: https://github.com/cloudfoundry/gorouter
 .. _route domain: https://support.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/tmos-routing-administration-12-0-0/9.html
-.. |Slack| image:: https://f5cloudsolutions.herokuapp.com/badge.svg
-   :target: https://f5cloudsolutions.herokuapp.com
-   :alt: Slack
-
+.. _Cloud Foundry Service Broker: https://docs.cloudfoundry.org/services/managing-service-brokers.html
+.. _TLS Server Name Indication: https://tools.ietf.org/html/rfc6066#section-3
+.. _user documentation: %(base_url)s/containers/latest/cloudfoundry/index.html
 ''' % {
     'url_version': version,
     'base_url': 'http://clouddocs.f5.com'
