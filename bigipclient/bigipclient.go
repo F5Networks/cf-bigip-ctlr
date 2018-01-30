@@ -23,21 +23,37 @@ import (
 	"time"
 )
 
-// Get will attempt a HTTP GET request to the given URL and return a []byte
-// with the response or an error.
-func Get(url, user, pass string) ([]byte, error) {
+// Client interface for the BigIPClient
+//go:generate counterfeiter -o fakes/fake_client.go . Client
+type Client interface {
+	Get(url, user, pass string) ([]byte, error)
+}
+
+// BigIPClient is a wrapper around an http client
+type BigIPClient struct {
+	Client *http.Client
+}
+
+// DefaultClient returns a new default configured BIG-IP client
+func DefaultClient() *BigIPClient {
 	// We are going basic auth so need to disable cert checks
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
 	}
-
-	c := &http.Client{
+	client := &http.Client{
 		Timeout:   60 * time.Second,
 		Transport: tr,
 	}
+	return &BigIPClient{
+		Client: client,
+	}
+}
 
+// Get will attempt a HTTP GET request to the given URL and return a []byte
+// with the response or an error.
+func (c *BigIPClient) Get(url, user, pass string) ([]byte, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
@@ -46,7 +62,7 @@ func Get(url, user, pass string) ([]byte, error) {
 	req.Header.Set("Accept", "application/json")
 	req.SetBasicAuth(user, pass)
 
-	resp, err := c.Do(req)
+	resp, err := c.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}

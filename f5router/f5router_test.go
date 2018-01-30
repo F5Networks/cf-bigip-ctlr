@@ -18,12 +18,15 @@ package f5router
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"sort"
 	"sync"
 
+	"github.com/F5Networks/cf-bigip-ctlr/bigipclient"
+	fakeClient "github.com/F5Networks/cf-bigip-ctlr/bigipclient/fakes"
 	"github.com/F5Networks/cf-bigip-ctlr/config"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/bigipResources"
 	"github.com/F5Networks/cf-bigip-ctlr/f5router/routeUpdate"
@@ -112,42 +115,43 @@ var _ = Describe("F5Router", func() {
 			logger := test_util.NewTestZapLogger("router-test")
 			mw := &MockWriter{}
 			c := config.DefaultConfig()
+			client := bigipclient.DefaultClient()
 
-			r, err := NewF5Router(logger, nil, mw)
+			r, err := NewF5Router(logger, nil, mw, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
-			r, err = NewF5Router(logger, c, nil)
+			r, err = NewF5Router(logger, c, nil, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.URL = "http://example.com"
-			r, err = NewF5Router(logger, c, mw)
+			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.User = "admin"
-			r, err = NewF5Router(logger, c, mw)
+			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.Pass = "pass"
-			r, err = NewF5Router(logger, c, mw)
+			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.Partitions = []string{"cf"}
-			r, err = NewF5Router(logger, c, mw)
+			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.Tier2IPRange = "10.0.0.1/32"
-			r, err = NewF5Router(logger, c, mw)
+			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).To(BeNil())
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.ExternalAddr = "127.0.0.1"
-			r, err = NewF5Router(logger, c, mw)
+			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).NotTo(BeNil())
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -375,6 +379,7 @@ var _ = Describe("F5Router", func() {
 		var up updateHTTP
 		var logger *test_util.TestZapLogger
 		var c *config.Config
+		var client *bigipclient.BigIPClient
 
 		var (
 			fooEndpoint,
@@ -423,8 +428,9 @@ var _ = Describe("F5Router", func() {
 			logger = test_util.NewTestZapLogger("router-test")
 			c = makeConfig()
 			mw = &MockWriter{}
+			client = bigipclient.DefaultClient()
 
-			router, err = NewF5Router(logger, c, mw)
+			router, err = NewF5Router(logger, c, mw, client)
 
 			Expect(router).NotTo(BeNil(), "%v", router)
 			Expect(err).NotTo(HaveOccurred())
@@ -554,7 +560,7 @@ var _ = Describe("F5Router", func() {
 			c.BigIP.LoadBalancingMode = "least-connections-member"
 			c.SessionPersistence = false
 
-			router, err = NewF5Router(logger, c, mw)
+			router, err = NewF5Router(logger, c, mw, client)
 
 			go func() {
 				defer GinkgoRecover()
@@ -787,6 +793,91 @@ var _ = Describe("F5Router", func() {
 				Eventually(done).Should(BeClosed(), "timed out waiting for Run to complete")
 			})
 		})
+
+		Context("retry backoff", func() {
+			var fakeBigIPClient *fakeClient.FakeClient
+
+			BeforeEach(func() {
+				fakeBigIPClient = &fakeClient.FakeClient{}
+			})
+
+			It("handles retry backoff recovery", func() {
+				networkError1 := mockNetworkError{
+					error:   errors.New("mock network error 1"),
+					retTime: false,
+					retTemp: true,
+				}
+				fakeBigIPClient.GetReturnsOnCall(0, nil, networkError1)
+
+				networkError2 := mockNetworkError{
+					error:   errors.New("mock network error 2"),
+					retTime: true,
+					retTemp: false,
+				}
+				fakeBigIPClient.GetReturnsOnCall(1, nil, networkError2)
+
+				fakeBigIPClient.GetReturnsOnCall(2, []byte("was not found"), nil)
+
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				router, err = NewF5Router(logger, c, mw, fakeBigIPClient)
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+
+				Eventually(logger).Should(Say(`"bigip-client-get-recoverable-error","source":"router-test","data":{"error":"mock network error 1"`))
+				Eventually(logger).Should(Say("Retrying in 1 seconds"))
+				Eventually(logger).Should(Say(`"retry-backoff-encountered-error-retrying","source":"router-test","data":{"error":"mock network error 2"`))
+				Eventually(logger).Should(Say("Retrying in 2 seconds"))
+				Eventually(logger).Should(Say("data group cf-ctlr-data-group not found on the BIG-IP"))
+				Eventually(ready).Should(BeClosed())
+			})
+
+			It("handles retry backoff fatal error", func() {
+				networkError1 := mockNetworkError{
+					error:   errors.New("mock network error 1"),
+					retTime: true,
+					retTemp: true,
+				}
+				fakeBigIPClient.GetReturnsOnCall(0, nil, networkError1)
+
+				networkError2 := mockNetworkError{
+					error:   errors.New("mock network error 2"),
+					retTime: false,
+					retTemp: false,
+				}
+				fakeBigIPClient.GetReturnsOnCall(1, nil, networkError2)
+
+				done := make(chan struct{})
+				os := make(chan os.Signal)
+				ready := make(chan struct{})
+
+				router, err = NewF5Router(logger, c, mw, fakeBigIPClient)
+
+				go func() {
+					defer GinkgoRecover()
+					Expect(func() {
+						err = router.Run(os, ready)
+						Expect(err).NotTo(HaveOccurred())
+						close(done)
+					}).NotTo(Panic())
+				}()
+
+				Eventually(logger).Should(Say(`"bigip-client-get-recoverable-error","source":"router-test","data":{"error":"mock network error 1"`))
+				Eventually(logger).Should(Say("Retrying in 1 seconds"))
+				Eventually(logger).Should(Say("failed-to-fetch-existing-controller-data-group"))
+				Eventually(ready).Should(BeClosed())
+			})
+		})
+
 		Context("fake BIG-IP provides a response", func() {
 			var server *ghttp.Server
 			var fakeDataGroup *bigipResources.InternalDataGroup
@@ -810,7 +901,7 @@ var _ = Describe("F5Router", func() {
 				// Update the config
 				c.BigIP.URL = server.URL()
 
-				router, err = NewF5Router(logger, c, mw)
+				router, err = NewF5Router(logger, c, mw, client)
 
 				go func() {
 					defer GinkgoRecover()
@@ -889,7 +980,7 @@ var _ = Describe("F5Router", func() {
 				c.BigIP.URL = server.URL()
 				c.BrokerMode = true
 
-				router, err = NewF5Router(logger, c, mw)
+				router, err = NewF5Router(logger, c, mw, client)
 
 				// Add broker plans to router
 				plans := make(map[string]planResources.Plan)
@@ -957,7 +1048,7 @@ var _ = Describe("F5Router", func() {
 
 				c.BigIP.Policies = []string{"fakepolicy", "/cf/anotherpolicy"}
 
-				router, err = NewF5Router(logger, c, mw)
+				router, err = NewF5Router(logger, c, mw, client)
 
 				go func() {
 					defer GinkgoRecover()
@@ -977,7 +1068,7 @@ var _ = Describe("F5Router", func() {
 				os := make(chan os.Signal)
 				ready := make(chan struct{})
 
-				router, err = NewF5Router(logger, c, mw)
+				router, err = NewF5Router(logger, c, mw, client)
 				// Set the current port to the max
 				router.tier2VSInfo.holderPort = 65535
 
@@ -1018,7 +1109,7 @@ var _ = Describe("F5Router", func() {
 			}
 			BeforeEach(func() {
 				c.RoutingMode = config.TCP
-				router, err = NewF5Router(logger, c, mw)
+				router, err = NewF5Router(logger, c, mw, client)
 
 				done := make(chan struct{})
 				os := make(chan os.Signal)
@@ -1081,6 +1172,22 @@ var _ = Describe("F5Router", func() {
 
 	})
 })
+
+type mockNetworkError struct {
+	error   error
+	retTime bool
+	retTemp bool
+}
+
+func (m mockNetworkError) Error() string {
+	return m.error.Error()
+}
+func (m mockNetworkError) Timeout() bool {
+	return m.retTime
+}
+func (m mockNetworkError) Temporary() bool {
+	return m.retTemp
+}
 
 type configMatcher struct {
 	Global    bigipResources.GlobalConfig `json:"global"`
