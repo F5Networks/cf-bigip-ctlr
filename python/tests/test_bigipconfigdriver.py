@@ -122,6 +122,7 @@ class MockMgr(bigipconfigdriver.CloudServiceManager):
         self._notify_event = notify_event
         self._notify_after = notify_after
         self._handle_results = handle_results
+        self._schema = None
 
     def get_partition(self):
         return self._partition
@@ -129,8 +130,8 @@ class MockMgr(bigipconfigdriver.CloudServiceManager):
     def _apply_ltm_config(self, cfg):
         return self._apply_config(cfg)
 
-    def _apply_network_config(self, cfg):
-        return 0
+    def _apply_net_config(self, cfg):
+        return self._apply_config(cfg)
 
     def _apply_config(self, cfg):
         expected_bigip_config = json.loads(json.dumps(cfg))
@@ -522,7 +523,9 @@ def test_handle_global_config(request):
         handler = bigipconfigdriver.ConfigHandler(config_file, mgr, 30)
 
         obj = {}
-        obj['global'] = {'log-level': 'WARNING', 'verify-interval': 10}
+        obj['global'] = {'log-level': 'WARNING',
+                         'verify-interval': 10,
+                         'vxlan-partition': 'test'}
 
         with open(config_file, 'w+') as f:
             def fin():
@@ -531,9 +534,11 @@ def test_handle_global_config(request):
             json.dump(obj, f)
 
         r = bigipconfigdriver._parse_config(config_file)
-        verify_interval, level = bigipconfigdriver._handle_global_config(r)
+        verify_interval, level, vx_p = \
+            bigipconfigdriver._handle_global_config(r)
         assert verify_interval == 10
         assert level == logging.WARNING
+        assert vx_p == 'test'
 
     finally:
         assert handler is not None
@@ -562,9 +567,11 @@ def test_handle_global_config_defaults(request):
             json.dump(obj, f)
 
         r = bigipconfigdriver._parse_config(config_file)
-        verify_interval, level = bigipconfigdriver._handle_global_config(r)
+        verify_interval, level, vx_p = \
+            bigipconfigdriver._handle_global_config(r)
         assert verify_interval == bigipconfigdriver.DEFAULT_VERIFY_INTERVAL
         assert level == bigipconfigdriver.DEFAULT_LOG_LEVEL
+        assert vx_p is None
 
     finally:
         assert handler is not None
@@ -592,7 +599,7 @@ def test_handle_global_config_bad_string_log_level(request):
             json.dump(obj, f)
 
         r = bigipconfigdriver._parse_config(config_file)
-        verify_interval, level = bigipconfigdriver._handle_global_config(r)
+        verify_interval, level, _ = bigipconfigdriver._handle_global_config(r)
         assert verify_interval == 100
         assert level == bigipconfigdriver.DEFAULT_LOG_LEVEL
 
@@ -622,7 +629,7 @@ def test_handle_global_config_number_log_level(request):
             json.dump(obj, f)
 
         r = bigipconfigdriver._parse_config(config_file)
-        verify_interval, level = bigipconfigdriver._handle_global_config(r)
+        verify_interval, level, _ = bigipconfigdriver._handle_global_config(r)
         assert verify_interval == 100
         assert level == bigipconfigdriver.DEFAULT_LOG_LEVEL
 
@@ -652,7 +659,7 @@ def test_handle_global_config_negative_verify_interval(request):
             json.dump(obj, f)
 
         r = bigipconfigdriver._parse_config(config_file)
-        verify_interval, level = bigipconfigdriver._handle_global_config(r)
+        verify_interval, level, _ = bigipconfigdriver._handle_global_config(r)
         assert verify_interval == bigipconfigdriver.DEFAULT_VERIFY_INTERVAL
         assert level == logging.ERROR
 
@@ -682,7 +689,7 @@ def test_handle_global_config_string_verify_interval(request):
             json.dump(obj, f)
 
         r = bigipconfigdriver._parse_config(config_file)
-        verify_interval, level = bigipconfigdriver._handle_global_config(r)
+        verify_interval, level, _ = bigipconfigdriver._handle_global_config(r)
         assert verify_interval == bigipconfigdriver.DEFAULT_VERIFY_INTERVAL
         assert level == logging.ERROR
 
@@ -881,13 +888,137 @@ def test_handle_bigip_config_missing_partitions(request):
         assert handler._thread.is_alive() is False
 
 
-def test_confighandler_reset_validation_error(request):
-    exception = F5CcclValidationError
+def test_handle_vxlan_config(request):
+    handler = None
+    try:
+        mgr = MockMgr()
+        config_template = Template('/tmp/config.$pid')
+        config_file = config_template.substitute(pid=os.getpid())
+
+        handler = bigipconfigdriver.ConfigHandler(config_file, mgr, 30)
+
+        obj = {}
+        obj['vxlan-fdb'] = {'name': 'vxlan0',
+                            'records': [
+                                {'name': '0a:0a:ac:10:1:5',
+                                 'endpoint': '198.162.0.1'},
+                                {'name': '0a:0a:ac:10:1:6',
+                                 'endpoint': '198.162.0.2'}
+                            ]}
+        obj['vxlan-arp'] = {'arps': [
+                                {'macAddress': '0a:0a:ac:10:1:5',
+                                 'ipAddress': '1.2.3.4',
+                                 'name': '1.2.3.4'}
+                                ]
+                            }
+
+        with open(config_file, 'w+') as f:
+            def fin():
+                os.unlink(config_file)
+            request.addfinalizer(fin)
+            json.dump(obj, f)
+
+        r = bigipconfigdriver._parse_config(config_file)
+        try:
+            bigipconfigdriver._handle_vxlan_config(r)
+        except:
+            assert 0
+
+    finally:
+        assert handler is not None
+
+        handler.stop()
+        handler._thread.join(30)
+        assert handler._thread.is_alive() is False
+
+
+def test_handle_vxlan_config_missing_vxlan_name(request):
+    handler = None
+    try:
+        mgr = MockMgr()
+        config_template = Template('/tmp/config.$pid')
+        config_file = config_template.substitute(pid=os.getpid())
+
+        handler = bigipconfigdriver.ConfigHandler(config_file, mgr, 30)
+
+        obj = {}
+        obj['vxlan-fdb'] = {'records': [
+                                {'name': '0a:0a:ac:10:1:5',
+                                 'endpoint': '198.162.0.1'},
+                                {'name': '0a:0a:ac:10:1:6',
+                                 'endpoint': '198.162.0.2'}
+                            ]}
+
+        with open(config_file, 'w+') as f:
+            def fin():
+                os.unlink(config_file)
+            request.addfinalizer(fin)
+            json.dump(obj, f)
+
+        r = bigipconfigdriver._parse_config(config_file)
+        with pytest.raises(bigipconfigdriver.ConfigError):
+            bigipconfigdriver._handle_vxlan_config(r)
+    finally:
+        assert handler is not None
+
+        handler.stop()
+        handler._thread.join(30)
+        assert handler._thread.is_alive() is False
+
+
+def test_handle_vxlan_config_missing_vxlan_records(request):
+    handler = None
+    try:
+        mgr = MockMgr()
+        config_template = Template('/tmp/config.$pid')
+        config_file = config_template.substitute(pid=os.getpid())
+
+        handler = bigipconfigdriver.ConfigHandler(config_file, mgr, 30)
+
+        obj = {}
+        obj['vxlan-fdb'] = {'name': 'vxlan0'}
+
+        with open(config_file, 'w+') as f:
+            def fin():
+                os.unlink(config_file)
+            request.addfinalizer(fin)
+            json.dump(obj, f)
+
+        r = bigipconfigdriver._parse_config(config_file)
+        with pytest.raises(bigipconfigdriver.ConfigError):
+            bigipconfigdriver._handle_vxlan_config(r)
+    finally:
+        assert handler is not None
+
+        handler.stop()
+        handler._thread.join(30)
+        assert handler._thread.is_alive() is False
+
+
+def _raise_value_error():
+    raise ValueError('No JSON object could be decoded', 0)
+
+
+def test_confighandler_reset_json_error(request):
+    exception = _raise_value_error
     common_confighandler_reset(request, exception)
 
 
+def _raise_cccl_error():
+    raise F5CcclValidationError('Generic CCCL Error')
+
+
+def test_confighandler_reset_validation_error(request):
+    exception = _raise_cccl_error
+    common_confighandler_reset(request, exception)
+
+
+def _raise_unexpected_error():
+    raise Exception('Unexpected Failure')
+
+
 def test_confighandler_reset_unexpected_error(request):
-    exception = Exception('Unexpected Failure')
+    exception = _raise_unexpected_error
     common_confighandler_reset(request, exception)
 
 
@@ -902,7 +1033,7 @@ def common_confighandler_reset(request, exception):
         def handle_results():
             if mgr.calls == 4:
                 # turn on retries by returning an error
-                raise exception
+                exception()
 
             valid_interval_state = flags['valid_interval_state']
             if mgr.calls == 1 or mgr.calls == 5:
@@ -956,20 +1087,30 @@ def common_confighandler_reset(request, exception):
         assert mgr.calls == 3
         assert flags['valid_interval_state'] is True
 
-        # in the failure case, the exception will not be caught
-        # set the backoff_timer for quick testing
-        handler._backoff_time = .01
+        # in the failure case, the exception will be caught
+        # and the backoff_timer will be set.  Verify the
+        # backoff time has doubled.
+        handler._backoff_time = 0.6
 
         handler.notify_reset()
-        event.wait(0.6)
-        assert event.is_set() is False
+        time.sleep(0.1)
+        assert mgr.calls == 4
         assert flags['valid_interval_state'] is True
 
-        # verify interval timer doesn't fire and backoff does
-        # not change
-        time.sleep(interval_time / 2)
-        assert mgr.calls == 4
-        assert handler._backoff_time == 0.01
+        assert handler._backoff_time == 1.2
+        assert handler._backoff_timer is not None
+
+        assert handler._interval.is_running() is False
+
+        handler.notify_reset()
+        time.sleep(0.1)
+        event.wait(30)
+        assert event.is_set() is True
+        assert flags['valid_interval_state'] is True
+
+        # After a successful call, we should be back to using the
+        # interval timer
+        assert handler._backoff_time == 1
         assert handler._backoff_timer is None
 
     finally:
@@ -1155,12 +1296,13 @@ class MockApplyConfigMgr(bigipconfigdriver.CloudServiceManager):
 
     def __init__(self, returns):
         self._returns = returns
+        self._schema = None
 
     def _apply_ltm_config(self, cfg):
         return self._apply_config(cfg)
 
-    def _apply_network_config(self, cfg):
-        return 0
+    def _apply_net_config(self, cfg):
+        return self._apply_config(cfg)
 
     def _apply_config(self, cfg):
         val = self._returns.pop(0)
