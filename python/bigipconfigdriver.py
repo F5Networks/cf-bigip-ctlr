@@ -22,10 +22,11 @@ import json
 import logging
 import os
 import os.path
-import sys
-import time
-import threading
 import signal
+import sys
+import threading
+import time
+import traceback
 
 import pyinotify
 
@@ -67,6 +68,7 @@ root_logger.addFilter(KeyFilter())
 
 DEFAULT_LOG_LEVEL = logging.INFO
 DEFAULT_VERIFY_INTERVAL = 30.0
+NET_SCHEMA = '/app/src/f5-cccl/f5_cccl/schemas/cccl-net-api-schema.yml'
 
 
 class CloudServiceManager():
@@ -79,14 +81,17 @@ class CloudServiceManager():
         partition: BIG-IP partition to manage
     """
 
-    def __init__(self, bigip, partition, user_agent=None):
+    def __init__(self, bigip, partition, user_agent=None, prefix=None,
+                 schema_path=None):
         """Initialize the CloudServiceManager object."""
         self._mgmt_root = bigip
+        self._schema = schema_path
         self._cccl = F5CloudServiceManager(
             bigip,
             partition,
             user_agent=user_agent,
-            prefix="")
+            prefix=prefix,
+            schema_path=schema_path)
 
     def mgmt_root(self):
         """ Return the BIG-IP ManagementRoot object"""
@@ -96,13 +101,24 @@ class CloudServiceManager():
         """ Return the managed partition."""
         return self._cccl.get_partition()
 
+    def get_schema_type(self):
+        """Return 'ltm' or 'net', based on schema type."""
+        if self._schema is None:
+            return 'ltm'
+        elif 'net' in self._schema:
+            return 'net'
+
     def _apply_ltm_config(self, config):
-        """Apply the configuration to the BIG-IP.
+        """Apply the ltm configuration to the BIG-IP.
 
         Args:
             config: BIG-IP config dict
         """
         return self._cccl.apply_ltm_config(config)
+
+    def _apply_net_config(self, config):
+        """Apply the net configuration to the BIG-IP."""
+        return self._cccl.apply_net_config(config)
 
 
 class IntervalTimerError(Exception):
@@ -162,9 +178,8 @@ class IntervalTimer(object):
                 self.stop()
             self._timer = threading.Timer(self._adjust_interval(), self._run)
             # timers can't be stopped, cancel just prevents the callback from
-            # occurring when the timer finally expires.  Making it a daemon
-            # allows cancelled timers to exit eventually without a need for
-            # join.
+            # occuring when the timer finally expires.  Make it a daemon allows
+            # cancelled timers to exit eventually without a need for join.
             self._timer.daemon = True
             self._timer.start()
             self._running = True
@@ -192,21 +207,49 @@ def create_ltm_config(partition, config):
     if 'resources' in config and partition in config['resources']:
         ltm = config['resources'][partition]
 
-    log.debug("Service Config: %s", json.dumps(ltm))
     return ltm
+
+
+def create_network_config(config):
+    """Extract a BIG-IP Network configuration from the network config.
+
+    Args:
+        config: BigIP config which contains vxlan defs
+    """
+    net = {}
+    if 'vxlan-fdb' in config:
+        net['userFdbTunnels'] = [config['vxlan-fdb']]
+    if ('vxlan-arp' in config and 'arps' in config['vxlan-arp']
+            and config['vxlan-arp']['arps'] is not None):
+        net['arps'] = config['vxlan-arp']['arps']
+
+    log.debug("NET Config: %s", json.dumps(net))
+    return net
 
 
 def _create_custom_profiles(mgmt, partition, custom_profiles):
     incomplete = 0
 
     customProfiles = False
+
+    # Server profiles may reference a CA cert in another server profile.
+    # These need to be loaded first.
+    for profile in custom_profiles:
+        caFile = profile.get('caFile', '')
+        if profile['context'] == 'serverside' and caFile == "self":
+            incomplete += create_server_ssl_profile(mgmt, partition, profile)
+            customProfiles = True
+
     for profile in custom_profiles:
         if profile['context'] == 'clientside':
             incomplete += create_client_ssl_profile(mgmt, partition, profile)
             customProfiles = True
         elif profile['context'] == 'serverside':
-            incomplete += create_server_ssl_profile(mgmt, partition, profile)
-            customProfiles = True
+            caFile = profile.get('caFile', '')
+            if caFile != "self":
+                incomplete += create_server_ssl_profile(
+                    mgmt, partition, profile)
+                customProfiles = True
         else:
             log.error(
                 "Only client or server custom profiles are supported.")
@@ -254,10 +297,6 @@ class ConfigHandler():
         log.debug('config handler thread start')
 
         with self._condition:
-            # customProfiles is true when we've written out a custom profile.
-            # Once we know we've written out a profile, we can call delete
-            # if needed.
-            customProfiles = False
             while True:
                 self._condition.acquire()
                 if not self._pending_reset and not self._stop:
@@ -275,43 +314,23 @@ class ConfigHandler():
 
                 start_time = time.time()
 
-                config = _parse_config(self._config_file)
-                # No 'resources' indicates that the controller is not
-                # yet ready -- it does not mean to apply an empty config
-                if 'resources' not in config:
-                    continue
-
                 incomplete = 0
-                for mgr in self._managers:
-                    partition = mgr.get_partition()
-                    cfg_ltm = create_ltm_config(partition, config)
-                    try:
-                        # Manually create custom profiles;
-                        # CCCL doesn't yet do this
-                        if 'customProfiles' in cfg_ltm:
-                            tmp = 0
-                            customProfiles, tmp = _create_custom_profiles(
-                                mgr.mgmt_root(),
-                                partition,
-                                cfg_ltm['customProfiles'])
-                            incomplete += tmp
-
-                        # Apply the BIG-IP config after creating profiles
-                        # and before deleting profiles
-                        incomplete += mgr._apply_ltm_config(cfg_ltm)
-
-                        # Manually delete custom profiles (if needed)
-                        if customProfiles:
-                            _delete_unused_ssl_profiles(
-                                mgr.mgmt_root(),
-                                partition,
-                                cfg_ltm)
-
-                    except F5CcclError as e:
-                        # We created an invalid configuration, raise the
-                        # exception and fail
-                        log.error("CCCL Error: %s", e.msg)
-                        raise e
+                try:
+                    config = _parse_config(self._config_file)
+                    # No 'resources' indicates that the controller is not
+                    # yet ready -- it does not mean to apply an empty config
+                    if 'resources' not in config:
+                        continue
+                    incomplete = self._update_cccl(config)
+                except ValueError:
+                    formatted_lines = traceback.format_exc().splitlines()
+                    last_line = formatted_lines[-1]
+                    log.error('Failed to process the config file {} ({})'
+                              .format(self._config_file, last_line))
+                    incomplete = 1
+                except Exception:
+                    log.exception('Unexpected error')
+                    incomplete = 1
 
                 if incomplete:
                     # Error occurred, perform retries
@@ -334,7 +353,7 @@ class ConfigHandler():
                         app_count += 1
                         backends = 0
                         for pool in config['resources']['test']['pools']:
-                            if pool['name'] == service['name']:
+                            if service['name'] in pool['name']:
                                 backends = len(pool['members'])
                                 break
                         test_data[service['name']] = backends
@@ -351,6 +370,53 @@ class ConfigHandler():
 
         if self._interval:
             self._interval.stop()
+
+    def _update_cccl(self, config):
+        # customProfiles is true when we've written out a custom profile.
+        # Once we know we've written out a profile, we can call delete
+        # if needed.
+        customProfiles = False
+
+        _handle_vxlan_config(config)
+        cfg_net = create_network_config(config)
+        incomplete = 0
+        for mgr in self._managers:
+            partition = mgr.get_partition()
+            cfg_ltm = create_ltm_config(partition, config)
+            try:
+                # Manually create custom profiles;
+                # CCCL doesn't yet do this
+                if 'customProfiles' in cfg_ltm and \
+                        mgr.get_schema_type() == 'ltm':
+                    tmp = 0
+                    customProfiles, tmp = _create_custom_profiles(
+                        mgr.mgmt_root(),
+                        partition,
+                        cfg_ltm['customProfiles'])
+                    incomplete += tmp
+
+                # Apply the BIG-IP config after creating profiles
+                # and before deleting profiles
+                if mgr.get_schema_type() == 'net':
+                    incomplete += mgr._apply_net_config(cfg_net)
+                else:
+                    incomplete += mgr._apply_ltm_config(cfg_ltm)
+
+                # Manually delete custom profiles (if needed)
+                if customProfiles and \
+                        mgr.get_schema_type() == 'ltm':
+                    _delete_unused_ssl_profiles(
+                        mgr.mgmt_root(),
+                        partition,
+                        cfg_ltm)
+
+            except F5CcclError as e:
+                # We created an invalid configuration, raise the
+                # exception and fail
+                log.error("CCCL Error: %s", e.msg)
+                incomplete += 1
+
+        return incomplete
 
     def cleanup_backoff(self):
         """Cleans up canceled backoff timers."""
@@ -532,8 +598,9 @@ def _parse_config(config_file):
     if os.path.exists(config_file):
         with open(config_file, 'r') as config:
             fcntl.lockf(config.fileno(), fcntl.LOCK_SH, 0, 0, 0)
-            config_json = json.load(config)
+            data = config.read()
             fcntl.lockf(config.fileno(), fcntl.LOCK_UN, 0, 0, 0)
+            config_json = json.loads(data)
             log.debug('loaded configuration file successfully')
             return config_json
     else:
@@ -585,6 +652,8 @@ def _handle_global_config(config):
                 log.warn('The "global:verify-interval" field in the '
                          'configuration file should be a number')
 
+        vxlan_partition = global_cfg.get('vxlan-partition')
+
     try:
         root_logger.setLevel(level)
         if level > logging.DEBUG:
@@ -600,7 +669,7 @@ def _handle_global_config(config):
                  '"global:log-level" field in the configuration file')
 
     # level only is needed for unit tests
-    return verify_interval, level
+    return verify_interval, level, vxlan_partition
 
 
 def _handle_bigip_config(config):
@@ -628,6 +697,22 @@ def _handle_bigip_config(config):
     return host, port
 
 
+def _handle_vxlan_config(config):
+    if config and 'vxlan-fdb' in config:
+        fdb = config['vxlan-fdb']
+        if 'name' not in fdb:
+            raise ConfigError('Configuration file missing '
+                              '"vxlan-fdb:name" section')
+        if 'records' not in fdb:
+            raise ConfigError('Configuration file missing '
+                              '"vxlan-fdb:records" section')
+    if config and 'vxlan-arp' in config:
+        arp = config['vxlan-arp']
+        if 'arps' not in arp:
+            raise ConfigError('Configuration file missing '
+                              '"vxlan-arp:arps" section')
+
+
 def _set_user_agent():
     try:
         with open('/app/python/VERSION_BUILD.json', 'r') as version_file:
@@ -646,7 +731,7 @@ def main():
         args = _handle_args()
 
         config = _parse_config(args.config_file)
-        verify_interval, _ = _handle_global_config(config)
+        verify_interval, _, vxlan_partition = _handle_global_config(config)
         host, port = _handle_bigip_config(config)
 
         # FIXME (kenr): Big-IP settings are currently static (we ignore any
@@ -670,7 +755,16 @@ def main():
             manager = CloudServiceManager(
                 bigip,
                 partition,
-                user_agent)
+                user_agent=user_agent)
+            managers.append(manager)
+        if vxlan_partition:
+            # Management for net resources (VXLAN)
+            manager = CloudServiceManager(
+                bigip,
+                vxlan_partition,
+                user_agent=user_agent,
+                prefix="cf",
+                schema_path=NET_SCHEMA)
             managers.append(manager)
 
         handler = ConfigHandler(args.config_file,
