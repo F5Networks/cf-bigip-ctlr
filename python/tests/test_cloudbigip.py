@@ -1,4 +1,4 @@
-# Copyright 2017 F5 Networks
+# Copyright 2018 F5 Networks
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ from __future__ import absolute_import
 import unittest
 import json
 from mock import Mock, mock_open, patch
-from f5_cccl.bigip import BigIPProxy
 from f5_cccl.utils.mgmt import ManagementRoot
+from f5_cccl.bigip import BigIPProxy
 from f5_cccl.utils.mgmt import mgmt_root
 from f5_cccl.exceptions import F5CcclValidationError
 from .. import bigipconfigdriver as ctlr
@@ -32,6 +32,7 @@ from .. import bigipconfigdriver as ctlr
 # Cloud app data
 cloud_test_data = [
     'tests/one_svc_two_nodes.json',
+    'tests/one_udp_svc_two_nodes.json',
     'tests/invalid_svcs.json',
     'tests/one_svc_one_node.json',
     'tests/one_svc_four_nodes.json',
@@ -64,8 +65,6 @@ class CloudTest(unittest.TestCase):
         self.cccl._service_manager._service_deployer._bigip.refresh_ltm = \
             Mock()
         self.cccl._service_manager._service_deployer.deploy_ltm = \
-            Mock(return_value=0)
-        self.cccl._bigip_proxy.get_default_route_domain = \
             Mock(return_value=0)
 
     def read_test_vectors(self, cloud_state, network_state=None):
