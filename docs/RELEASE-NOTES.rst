@@ -1,6 +1,13 @@
 Release Notes for BIG-IP Controller for Cloud Foundry
 =====================================================
 
+next-release
+------------
+
+Bug Fixes
+`````````
+* :cccl-issue:`208` - Address compatibility for BIG-IP v13.0 Health Monitor interval and timeout.
+
 v1.1.0
 ------
 
