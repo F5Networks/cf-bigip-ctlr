@@ -6,14 +6,14 @@
         "l7Policies": [],
         "monitors": [
             {
-                "interval": 30,
+                "interval": 10,
                 "name": "default_configmap_0_tcp",
                 "send": "GET /",
                 "timeout": 20,
                 "type": "tcp"
             },
             {
-                "interval": 10,
+                "interval": 4,
                 "name": "default_configmap_1_0_http",
                 "send": "GET /",
                 "timeout": 5,

@@ -6,7 +6,7 @@
         "l7Policies": [],
         "monitors": [
             {
-                "interval": 30,
+                "interval": 10,
                 "name": "default_configmap_0_udp",
                 "send": "GET /",
                 "timeout": 20,
