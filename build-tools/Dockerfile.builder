@@ -39,8 +39,7 @@ WORKDIR $GOPATH
 
 # Controller install steps
 COPY entrypoint.builder.sh /entrypoint.sh
-COPY cf-build-requirements.txt /tmp/cf-build-requirements.txt
-COPY cf-runtime-requirements.txt /tmp/cf-runtime-requirements.txt
+COPY requirements.txt /tmp/requirements.txt
 COPY requirements.docs.txt /tmp/requirements.docs.txt
 
 RUN apk add --no-cache \
@@ -52,8 +51,7 @@ RUN apk add --no-cache \
 		rsync \
 		su-exec && \
 	pip install setuptools flake8 && \
-	pip install -r /tmp/cf-build-requirements.txt && \
-	pip install -r /tmp/cf-runtime-requirements.txt && \
+	pip install --process-dependency-links -r /tmp/requirements.txt && \
 	pip install -r /tmp/requirements.docs.txt && \
         pip install virtualenv && \
 	go get github.com/wadey/gocovmerge && \

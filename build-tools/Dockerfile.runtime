@@ -8,12 +8,12 @@ RUN mkdir -p "$APPPATH/bin" \
 WORKDIR $APPPATH
 
 COPY cf-bigip-ctlr $APPPATH/bin
-COPY python/ $APPPATH/python
-COPY cf-runtime-requirements.txt /tmp/cf-runtime-requirements.txt
+COPY requirements.txt /tmp/requirements.txt
 COPY cf-schema_v*.json $APPPATH/schema/
+COPY VERSION_BUILD.json $APPPATH/vendor/src/f5/
 
 RUN apk --no-cache --update add --virtual pip-install-deps git && \
-    pip install -r /tmp/cf-runtime-requirements.txt && \
+    pip install --process-dependency-links -r /tmp/requirements.txt && \
     apk del pip-install-deps
 
 # Run the run application in the projects bin directory.

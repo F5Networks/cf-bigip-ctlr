@@ -130,12 +130,12 @@ gather_coverage() {
 
   (
     cd $WKDIR/src/github.com/F5Networks
-    gocovmerge `find . -not -name cf-bigip-ctlr.coverprofile -and -name '*.coverprofile'` > merged-coverage.out
-    go tool cover -html=merged-coverage.out -o coverage.html
-    go tool cover -func=merged-coverage.out
+    gocovmerge `find . -not -name cf-bigip-ctlr.coverprofile -and -name '*.coverprofile'` > coverage.out
+    go tool cover -html=coverage.out -o coverage.html
+    go tool cover -func=coverage.out
     # Total coverage for CI
-    go tool cover -func=merged-coverage.out | grep "^total:" | awk 'END { print "Total coverage:", $3, "of statements" }'
-    rsync -a -f"+ */" -f"+ *.coverprofile" -f"+ coverage.html" -f"+ merged-coverage.out" -f"- *" . $BUILDDIR/coverage
+    go tool cover -func=coverage.out | grep "^total:" | awk 'END { print "Total coverage:", $3, "of statements" }'
+    rsync -a -f"+ */" -f"+ *.coverprofile" -f"+ coverage.html" -f"+ coverage.out" -f"- *" . $BUILDDIR/coverage
   )
 }
 
