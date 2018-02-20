@@ -7,6 +7,7 @@ next-release
 Bug Fixes
 `````````
 * :cccl-issue:`208` - Address compatibility for BIG-IP v13.0 Health Monitor interval and timeout.
+* :cccl-issue:`211` - Fixed memory leak in python subprocess.
 
 v1.1.0
 ------
