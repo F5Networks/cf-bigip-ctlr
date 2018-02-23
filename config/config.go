@@ -80,6 +80,9 @@ type StatusConfig struct {
 	Pass string `yaml:"pass"`
 }
 
+// DefaultTier2IPRange is the default tier2 virtual server IP range
+var DefaultTier2IPRange = "172.0.0.0/24"
+
 // BigIPConfig configuration parameters for bigip integration
 type BigIPConfig struct {
 	URL               string   `yaml:"url" json:"url"`
@@ -102,13 +105,14 @@ var defaultBigIPConfig = BigIPConfig{
 	User:              "",
 	Pass:              "",
 	Partitions:        []string{},
-	LoadBalancingMode: "round-robin",
+	LoadBalancingMode: LoadBalancingStrategies[0],
 	VerifyInterval:    30,
 	ExternalAddr:      "",
 	SSLProfiles:       []string{},
 	Policies:          []string{},
 	Profiles:          []string{},
 	DriverCmd:         "",
+	Tier2IPRange:      DefaultTier2IPRange,
 }
 
 var defaultStatusConfig = StatusConfig{
