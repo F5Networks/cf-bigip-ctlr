@@ -149,19 +149,18 @@ func main() {
 	}
 
 	var dp string
-	if 0 == len(c.BigIP.DriverCmd) {
-		folderPath, err := os.Getwd()
-		if err != nil {
-			logger.Fatal("file-get-error", zap.Error(err))
-		}
-
-		dp = fmt.Sprintf("%v/%v", folderPath, f5router.DefaultCmd)
-	} else {
+	if 0 != len(c.BigIP.DriverCmd) {
+		logger.Warn(
+			"f5-driver-config",
+			zap.String("DEPRECATED", "driver_path: option may no longer work as expected."))
 		dp = c.BigIP.DriverCmd
-	}
-	_, err = os.Stat(dp)
-	if os.IsNotExist(err) {
-		logger.Fatal("driver-file-does-not-exist", zap.Error(err))
+
+		_, err = os.Stat(dp)
+		if os.IsNotExist(err) {
+			logger.Fatal("driver-file-does-not-exist", zap.Error(err))
+		}
+	} else {
+		dp = f5router.DefaultCmd
 	}
 
 	driver := f5router.NewDriver(

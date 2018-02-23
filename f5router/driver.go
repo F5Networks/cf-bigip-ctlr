@@ -33,7 +33,7 @@ import (
 
 const (
 	// DefaultCmd default config driver
-	DefaultCmd = "python/bigipconfigdriver.py"
+	DefaultCmd = "bigipconfigdriver.py"
 )
 
 // Driver type which provides ifrit process interface
@@ -59,14 +59,23 @@ func NewDriver(
 }
 
 func (d *Driver) createDriverCmd() *exec.Cmd {
-	cmdName := "python"
+	var cmd *exec.Cmd
 
-	cmdArgs := []string{
-		d.driverCmd,
-		"--config-file", d.fname,
+	if d.driverCmd == DefaultCmd {
+		cmdArgs := []string{
+			"--config-file", d.fname,
+			"--ctlr-prefix", "cf",
+		}
+		cmd = exec.Command(d.driverCmd, cmdArgs...)
+	} else {
+		cmdName := "python"
+		cmdArgs := []string{
+			d.driverCmd,
+			"--config-file", d.fname,
+			"--ctlr-prefix", "cf",
+		}
+		cmd = exec.Command(cmdName, cmdArgs...)
 	}
-
-	cmd := exec.Command(cmdName, cmdArgs...)
 
 	return cmd
 }

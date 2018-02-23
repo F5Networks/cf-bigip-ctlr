@@ -15,7 +15,7 @@ BUILDDIR ?= $(CURDIR)/_build
 
 all: local-build
 
-test: local-go-test local-python-test
+test: local-go-test
 
 prod: prod-build
 
@@ -123,37 +123,10 @@ flatfile_attributions.json: .f5license
 pip_attributions.json: always-build
 	./build-tools/attributions-generator.sh \
 		/usr/local/bin/pip-backend.py \
-		--requirements=python/cf-runtime-requirements.txt \
+		--requirements=requirements.txt \
 		--project-path=$(CURDIR) \
 
 docs/_static/ATTRIBUTIONS.md: flatfile_attributions.json  golang_attributions.json  pip_attributions.json
 	./build-tools/attributions-generator.sh \
 		node /frontEnd/frontEnd.js $(CURDIR)
 	mv ATTRIBUTIONS.md $@
-
-#
-# Python unit tests
-#
-$(BUILDDIR)/venv.local: python/cf-build-requirements.txt  python/cf-runtime-requirements.txt
-	[ -d "$@" ] || virtualenv "$@"
-	. "$@/bin/activate" && pip install $(foreach f,$^,-r $(f))
-	touch "$@"
-
-local-python-test: $(BUILDDIR)/python.testpass
-
-ifeq ($(GOOS), darwin)
-# Python tests depend on inotify, which isn't available on mac
-$(BUILDDIR)/python.testpass:
-	@echo "SKIPPING PYTHON TESTS"
-	@echo "  Use 'make prod' to run python tests"
-	touch $@
-else
-$(BUILDDIR)/python.testpass: $(BUILDDIR)/venv.local $(shell find python -type f)
-	@mkdir -p $(@D)
-	. $(BUILDDIR)/venv.local/bin/activate \
-	  && flake8 $(CURDIR)/python/
-	. $(BUILDDIR)/venv.local/bin/activate \
-	  && cd $(CURDIR)/python \
-	  && PYTHONPATH=$$PYTHONPATH:$(CURDIR)/python pytest -slvv
-	touch $@
-endif
