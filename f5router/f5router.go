@@ -353,11 +353,10 @@ func (r *F5Router) validateConfig() error {
 		0 == len(r.c.BigIP.User) ||
 		0 == len(r.c.BigIP.Pass) ||
 		0 == len(r.c.BigIP.Partitions) ||
-		0 == len(r.c.BigIP.ExternalAddr) ||
-		0 == len(r.c.BigIP.Tier2IPRange) {
+		0 == len(r.c.BigIP.ExternalAddr) {
 		return fmt.Errorf(
 			"required parameter missing; URL, User, Pass, Partitions, ExternalAddr, "+
-				"Tier2IPRange must have value: %+v", r.c.BigIP)
+				"must have value: %+v", r.c.BigIP)
 	}
 
 	// Verify the ExternalAddr provided is a valid IP address
@@ -368,6 +367,12 @@ func (r *F5Router) validateConfig() error {
 	_, err := verifyDestAddress(va, r.c.BigIP.Partitions[0])
 	if nil != err {
 		return err
+	}
+
+	if len(r.c.BigIP.Tier2IPRange) == 0 {
+		r.c.BigIP.Tier2IPRange = config.DefaultTier2IPRange
+		r.logger.Info(
+			fmt.Sprintf("tier2_ip_range not set in config using default: %s", config.DefaultTier2IPRange))
 	}
 
 	ipAddr, ipNet, err := net.ParseCIDR(r.c.BigIP.Tier2IPRange)
