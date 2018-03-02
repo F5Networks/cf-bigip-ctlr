@@ -6,8 +6,17 @@ next-release
 
 Bug Fixes
 `````````
+
+v1.1.1
+------
+
+Bug Fixes
+`````````
 * :cccl-issue:`208` - Address compatibility for BIG-IP v13.0 Health Monitor interval and timeout.
 * :cccl-issue:`211` - Fixed memory leak in python subprocess.
+* :issues:`127` - Make tier2_ip_range parameter optional (to be backwards compatible)
+* :issues:`113` - Change behavior of controller (do not exit) on startup when encountering errors 
+* :issues:`112` - Controller should not stop updating BIG-IP configuration after an exception occurs in the python driver
 
 v1.1.0
 ------
