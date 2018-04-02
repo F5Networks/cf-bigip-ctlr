@@ -118,7 +118,7 @@ Define the parameters in the ``env`` section of the `Controller application mani
    +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------------+
    |    | external_addr [#extaddr]_           | string  | Required | n/a            | Virtual address on the BIG-IP to use for cloud ingress.                         |                      |
    +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------------+
-   |    | tier2_ip_range                      | string  | Optional | 172.0.0.0/24   | IP range to assign to the tier2 vips (required in Service Broker mode only)     | Must use CIDR        |
+   |    | tier2_ip_range                      | string  | Optional | 172.0.0.0/24   | IP range to assign to the tier2 vips (used in Service Broker mode only)     | Must use CIDR        |
    |    |                                     |         |          |                |                                                                                 | notation             |
    +----+-------------------------------------+---------+----------+----------------+---------------------------------------------------------------------------------+----------------------+
    |    | ssl_profiles                        | array   | Optional | n/a            | List of BIG-IP SSL policies to attach to the HTTPS routing virtual server.      |                      |
