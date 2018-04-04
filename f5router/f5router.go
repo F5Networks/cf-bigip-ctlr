@@ -591,7 +591,7 @@ func initPartitionData(pm bigipResources.PartitionMap, partition string) {
 }
 
 // Populates a data group from the mutexBindIDRouteURIPlanNameMap
-func populateBrokerDataGroup(brokerData mutexBindIDRouteURIPlanNameMap) map[string]*bigipResources.InternalDataGroupRecord {
+func populateBrokerDataGroup(brokerData *mutexBindIDRouteURIPlanNameMap) map[string]*bigipResources.InternalDataGroupRecord {
 	dg := make(map[string]*bigipResources.InternalDataGroupRecord)
 
 	brokerData.lock.Lock()
@@ -634,7 +634,7 @@ func (r *F5Router) createResources() bigipResources.PartitionMap {
 
 	dataGroups := make(map[string]map[string]*bigipResources.InternalDataGroupRecord)
 	if r.c.BrokerMode {
-		brokerInternalDataGroup := populateBrokerDataGroup(r.bindIDRouteURIPlanNameMap)
+		brokerInternalDataGroup := populateBrokerDataGroup(&r.bindIDRouteURIPlanNameMap)
 		dataGroups[BrokerDataGroupName] = brokerInternalDataGroup
 	}
 	dataGroups[InternalDataGroupName] = r.internalDataGroup

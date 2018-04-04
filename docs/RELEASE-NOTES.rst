@@ -10,6 +10,7 @@ Added controller name and version to the metadata of certain BIG-IP LTM resource
 
 Bug Fixes
 `````````
+* :issues:`150` - Fix go vet lock copy error
 
 v1.1.1
 ------
