@@ -11,6 +11,7 @@ Added controller name and version to the metadata of certain BIG-IP LTM resource
 Bug Fixes
 `````````
 * :issues:`150` - Fix go vet lock copy error
+* :issues:`134` - Add tier2_ip_range validation more robust to match BIG-IP input requirements.
 
 v1.1.1
 ------

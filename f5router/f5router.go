@@ -340,6 +340,48 @@ func (r *F5Router) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 	return nil
 }
 
+func validateTier2Range(s string) (net.IP, *net.IPNet, error) {
+	var bits int
+	var ones int
+	var err error
+
+	if -1 != strings.Index(s, "/") {
+		splt := strings.Split(s, "/")
+		if 2 != len(splt) {
+			return nil, nil, fmt.Errorf("invalid CIDR address - too many '/': %s", s)
+		}
+		ones, err = strconv.Atoi(splt[1])
+		if nil != err {
+			return nil, nil, err
+		}
+	} else {
+		return nil, nil, fmt.Errorf("invalid CIDR address - no '/': %s", s)
+	}
+
+	i, n, err := net.ParseCIDR(s)
+	if nil != err {
+		return nil, nil, err
+	}
+	if i.IsLoopback() {
+		return nil, nil, fmt.Errorf("loopback not allowed: %s", i)
+	}
+
+	if nil != i.To4() {
+		bits = 32 // bits in IPv4
+	} else {
+		bits = 128 // bits in IPv6
+	}
+
+	ipMask := net.CIDRMask(ones, bits)
+	ip := i.Mask(ipMask)
+
+	if false == i.Equal(ip) {
+		return nil, nil, fmt.Errorf("invalid CIDR address - must be CIDR network: %s", s)
+	}
+
+	return i, n, nil
+}
+
 func (r *F5Router) validateConfig() error {
 	if nil == r.c {
 		return errors.New("no configuration provided")
@@ -375,12 +417,9 @@ func (r *F5Router) validateConfig() error {
 			fmt.Sprintf("tier2_ip_range not set in config using default: %s", config.DefaultTier2IPRange))
 	}
 
-	ipAddr, ipNet, err := net.ParseCIDR(r.c.BigIP.Tier2IPRange)
+	ipAddr, ipNet, err := validateTier2Range(r.c.BigIP.Tier2IPRange)
 	if nil != err {
 		return err
-	}
-	if ipAddr.IsLoopback() {
-		return fmt.Errorf("Loopback not allowed: %s", ipAddr)
 	}
 
 	r.tier2VSInfo.holderIP = ipAddr
