@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 
 	"github.com/F5Networks/cf-bigip-ctlr/bigipclient"
@@ -151,6 +152,72 @@ var _ = Describe("F5Router", func() {
 			Expect(err).To(HaveOccurred())
 
 			c.BigIP.ExternalAddr = "127.0.0.1"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).NotTo(BeNil())
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		It("should process tier2 range properly", func() {
+			logger := test_util.NewTestZapLogger("router-test")
+			mw := &MockWriter{}
+			c := config.DefaultConfig()
+			client := bigipclient.DefaultClient()
+
+			c.BigIP.URL = "http://example.com"
+			c.BigIP.User = "admin"
+			c.BigIP.Pass = "pass"
+			c.BigIP.Partitions = []string{"cf"}
+			c.BigIP.ExternalAddr = "127.0.0.1"
+
+			c.BigIP.Tier2IPRange = "10.0.0.1"
+			r, err := NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("invalid CIDR address - no '/': 10.0.0.1"))
+
+			c.BigIP.Tier2IPRange = "10/0/0/1"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("invalid CIDR address - too many '/': 10/0/0/1"))
+
+			c.BigIP.Tier2IPRange = "10.0.0.1/A"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			e := err.(*strconv.NumError)
+			Expect(e.Num).To(Equal("A"))
+
+			c.BigIP.Tier2IPRange = "10/2042"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("invalid CIDR address: 10/2042"))
+
+			c.BigIP.Tier2IPRange = "10.0.0.245/30"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("invalid CIDR address - must be CIDR network: 10.0.0.245/30"))
+
+			c.BigIP.Tier2IPRange = "2001:db8:a0b:12f0::1/32"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("invalid CIDR address - must be CIDR network: 2001:db8:a0b:12f0::1/32"))
+
+			c.BigIP.Tier2IPRange = "127.0.0.244/30"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).To(BeNil())
+			Expect(err).To(HaveOccurred())
+			Expect(err).To(MatchError("loopback not allowed: 127.0.0.244"))
+
+			c.BigIP.Tier2IPRange = "10.0.0.244/30"
+			r, err = NewF5Router(logger, c, mw, client)
+			Expect(r).NotTo(BeNil())
+			Expect(err).NotTo(HaveOccurred())
+
+			c.BigIP.Tier2IPRange = "2001:db8::/32"
 			r, err = NewF5Router(logger, c, mw, client)
 			Expect(r).NotTo(BeNil())
 			Expect(err).NotTo(HaveOccurred())
