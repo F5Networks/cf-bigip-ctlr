@@ -229,8 +229,10 @@ var _ = Describe("Router Integration", func() {
 			}
 		}()
 
-		zombieApp.VerifyAppStatus(200)
-		runningApp.VerifyAppStatus(200)
+		Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
+		Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+		Consistently(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
+		Consistently(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
 		// Give enough time to register multiple times
 		time.Sleep(heartbeatInterval * 3)
@@ -248,16 +250,16 @@ var _ = Describe("Router Integration", func() {
 		// While NATS is down all routes should go down
 		Eventually(func() bool { return appUnregistered(routesUri, zombieApp) }).Should(BeTrue())
 		Eventually(func() bool { return appUnregistered(routesUri, runningApp) }).Should(BeTrue())
+		Consistently(func() bool { return appUnregistered(routesUri, zombieApp) }).Should(BeTrue())
+		Consistently(func() bool { return appUnregistered(routesUri, runningApp) }).Should(BeTrue())
 
 		natsRunner.Start()
 
 		// After NATS starts up the zombie should stay gone
 		Eventually(func() bool { return appUnregistered(routesUri, zombieApp) }).Should(BeTrue())
 		Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
-
-		uri := fmt.Sprintf("http://%s:%d/%s", "innocent.bystander.vcap.me", runningApp.Port(), "some-path")
-		_, err = http.Get(uri)
-		Expect(err).ToNot(HaveOccurred())
+		Consistently(func() bool { return appUnregistered(routesUri, zombieApp) }).Should(BeTrue())
+		Consistently(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 	})
 
 	Context("when nats server shuts down and comes back up", func() {
@@ -295,7 +297,8 @@ var _ = Describe("Router Integration", func() {
 				}
 			}()
 
-			zombieApp.VerifyAppStatus(200)
+			Eventually(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
+			Consistently(func() bool { return appRegistered(routesUri, zombieApp) }).Should(BeTrue())
 
 			natsRunner.Stop()
 
@@ -365,7 +368,8 @@ var _ = Describe("Router Integration", func() {
 				}
 			}()
 
-			runningApp.VerifyAppStatus(200)
+			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+			Consistently(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
 			// Give enough time to register multiple times
 			time.Sleep(heartbeatInterval * 3)
@@ -380,10 +384,10 @@ var _ = Describe("Router Integration", func() {
 			time.Sleep(sleepTime)
 
 			// Expect not to have pruned the routes as it fails over to next NAT server
-			runningApp.VerifyAppStatus(200)
+			Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+			Consistently(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
 			natsRunner.Start()
-
 		})
 
 		Context("when suspend_pruning_if_nats_unavailable enabled", func() {
@@ -427,7 +431,8 @@ var _ = Describe("Router Integration", func() {
 					}
 				}()
 
-				runningApp.VerifyAppStatus(200)
+				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+				Consistently(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 
 				// Give enough time to register multiple times
 				time.Sleep(heartbeatInterval * 3)
@@ -442,7 +447,8 @@ var _ = Describe("Router Integration", func() {
 				time.Sleep(sleepTime)
 
 				// Expect not to have pruned the routes after nats goes away
-				runningApp.VerifyAppStatus(200)
+				Eventually(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
+				Consistently(func() bool { return appRegistered(routesUri, runningApp) }).Should(BeTrue())
 			})
 		})
 	})
