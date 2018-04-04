@@ -6,6 +6,7 @@ next-release
 
 Bug Fixes
 `````````
+* :issues:`150` - Fix go vet lock copy error
 
 v1.1.1
 ------
