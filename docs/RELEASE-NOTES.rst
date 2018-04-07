@@ -6,7 +6,8 @@ next-release
 
 Added Functionality
 ```````````````````
-Added controller name and version to the metadata of certain BIG-IP LTM resources managed by the controller.
+* Added controller name and version to the metadata of certain BIG-IP LTM resources managed by the controller.
+* Base container image upgraded from Alpine 3.4 to Alpine 3.7.
 
 Bug Fixes
 `````````
