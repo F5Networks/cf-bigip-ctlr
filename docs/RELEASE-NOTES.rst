@@ -1,14 +1,6 @@
 Release Notes for BIG-IP Controller for Cloud Foundry
 =====================================================
 
-next-release
-------------
-
-Bug Fixes
-`````````
-* :issues:`150` - Fix go vet lock copy error
-* :issues:`134` - Add tier2_ip_range validation more robust to match BIG-IP input requirements.
-
 v1.1.1
 ------
 
