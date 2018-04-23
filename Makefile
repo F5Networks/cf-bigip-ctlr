@@ -13,6 +13,15 @@ GO_BUILD_FLAGS=-v -ldflags "-extldflags \"-static\" -X main.version=$(BUILD_VERS
 
 BUILDDIR ?= $(CURDIR)/_build
 
+# This is for builds not triggered through Travis CI
+LICENSE_STRICT ?= false
+
+# If strict license approval check is desired, pass the corresponding flag
+# to Attributions Generator on command line
+ifeq ($(LICENSE_STRICT), true)
+        LIC_FLAG=--al release
+endif
+
 all: local-build
 
 test: local-go-test
@@ -39,7 +48,6 @@ clean:
 
 info:
 	env
-
 
 ############################################################################
 # NOTE:
@@ -128,5 +136,5 @@ pip_attributions.json: always-build
 
 docs/_static/ATTRIBUTIONS.md: flatfile_attributions.json  golang_attributions.json  pip_attributions.json
 	./build-tools/attributions-generator.sh \
-		node /frontEnd/frontEnd.js --pd $(CURDIR)
+		node /frontEnd/frontEnd.js --pd $(CURDIR) $(LIC_FLAG)
 	mv ATTRIBUTIONS.md $@
