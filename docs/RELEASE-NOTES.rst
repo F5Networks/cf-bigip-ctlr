@@ -4,6 +4,12 @@ Release Notes for BIG-IP Controller for Cloud Foundry
 next-release
 ------------
 
+Bug Fixes
+`````````
+
+v1.2.0
+------
+
 Added Functionality
 ```````````````````
 * Added controller name and version to the metadata of certain BIG-IP LTM resources managed by the controller.
