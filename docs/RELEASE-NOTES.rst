@@ -1,12 +1,6 @@
 Release Notes for BIG-IP Controller for Cloud Foundry
 =====================================================
 
-next-release
-------------
-
-Bug Fixes
-`````````
-
 v1.2.0
 ------
 
