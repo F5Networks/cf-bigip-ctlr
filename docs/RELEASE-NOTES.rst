@@ -1,6 +1,13 @@
 Release Notes for BIG-IP Controller for Cloud Foundry
 =====================================================
 
+v1.2.1
+-----
+
+Bug Fixes
+`````````
+* :issues:`171` - Controller upgrades properly with new metadata field.
+
 v1.2.0
 ------
 
@@ -13,6 +20,11 @@ Bug Fixes
 `````````
 * :issues:`150` - Fix go vet lock copy error
 * :issues:`134` - Add tier2_ip_range validation more robust to match BIG-IP input requirements.
+
+Limitations
+```````````
+* If an older controller created resources, upgrading to the new version could result in a python
+  exception when adding metadata to virtuals: :issues:`171`
 
 v1.1.1
 ------
