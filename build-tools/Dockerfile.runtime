@@ -4,7 +4,7 @@ ENV APPPATH /app
 
 RUN mkdir -p "$APPPATH/bin" \
  && chmod -R 755 "$APPPATH" \
- && adduser -D ctrl
+ && adduser -D ctlr
 
 RUN pip install "pip==18.0.0"
 
@@ -19,7 +19,7 @@ RUN apk --no-cache --update add --virtual pip-install-deps git && \
     pip install --process-dependency-links -r /tmp/requirements.txt && \
     apk del pip-install-deps
 
-USER ctrl
+USER ctlr
 # Run the run application in the projects bin directory.
 EXPOSE 8080
 CMD [ "/app/bin/cf-bigip-ctlr" ]
