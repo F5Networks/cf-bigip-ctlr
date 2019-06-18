@@ -3,7 +3,10 @@ FROM python:2.7-alpine3.7
 ENV APPPATH /app
 
 RUN mkdir -p "$APPPATH/bin" \
- && chmod -R 755 "$APPPATH"
+ && chmod -R 755 "$APPPATH" \
+ && adduser -D cf
+
+RUN pip install "pip==18.0.0"
 
 WORKDIR $APPPATH
 
@@ -16,6 +19,7 @@ RUN apk --no-cache --update add --virtual pip-install-deps git && \
     pip install --process-dependency-links -r /tmp/requirements.txt && \
     apk del pip-install-deps
 
+USER cf
 # Run the run application in the projects bin directory.
 EXPOSE 8080
 CMD [ "/app/bin/cf-bigip-ctlr" ]
